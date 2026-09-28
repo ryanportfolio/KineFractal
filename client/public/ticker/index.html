@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MARKET TERMINAL v1.0</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="crt-overlay"></div>
+    <div class="terminal-container">
+        <header>
+            <div class="marquee">
+                <span class="marquee-text">Coming Soon</span>
+            </div>
+            <pre class="ascii-header">
+ __  __    __    ____  _  _  ____  ____    ____  ____  ____  __  __  __  __ _    __    __   
+(  \/  )  /__\  (  _ \( )/ )( ___)(_  _)  (_  _)( ___)(  _ \(  \/  )(  )(  ( \  /__\  (  )  
+ )    (  /(__)\  )   / )  (  )__)   )(      )(   )__)  )   / )    (  )( /    / /(__)\  )(__ 
+(_/\/\_)(__)(__)(_)\_)(_)\_)(____) (__)    (__) (____)(_)\_)(_/\/\_)(__)\_)__)(__)(__)(____)
+            </pre>
+            <div class="system-status">
+                <span>SYSTEM: <span class="status-online">ONLINE</span></span>
+                <span>CONNECTION: <span class="blink">ENCRYPTED</span></span>
+                <span>v1.0.4</span>
+            </div>
+            <div class="divider">────────────────────────────────────────────────────────────────────────────────</div>
+        </header>
+
+        <main id="ticker-grid" class="ticker-grid">
+            <div class="loading-message">INITIALIZING DATA FEED...</div>
+        </main>
+
+        <footer>
+            <div class="divider">────────────────────────────────────────────────────────────────────────────────</div>
+            <div class="footer-info">
+                <span class="blink">●</span> <span class="live-indicator">LIVE FEED</span>
+                <span class="delay-notice">[DELAY: 15MIN]</span>
+                <span id="last-updated">UPDATED: --:--:--</span>
+            </div>
+            <div class="api-notice">DATA SOURCE: ALPHA VANTAGE API</div>
+        </footer>
+    </div>
+    <script src="ticker.js"></script>
+</body>
+</html>
