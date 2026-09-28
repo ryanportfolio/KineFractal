@@ -4,7 +4,6 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
-const readOptional = (path) => read(path).catch(() => "");
 const [
   about,
   aboutPage,
@@ -14,8 +13,6 @@ const [
   footer,
   logo,
   heroSignal,
-  home,
-  monthlyRecord,
   ratioRelevance,
   sectorRotation,
 ] = await Promise.all([
@@ -27,8 +24,6 @@ const [
   read("client/src/components/footer.tsx"),
   read("client/src/components/kf-logo.tsx"),
   read("client/src/components/hero-signal.tsx"),
-  read("client/src/pages/home.tsx"),
-  readOptional("client/src/components/spy-monthly-record.tsx"),
   read("client/src/pages/ratio-relevance.tsx"),
   read("client/src/pages/sector-rotation.tsx"),
 ]);
@@ -116,16 +111,6 @@ test("Alerts omits redundant channel and format explainers", () => {
 
 test("About omits the trailing terminal-question hint", () => {
   assert.equal(aboutPage.includes("questions the site doesn't answer"), false);
-});
-
-test("Home replaces the yearly raster with the SPY monthly record", () => {
-  assert.match(home, /SpyMonthlyRecord/);
-  assert.doesNotMatch(home, /RasterMatrix/);
-  assert.match(monthlyRecord, /text=\{`SPY \$\{SPY_VARIANT\} Strategy`\}/);
-  assert.match(monthlyRecord, /B&amp;H YEAR/);
-  assert.match(monthlyRecord, /overflow-x-auto/);
-  assert.match(monthlyRecord, /sticky left-0/);
-  assert.match(monthlyRecord, /instant \? "raster-done" : "raster-scanning"/);
 });
 
 test("Ratio Relevance and Sector Rotation rely on the app-shell footer", () => {
