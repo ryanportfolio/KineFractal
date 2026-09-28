@@ -27,3 +27,9 @@ User clarification: the homepage ignition Lissajous and visuals like it are deco
 This repo was split out of range so the public site and the owner's local tools stop sharing files. `server/charts-app/charts.html` is the site's own page and is edited here. Range's `fearlab/charts.html` is the local viewer; it is not this page's source and nothing syncs between them. Only chart DATA (`/charts/dashboard/*`, `/charts/assets/*`) still comes from the engine worker.
 
 Symptom: docs and comments carried over from range (kernel, README, deployment/tech-stack/commands references, `server/fearlab-charts.ts`, a `sync:charts` script) said the page was a byte-identical copy to be edited in range and synced in. A session built a UI skill on that and routed a charts login change through a range PR; the user corrected it. Those references and the sync script were removed. If "edit range, then sync" reappears anywhere for the chart page, it is stale.
+
+### 2026-09-28: Desktop CSS zoom scales viewport units; full-screen pieces must divide by `--pz`
+
+At widths of 1440px and up, `index.css` sets `zoom: 1.2` (1.4 from 1800px) on `:root` and exposes the factor as `--pz`. CSS zoom scales `vh`/`vw` too, so a new `h-screen` sticky stage or `bottom-[9vh]` overlay renders 20 to 40% taller than the screen and its bottom captions fall off the page. The About scroll film hit this: captions and the progress bar were cut off until the heights moved to `calc(100vh / var(--pz))`.
+
+Two related traps: `canvas.clientWidth` reports unzoomed CSS px, so a WebGL canvas sized from it renders below screen resolution unless the backing store also multiplies by `--pz`; and `getBoundingClientRect()` returns zoomed px while `offsetHeight` does not, so scroll-progress math must not mix the two. Existing full-screen utilities get unlayered overrides in `index.css` (`.h-\[100svh\]` and friends); new ones need either an override there or an inline `calc(... / var(--pz))`.
