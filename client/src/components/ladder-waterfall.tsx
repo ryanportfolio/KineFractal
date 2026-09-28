@@ -1,6 +1,10 @@
 import { useBeam } from "@/hooks/use-beam";
 import { BeamHeading } from "@/components/beam-heading";
+import { DEPLOY } from "@/data/fearlab-board";
 import type { StartCohorts } from "@/data/lab-data";
+
+// Shown until the live cohorts load; the snapshot tracks cells.py, so no version literal here.
+const SPY_VARIANT = DEPLOY.find((entry) => entry.sym === "SPY")?.variant;
 
 const signedPct = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
 const signedPp = (n: number) => `${n >= 0 ? "+" : ""}${n.toFixed(1)} pp`;
@@ -19,7 +23,7 @@ export function LadderWaterfall({ cohorts }: { cohorts: StartCohorts | null | un
         <div className="etched mb-2 text-beam-dim" aria-hidden="true">03</div>
         <BeamHeading text="START ANY YEAR" as="h2" active={drawn} instant={instant} />
         <p className="etched mt-4 max-w-[88ch] leading-relaxed text-beam-dim">
-          SPY {cohorts?.preset.replace(/^fav-spy-/, "").replace(/-1d$/, "") ?? "v4.6"} · daily · contribution-free start cohorts
+          SPY {cohorts?.preset.replace(/^fav-spy-/, "").replace(/-1d$/, "") ?? SPY_VARIANT} · daily · contribution-free start cohorts
           {endDate ? ` · through EOD ${endDate}.` : "."}
           {endDate
             ? " Each row starts all cash on that year’s first available trading session and runs through that EOD date."

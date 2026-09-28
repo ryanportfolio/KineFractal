@@ -15,11 +15,10 @@ import { BeamHeading } from "@/components/beam-heading";
 import { DecodeText } from "@/components/decode-text";
 import { useBeam } from "@/hooks/use-beam";
 import { useFearState } from "@/hooks/use-fear-state";
-import { DEPLOY } from "@/data/fearlab-board";
 
-// Version label tracks the deploy (regen keeps DEPLOY in step with cells.py);
-// a SPY flip auto-updates the copy. Fallback only if the snapshot is absent.
-const SPY_VARIANT = DEPLOY.find((d) => d.sym === "SPY")?.variant ?? "v4.6";
+// Version label comes from the episode file's own preset, not the deploy: the
+// replay is a static artifact and may lag a deploy relabel until re-emitted.
+const presetVariant = (preset: string) => preset.match(/-(v[\d.]+)-/)?.[1] ?? null;
 
 type EpDay = { d: string; c: number; fear: number | null };
 type EpFill = { d: string; side: "buy" | "sell"; eng?: string; tag?: string; usd: number; pctEq: number | null; lots?: number };
@@ -278,6 +277,7 @@ export function Rulebook() {
   const drawn = phase !== "dark";
   const instant = phase === "held";
   const spyFloor = fear.funds.find((f) => f.sym === "SPY")?.floorPct ?? null;
+  const epVariant = ep ? presetVariant(ep.preset) : null;
   return (
     <section ref={ref} id="rulebook" className="px-5 md:px-10 py-24 scroll-mt-16" aria-label="The rulebook: how the engine works">
       <div className="max-w-6xl mx-auto">
@@ -287,7 +287,7 @@ export function Rulebook() {
         </div>
         <p className="etched mb-10 max-w-[72ch]">
           <DecodeText
-            text={`SPY ${SPY_VARIANT} full-history backtest, viewed during 2020. Simulated next-open fills.`}
+            text={`SPY ${epVariant ? `${epVariant} ` : ""}full-history backtest, viewed during 2020. Simulated next-open fills.`}
             active={drawn}
             instant={instant}
           />

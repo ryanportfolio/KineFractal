@@ -25,11 +25,10 @@ import { registerFearlabChartsRoutes } from "./fearlab-charts";
 import { registerAccountRoutes, requireUser } from "./account-routes";
 import { registerAlertsRoutes } from "./alerts-routes";
 import type { BoardV1, ComboV1, SignalsV1, ChartV1 } from "@shared/fearlab-contracts";
-// Static board snapshot fallback. Provenance: byte-for-byte copy of
-// client/public/fearlab/board.json (the 2026-07-01 static site snapshot that
-// client/src/data/fearlab-board.ts documents) — regenerate by re-copying that
-// file whenever the static snapshot is refreshed.
-import fearlabBoardSnapshot from "./fearlab-snapshot.json";
+// Static board snapshot fallback: the same board.json the client falls back
+// to, bundled into the server build. `npm run sync:snapshot` rewrites it, so a
+// version flip reaches this fallback without a separate copy step.
+import fearlabBoardSnapshot from "../client/public/fearlab/board.json";
 
 interface QuarterData {
   date: string;
@@ -811,8 +810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           stale: age == null ? true : age > STALE_AFTER_HOURS,
         });
       }
-      // Fallback: vendored static snapshot (see import comment). Age from its
-      // legacy local-ET stamp is meaningless for a live banner -> stale:true.
+      // Fallback: vendored static snapshot (see import comment). Its age says
+      // nothing about the live feed -> stale:true.
       res.set("Cache-Control", FEARLAB_DATA_CACHE);
       res.json({ ...(fearlabBoardSnapshot as object), live: false, age_hours: null, stale: true });
     } catch (error: any) {
