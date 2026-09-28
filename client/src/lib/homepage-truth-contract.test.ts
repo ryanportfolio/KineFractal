@@ -73,7 +73,8 @@ test("mechanism, replay and record use plain truthful labels", () => {
   assert.match(mechanism, /sr-only[^>]*>[^<]*buy line/is);
 
   assert.match(rulebook, /SPY, STEP BY STEP/);
-  assert.match(rulebook, /SPY \$\{SPY_VARIANT\} full-history backtest, viewed during 2020\. Simulated next-open fills\./);
+  assert.match(rulebook, /presetVariant\(ep\.preset\)/);
+  assert.match(rulebook, /SPY \$\{epVariant \? `\$\{epVariant\} ` : ""\}full-history backtest, viewed during 2020\. Simulated next-open fills\./);
   assert.doesNotMatch(rulebook, /SPY v4\.\d full-history backtest/);
   assert.doesNotMatch(rulebook, /actually placed|every real fill|one scary week cannot spend/i);
   assert.doesNotMatch(rulebook, /never sits idle/i);
