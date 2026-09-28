@@ -17,3 +17,7 @@ When the engine flips a deployed version, the site snapshot must follow: run `np
 ### 2026-07-12: DESIGN.md "no fabricated data as texture" is not a ban on decorative visuals
 
 User clarification: the homepage ignition Lissajous and visuals like it are decoration and are fine. The DESIGN.md rule targets fake data VALUES presented as real (invented numbers, made-up curves labeled as history), not ornamental motion.
+
+### 2026-09-28: `launchPlacedChrome()` needs Playwright, which the repo does not install
+
+`scripts/lib/launch-chrome.mjs` imports `playwright` or `playwright-core`, but neither is in `package.json`, so a fresh worktree fails with `launch-chrome needs playwright or playwright-core installed`. Run `npm i --no-save playwright-core` before a headed-browser check; it drives the system Chrome channel, so no browser download is needed. `--no-save` keeps `package.json` and the lockfile clean, and the next `npm ci` removes it.
