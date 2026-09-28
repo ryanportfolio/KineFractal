@@ -9,7 +9,7 @@ Change or review an interface on kinefractal.com so it keeps the site's evidence
 
 ## Authority
 
-Current user request > `CLAUDE.md` / `AGENTS.md` > `PRODUCT.md` (copy and evidence invariants) > the surface's own design source > this skill. When this skill disagrees with those files, they win; report the conflict.
+Current user request > `CLAUDE.md` / `AGENTS.md` > `PRODUCT.md` (copy and evidence invariants) > the surface's own design source > this skill. When this skill disagrees with those files, they win; report the conflict. When the user's request conflicts with `PRODUCT.md` or `DESIGN.md` (a new theme, a new dependency, a banned effect), name the conflict and ask before building.
 
 ## 1. Identify the surface
 

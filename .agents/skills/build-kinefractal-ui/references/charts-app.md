@@ -22,11 +22,11 @@ The non-site branches are left over from the file's shared past. Their only rema
 - `_chartAccess` from `GET /api/chart-symbols` decides which ticker buttons show. `#superBtns.await-access` hides the row until it answers.
 - `showSignupCta(heading, body)` builds the `#drawCta` modal with a `/account` link. `showDrawCta()` and `showAddCta()` call it when a signed-out visitor uses draw or "+ Add".
 - Hand lines persist through `/labels/*` per account; signed out they fall back to localStorage and save errors say "sign in at /account".
-- `/account` (React, `client/src/pages/account.tsx`) reads `?mode=signup` but has no return-to parameter today. A sign-in entry point on charts needs one: accept only same-origin relative paths (reject `//host`, schemes and backslashes) so it cannot become an open redirect, and carry the chart's ticker and timeframe.
+- `/account` (React, `client/src/pages/account.tsx`) reads `?mode=signup` but has no return-to parameter today. A sign-in entry point on charts needs one: accept only same-origin relative paths (reject `//host`, schemes and backslashes) so it cannot become an open redirect. The page restores the last ticker and view from `localStorage` (`fearlab_charts_sel` and the saved view), so returning to plain `/charts/` lands on the same chart; no URL state is needed. Sign-in does not require a verified email (`requireEmailVerification: false` in `server/auth.ts`); verification and ToS only gate alert emails.
 
-Chart writes (`/labels/save`, `/watchlist/add`) use raw `fetch` with no CSRF token, by design: the page is a shared artifact and cannot carry one. Their protection is the SameSite=Lax session cookie, a simple or preflighted request shape, server validation and the rate limiters in `server/security.ts`. A new chart write route copies that posture and gets its own limiter there; do not add `csrfProtection` to it or route it under `/api/` paths that require the token.
+The existing chart writes (`/labels/save`, `/watchlist/add`, `DELETE /api/chart-symbols/:sym`, `PUT /api/chart-symbols/order`) use raw `fetch` with no CSRF token, a leftover from when the page was shared with the local viewer. They rely on the SameSite=Lax session cookie, the request shape, server validation and rate limits in `server/security.ts` (`linesLimiter` on `/labels`, the shared `strictLimiter` on `/watchlist` and `/api/chart-symbols`); changing them is a protected-contract change. A new state-changing route the page calls should use the site's CSRF protection: fetch a token from `GET /api/csrf-token`, send it as `X-CSRF-Token`, and mount `csrfProtection` plus a rate limiter in `server/security.ts`. Better Auth's own `/api/auth/*` routes carry their own origin checks and need no token.
 
-When adding an account indicator, drive it from `siteUser` and re-render when the probe resolves; do not add a second `/api/me` call. Signed-in state should reach every consumer that currently checks `siteUser` or `_chartAccess` without a page reload where practical.
+`siteUser` keeps only a boolean. An account indicator needs the identity too: store it from the same `/api/me` response (do not add a second call) and render when that probe resolves. Show a shortened email, since charts get screen-shared. Signing out from the page is `POST /api/auth/sign-out` (same origin, JSON body `{}`), then reload; `/account` also offers it. Signed-in state should reach every consumer that currently checks `siteUser` or `_chartAccess` without a page reload where practical.
 
 ## Design system of this file
 
@@ -44,8 +44,8 @@ Its own tokens, not `DESIGN.md`'s beam ramp:
 
 The user wants the chart app modernized beyond login. Treat that as an overhaul: audit first, then a plan for approval, then build in slices, one PR per slice. Known gaps against `PRODUCT.md` / `DESIGN.md` to raise in the audit, not fix silently:
 
-- Layer toggles show internal codes (`TL`, `S+`, `SW`, `RR`, `RX`, `LV`, `GP`, `TH`, `CF`, `OB`, `tOB`, `PD`) with meaning only in `title` tooltips, which touch and keyboard users cannot reach.
-- `.kf-brand` runs `kf-glow` on an infinite 1 s loop; `DESIGN.md` limits idle motion and bans constant loops.
+- In site mode, layer toggles show internal codes (`TL`, `S+`, `SW`, `RR`, `RX`, `LV`, `GP`, `TH`, `CF`, `OB`, `tOB`, `PD`) with meaning only in `title` tooltips, which touch and keyboard users cannot reach.
+- `.kf-brand` runs `kf-glow` (keyframes come from the worker-served `kf-theme.css`) on an infinite 1 s loop; `DESIGN.md` limits idle motion and bans constant loops.
 - Fonts (Space Grotesk, Orbitron, Verdana) differ from the site's IBM Plex Mono voice. Its fonts come from the worker's published assets; a new font has to be served from this repo instead.
 - Many controls rely on `title` for their only description, and several targets are under 24 px.
 
