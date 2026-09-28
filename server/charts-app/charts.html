@@ -173,12 +173,71 @@
                   max-width:340px; box-shadow:0 8px 28px rgba(0,0,0,.6); }
   #drawCta h3 { margin:0 0 8px; font-size:15px; letter-spacing:.04em; color:var(--mine); }
   #drawCta p { margin:0 0 14px; font-size:13.5px; line-height:1.5; color:var(--fg); }
-  #drawCta .row { display:flex; gap:8px; }
-  #drawCta a.go { flex:1; text-align:center; padding:7px 10px; text-decoration:none;
-                  border:1px solid var(--mine); color:var(--mine); font-size:13px;
-                  letter-spacing:.04em; }
-  #drawCta a.go:hover { background:rgba(198,255,0,.08); }
+  #drawCta .row { display:flex; gap:8px; align-items:center; }
+  #drawCta button.go { flex:1; padding:7px 10px; border-color:var(--mine); color:var(--mine);
+                       font-size:13px; letter-spacing:.04em; }
+  #drawCta button.go:hover { background:rgba(198,255,0,.08); }
+  #drawCta a.alt { padding:7px 6px; color:var(--fg); font-size:13px; }
   #drawCta button.later { padding:7px 10px; font-size:13px; }
+  /* account control (site mode, right of EXPORT) + in-page sign-in dialog */
+  #acct { position:relative; display:inline-flex; align-items:center; }
+  #acct[hidden], #acct [hidden] { display:none !important; }
+  #topActions #signInBtn { color:#00ff88; border-color:rgba(0,255,136,.55); }
+  #topActions #signInBtn:hover { border-color:#00ff88; background:rgba(0,255,136,.08); }
+  #topActions #acctBtn { display:inline-flex; align-items:center; gap:7px; max-width:230px;
+                         font-weight:normal; letter-spacing:normal; color:var(--fg); }
+  #acctBtn .dot { flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:#00ff88;
+                  box-shadow:0 0 5px rgba(0,255,136,.6); }
+  #acctEmail { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #acctMenu { position:absolute; top:calc(100% + 6px); right:0; z-index:30; min-width:210px;
+              background:var(--panel); border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5);
+              padding:6px 0; white-space:normal; }
+  #acctMenuWho { margin:4px 12px 8px; color:var(--mut); font-size:12px; word-break:break-all; }
+  #acctMenu a, #acctMenu button { display:block; width:100%; padding:8px 12px; text-align:left;
+                                  color:var(--fg); text-decoration:none; font-size:13px; border:0;
+                                  background:none; letter-spacing:normal; font-weight:normal; }
+  #acctMenu a:hover, #acctMenu button:hover { color:#00ff88; background:rgba(0,255,136,.06); }
+  #acctMenuErr { margin:0 12px; color:var(--csell); font-size:12px; }
+  #acctMenuErr:empty { display:none; }
+  #signInDialog { display:none; position:fixed; inset:0; z-index:90; padding:20px;
+                  background:rgba(0,0,0,.72); align-items:center; justify-content:center; }
+  #signInDialog.open { display:flex; }
+  #signInDialog .box { width:min(380px,100%); background:var(--panel); border:1px solid rgba(0,255,136,.45);
+                       padding:22px; box-shadow:0 12px 38px rgba(0,0,0,.72); display:flex; flex-direction:column;
+                       max-height:calc(100vh - 40px); overflow-y:auto; overscroll-behavior:contain; }
+  #signInDialog .eyebrow { margin-bottom:8px; color:#00ff88; font:11px monospace; letter-spacing:.16em;
+                           text-transform:uppercase; }
+  #signInDialog h3 { margin:0 0 6px; color:var(--fg); font-size:18px; letter-spacing:.03em; }
+  #signInDialog .lede { margin:0 0 14px; color:var(--mut); font-size:13px; line-height:1.5; }
+  #signInDialog label { margin:8px 0 4px; color:var(--mut); font-size:12px; letter-spacing:.04em; }
+  #signInDialog input { background:var(--bg); color:var(--fg); border:1px solid var(--grid); border-radius:0;
+                        padding:8px 9px; font:14px "Space Grotesk","Segoe UI",sans-serif; }
+  #signInDialog input:focus { outline:none; border-color:#00ff88; }
+  #signInDialog .err { min-height:19px; margin:10px 0 0; color:var(--csell); font-size:13px; }
+  #signInDialog .row { display:flex; align-items:center; gap:8px; margin-top:12px; }
+  #signInDialog a.alt { margin-right:auto; color:var(--fg); font-size:13px; }
+  #signInDialog button { padding:7px 12px; font-size:13px; }
+  #signInDialog button.go { color:#00ff88; border-color:#00ff88; font-weight:bold; }
+  #signInDialog button.go:hover { background:rgba(0,255,136,.1); }
+  #signInDialog button:disabled { cursor:wait; opacity:.6; }
+  #acct button:focus-visible, #acctMenu a:focus-visible, #signInDialog a:focus-visible,
+  #signInDialog button:focus-visible, #drawCta a:focus-visible, #drawCta button:focus-visible {
+    outline:2px solid #00ff88; outline-offset:2px; }
+  @media (max-width:600px) {
+    /* the top row wraps on phones so the account control never leaves the screen */
+    #topActions { flex-wrap:wrap; justify-content:flex-end; gap:8px; min-width:0; }
+    #bar > #topActions { flex-shrink:1; }
+    #topUtil { margin-right:4px; }
+    #topActions button { padding:5px 10px; }
+    #topActions #signInBtn, #topActions #acctBtn { min-height:44px; }
+    #topActions #acctBtn { max-width:150px; }
+    #acctMenu a, #acctMenu button { min-height:44px; }
+    #signInDialog input, #signInDialog button { min-height:44px; }
+    #signInDialog { padding:10px; }
+    #drawCta .row { flex-wrap:wrap; }
+    #drawCta button.go, #drawCta a.alt, #drawCta button.later { min-height:44px; display:inline-flex;
+                                                                 align-items:center; justify-content:center; }
+  }
   /* build-ticker overlay (site "+ Add": the beam draws while the pipeline runs) */
   #buildOvl { display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.72);
               align-items:center; justify-content:center; }
@@ -459,18 +518,21 @@ var DATA = 'dashboard/';  // data-index.js, data-<key>.js, overlays-<key>.js liv
 var LIB_LOCAL = 'assets/lightweight-charts.standalone.production.js';
 var LIB_CDN = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
 
-// SITE mode: true when served over http(s) from a non-localhost host (kinefractal.com/charts/).
-// This file belongs to the site repo. The local-mode branches (file://, localhost, 127.0.0.1)
-// are left over from when it was shared with the engine repo's local viewer; today only this
-// repo's dev server on localhost reaches them.
-// Owner-only affordances (send, email_settings.html, py-command error hints, engineering legend
-// detail) are gated OFF in site mode; per-account hand-line persistence (/labels) stays on.
-var SITE = /^https?:$/.test(location.protocol) &&
-           !/^(127\.0\.0\.1|localhost)$/.test(location.hostname);
+// SITE mode: true whenever the page is served over http(s), which includes this repo's dev
+// server on localhost, so a local preview matches kinefractal.com/charts/. The non-site
+// branches (file://) are left over from when this file was shared with the engine repo's
+// local viewer. Owner-only affordances (send, email_settings.html, py-command error hints,
+// engineering legend detail) are gated OFF in site mode; per-account hand-line persistence
+// (/labels) stays on.
+var SITE = /^https?:$/.test(location.protocol);
 // SITE only: is the visitor signed in? null = unknown (probe pending/failed —
 // fail OPEN so a hiccup never blocks drawing), false = signed out (draw tool
 // shows the signup CTA), true = signed in. Probed once in applySiteMode().
 var siteUser = null;
+// SITE only: the signed-in account's email, from the same /api/me probe (null otherwise).
+var siteEmail = null;
+// "Create account" goes to /account, which sends the visitor back here afterwards.
+var SIGNUP_HREF = '/account?mode=signup&next=%2Fcharts%2F';
 
 function inject(src, ok, err) {
   var s = document.createElement('script');
@@ -1495,22 +1557,30 @@ var SITE_HIDE_LEGEND_CARDS = ['mine'];
 // site mode: strip owner-only affordances and give the page site chrome. Hand-line
 // auto-persistence (persistMine/loadMine -> /labels) is deliberately NOT gated: on the
 // site those routes are served per-account (P2), signed-out they 401 silently.
-function applySiteMode() {
+// Account probe + top-bar control (SITE only). Runs at page load, not from
+// applySiteMode(), so the control appears even when chart data fails to load.
+// /api/me answers 200 {user:null} signed out, {user:{...}} signed in; any
+// failure leaves siteUser null (fail open, control stays hidden).
+function initSiteAccount() {
   if (!SITE) return;
-  // signed-in probe for the draw-tool CTA gate. /api/me answers 200 {user:null}
-  // signed out, {user:{...}} signed in; any failure leaves siteUser null (open).
+  buildAccountControl();
+  document.addEventListener('keydown', onAccountKeydown);
   try {
     fetch('/api/me', { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j) siteUser = !!j.user; })
+      .then(function (j) {
+        if (!j) return;
+        siteUser = !!j.user;
+        siteEmail = (j.user && j.user.email) || null;
+        renderAccountControl();
+      })
       .catch(function () {});
   } catch (e) {}
-  // owner-only controls: send (explicit repo push — auto-save already covers the
-  // site). "+ Add" stays VISIBLE on the site: signed-in users get live ticker
-  // builds through the site's /watchlist/add, signed-out users get the signup CTA.
-  ['sendBtn'].forEach(function (id) {
-    var el = document.getElementById(id); if (el) el.style.display = 'none';
-  });
+}
+
+// Data-dependent site setup, run once chart data has loaded (buildDropdown).
+function applySiteMode() {
+  if (!SITE) return;
   // which tickers this visitor's button row shows (curated + their adds);
   // endpoint down -> _chartAccess stays null -> every button shows (fail open)
   try {
@@ -1521,6 +1591,18 @@ function applySiteMode() {
       })
       .catch(function () {});
   } catch (e) {}
+}
+
+// Static site chrome (SITE only), run at page load so the home link, site menu
+// and trimmed toolbar appear even when chart data fails to load.
+function applySiteChrome() {
+  if (!SITE) return;
+  // owner-only controls: send (explicit repo push — auto-save already covers the
+  // site). "+ Add" stays VISIBLE on the site: signed-in users get live ticker
+  // builds through the site's /watchlist/add, signed-out users get the signup CTA.
+  ['sendBtn'].forEach(function (id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
   // empty board-combo dropdown (cloud publishes no v2 combos -> nav is the super-symbol
   // + timeframe buttons) and the unsupported layer toggles (data key-gated, local-only)
   var cb = document.getElementById('combo'); if (cb) cb.style.display = 'none';
@@ -1545,10 +1627,11 @@ function applySiteMode() {
     home.href = '/'; home.className = 'kf-brand'; home.title = 'KineFractal — home';
     home.textContent = 'KINEFRACTAL';
     var menuBtn = document.createElement('button');
-    menuBtn.id = 'siteMenuBtn'; menuBtn.title = 'site menu'; menuBtn.innerHTML = '&#9776;';
+    menuBtn.id = 'siteMenuBtn'; menuBtn.type = 'button'; menuBtn.title = 'site menu';
+    menuBtn.setAttribute('aria-label', 'Site menu'); menuBtn.innerHTML = '&#9776;';
     var menu = document.createElement('div'); menu.id = 'siteMenu';
     [['board', '/'], ['lab', '/lab'], ['sectors', '/sector-rotation'],
-     ['about', '/about'], ['account', '/account']]
+     ['about', '/about'], ['account', '/account?next=%2Fcharts%2F']]
       .forEach(function (it) {
         var a = document.createElement('a'); a.href = it[1]; a.textContent = it[0];
         menu.appendChild(a);
@@ -1562,26 +1645,274 @@ function applySiteMode() {
 
 // signed-out signup CTA (SITE only): the draw tool and the "+ Add" ticker are
 // the site's account hooks — both persist per-account, so a signed-out visitor
-// using either gets a signup prompt. Built lazily on first use; Esc / backdrop
-// click / "not now" dismiss it.
+// using either gets a prompt. "Sign in" opens the in-page sign-in dialog;
+// "Create account" goes to /account and comes back here. Built lazily on first
+// use; Esc / backdrop click / "Not now" dismiss it and return focus.
+var _ctaReturnFocus = null;
+function closeSignupCta() {
+  var el = document.getElementById('drawCta');
+  if (!el || !el.classList.contains('open')) return;
+  el.classList.remove('open');
+  if (_ctaReturnFocus && document.body.contains(_ctaReturnFocus)) _ctaReturnFocus.focus();
+  _ctaReturnFocus = null;
+}
 function showSignupCta(heading, body) {
   var el = document.getElementById('drawCta');
   if (!el) {
     el = document.createElement('div');
     el.id = 'drawCta';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'drawCtaTitle');
     el.innerHTML =
       '<div class="box">' +
-      '<h3></h3><p></p>' +
-      '<div class="row"><a class="go" href="/account">sign in / create account</a>' +
-      '<button class="later" type="button">not now</button></div>' +
+      '<h3 id="drawCtaTitle"></h3><p></p>' +
+      '<div class="row"><button class="go" type="button">Sign in</button>' +
+      '<a class="alt" href="' + SIGNUP_HREF + '">Create account</a>' +
+      '<button class="later" type="button">Not now</button></div>' +
       '</div>';
-    el.addEventListener('click', function (e) { if (e.target === el) el.classList.remove('open'); });
-    el.querySelector('button.later').onclick = function () { el.classList.remove('open'); };
+    el.addEventListener('click', function (e) { if (e.target === el) closeSignupCta(); });
+    el.querySelector('button.later').onclick = closeSignupCta;
+    el.querySelector('button.go').onclick = function () {
+      var back = _ctaReturnFocus;
+      _ctaReturnFocus = null;
+      el.classList.remove('open');
+      openSignInDialog(back);
+    };
     document.body.appendChild(el);
   }
+  _ctaReturnFocus = document.activeElement;
   el.querySelector('h3').textContent = heading;
   el.querySelector('p').textContent = body;
   el.classList.add('open');
+  requestAnimationFrame(function () { el.querySelector('button.go').focus(); });
+}
+
+// --- account control + in-page sign-in (SITE only) ---------------------------
+// Top-bar control right of EXPORT. Hidden while the /api/me probe is pending or
+// failed (never flash a wrong state); "Sign in" when signed out; the account's
+// shortened email with a small menu (account, email alerts, sign out) when
+// signed in. Sign-in posts to Better Auth (same origin, its own origin check)
+// and reloads: the chosen ticker and view are restored from localStorage.
+var _signInReturnFocus = null;
+function shortEmail(email) {
+  var at = email.indexOf('@');
+  if (at < 0) return email.length > 18 ? email.slice(0, 17) + '…' : email;
+  var name = email.slice(0, at), host = email.slice(at);
+  if (name.length > 12) name = name.slice(0, 11) + '…';
+  if (host.length > 14) host = host.slice(0, 13) + '…';
+  return name + host;
+}
+function buildAccountControl() {
+  var actions = document.getElementById('topActions');
+  if (!actions || document.getElementById('acct')) return;
+  var wrap = document.createElement('span');
+  wrap.id = 'acct';
+  wrap.hidden = true;
+  wrap.innerHTML =
+    '<button id="signInBtn" type="button" hidden>SIGN IN</button>' +
+    '<button id="acctBtn" type="button" aria-expanded="false" aria-controls="acctMenu" hidden>' +
+      '<span class="dot" aria-hidden="true"></span><span id="acctEmail"></span></button>' +
+    '<div id="acctMenu" hidden>' +
+      '<p id="acctMenuWho"></p>' +
+      '<a href="/account?next=%2Fcharts%2F">Account</a>' +
+      '<a href="/alerts">Email alerts</a>' +
+      '<button id="signOutBtn" type="button">Sign out</button>' +
+      '<p id="acctMenuErr" role="status" aria-live="polite"></p>' +
+    '</div>';
+  actions.appendChild(wrap);
+  document.getElementById('signInBtn').onclick = function () { openSignInDialog(this); };
+  var btn = document.getElementById('acctBtn'), menu = document.getElementById('acctMenu');
+  btn.onclick = function (e) {
+    e.stopPropagation();
+    if (menu.hidden) openAccountMenu(); else closeAccountMenu(false);
+  };
+  menu.addEventListener('click', function (e) { e.stopPropagation(); });
+  document.addEventListener('click', function () { closeAccountMenu(false); });
+  document.getElementById('signOutBtn').onclick = signOut;
+  buildSignInDialog();
+}
+function renderAccountControl() {
+  var wrap = document.getElementById('acct');
+  if (!wrap || siteUser === null) return;
+  var signedIn = siteUser === true;
+  document.getElementById('signInBtn').hidden = signedIn;
+  document.getElementById('acctBtn').hidden = !signedIn;
+  if (signedIn) {
+    var email = siteEmail || 'your account';
+    document.getElementById('acctEmail').textContent = shortEmail(email);
+    document.getElementById('acctBtn').setAttribute('aria-label', 'Signed in as ' + email + '. Account menu');
+    document.getElementById('acctMenuWho').textContent = 'Signed in as ' + email;
+  }
+  wrap.hidden = false;
+}
+function openAccountMenu() {
+  var menu = document.getElementById('acctMenu');
+  menu.hidden = false;
+  document.getElementById('acctBtn').setAttribute('aria-expanded', 'true');
+  document.getElementById('acctMenuErr').textContent = '';
+  requestAnimationFrame(function () { menu.querySelector('a').focus(); });
+}
+function closeAccountMenu(refocus) {
+  var menu = document.getElementById('acctMenu');
+  if (!menu || menu.hidden) return;
+  menu.hidden = true;
+  var btn = document.getElementById('acctBtn');
+  btn.setAttribute('aria-expanded', 'false');
+  if (refocus) btn.focus();
+}
+function signOut() {
+  var b = document.getElementById('signOutBtn'), err = document.getElementById('acctMenuErr');
+  b.disabled = true; b.textContent = 'Signing out…'; err.textContent = '';
+  fetch('/api/auth/sign-out', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' }, body: '{}'
+  })
+    .then(function (r) {
+      if (!r.ok) throw new Error('sign-out failed');
+      clearLineCache();
+      location.reload();
+    })
+    .catch(function () {
+      b.disabled = false; b.textContent = 'Sign out';
+      err.textContent = 'Could not sign out. Try again.';
+    });
+}
+function buildSignInDialog() {
+  if (document.getElementById('signInDialog')) return;
+  var el = document.createElement('div');
+  el.id = 'signInDialog';
+  el.setAttribute('role', 'dialog');
+  el.setAttribute('aria-modal', 'true');
+  el.setAttribute('aria-labelledby', 'signInTitle');
+  el.setAttribute('aria-hidden', 'true');
+  el.innerHTML =
+    '<form class="box" novalidate>' +
+      '<div class="eyebrow">kinefractal account</div>' +
+      '<h3 id="signInTitle">Sign in</h3>' +
+      '<p class="lede">Your drawn lines, added tickers and ticker order follow your account to any device.</p>' +
+      '<label for="signInEmail">Email</label>' +
+      '<input id="signInEmail" name="email" type="email" autocomplete="email" required>' +
+      '<label for="signInPassword">Password</label>' +
+      '<input id="signInPassword" name="password" type="password" autocomplete="current-password" required>' +
+      '<p id="signInError" class="err" role="status" aria-live="polite"></p>' +
+      '<div class="row">' +
+        '<a class="alt" href="' + SIGNUP_HREF + '">Create account</a>' +
+        '<button id="signInCancel" type="button">Cancel</button>' +
+        '<button id="signInSubmit" class="go" type="submit">Sign in</button>' +
+      '</div>' +
+    '</form>';
+  el.addEventListener('click', function (e) { if (e.target === el) closeSignInDialog(); });
+  document.body.appendChild(el);
+  document.getElementById('signInCancel').onclick = closeSignInDialog;
+  el.querySelector('form').addEventListener('submit', function (e) { e.preventDefault(); submitSignIn(); });
+}
+function openSignInDialog(returnFocus) {
+  buildSignInDialog();
+  closeAccountMenu(false);
+  var el = document.getElementById('signInDialog');
+  _signInReturnFocus = returnFocus || document.activeElement;
+  document.getElementById('signInError').textContent = '';
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+  requestAnimationFrame(function () { document.getElementById('signInEmail').focus(); });
+}
+function closeSignInDialog() {
+  var el = document.getElementById('signInDialog');
+  if (!el || !el.classList.contains('open')) return;
+  if (document.getElementById('signInSubmit').disabled) return;   // mid-request
+  document.getElementById('signInPassword').value = '';           // never keep a typed password around
+  el.classList.remove('open');
+  el.setAttribute('aria-hidden', 'true');
+  if (_signInReturnFocus && document.body.contains(_signInReturnFocus)) _signInReturnFocus.focus();
+  _signInReturnFocus = null;
+}
+function isOpen(id) {
+  var el = document.getElementById(id);
+  return !!(el && el.classList.contains('open'));
+}
+// True while the sign-in dialog, signup prompt or an Escape on the open account
+// menu should keep a key away from the chart shortcuts.
+function accountUiOwnsKeys(e) {
+  if (isOpen('signInDialog') || isOpen('drawCta')) return true;
+  var menu = document.getElementById('acctMenu');
+  return !!(menu && !menu.hidden && e.key === 'Escape');
+}
+// Registered at page load, before the chart's own keydown listener, so
+// stopImmediatePropagation() keeps every key pressed while account UI is open
+// (including the Escape that closes it) away from the chart shortcuts.
+function onAccountKeydown(e) {
+  if (isOpen('signInDialog')) {
+    e.stopImmediatePropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeSignInDialog(); }
+    else if (e.key === 'Tab') trapSignInFocus(e);
+    return;
+  }
+  if (isOpen('drawCta')) {
+    e.stopImmediatePropagation();
+    var cta = document.getElementById('drawCta');
+    if (e.key === 'Escape') { e.preventDefault(); closeSignupCta(); }
+    else if (e.key === 'Tab') {
+      var items = cta.querySelectorAll('a[href], button');
+      var first = items[0], last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    return;
+  }
+  var menu = document.getElementById('acctMenu');
+  if (menu && !menu.hidden) {
+    e.stopImmediatePropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeAccountMenu(true); }
+  }
+}
+// Drawn lines are cached per chart in localStorage (LS_HAND) with no account
+// scope; the account keeps its own server copy. Clear the cache whenever the
+// signed-in account changes so one visitor's lines never show for another.
+// /account does the same through client/src/lib/chart-line-cache.ts.
+function clearLineCache() {
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(LS_HAND) === 0) localStorage.removeItem(k);
+    }
+  } catch (e) {}
+}
+function trapSignInFocus(event) {
+  var el = document.getElementById('signInDialog');
+  var focusable = Array.prototype.slice.call(
+    el.querySelectorAll('input, a[href], button:not(:disabled)'));
+  if (!focusable.length) return;
+  var first = focusable[0], last = focusable[focusable.length - 1];
+  // A button disabled while focused (mid-request) drops focus to <body>; pull it back in.
+  if (!el.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+function submitSignIn() {
+  var email = document.getElementById('signInEmail').value.trim();
+  var password = document.getElementById('signInPassword').value;
+  var err = document.getElementById('signInError');
+  var submit = document.getElementById('signInSubmit');
+  var cancel = document.getElementById('signInCancel');
+  if (!email || !password) { err.textContent = 'Enter your email and password.'; return; }
+  submit.disabled = true; cancel.disabled = true; submit.textContent = 'Signing in…';
+  err.textContent = '';
+  fetch('/api/auth/sign-in/email', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: email, password: password })
+  })
+    .then(function (r) {
+      if (r.ok) { clearLineCache(); location.reload(); return; }
+      throw { userMsg: r.status === 401 || r.status === 400 ? 'That email and password do not match an account.'
+                     : r.status === 429 ? 'Too many attempts. Wait a minute and try again.'
+                     : null };
+    })
+    .catch(function (e) {
+      submit.disabled = false; cancel.disabled = false; submit.textContent = 'Sign in';
+      err.textContent = (e && e.userMsg) || 'Sign-in is unavailable right now. Try again later.';
+    });
 }
 function showDrawCta() {
   showSignupCta('Draw your own lines',
@@ -2875,6 +3206,9 @@ function buildDropdown() {
   document.getElementById('soloBtn').onclick = toggleSolo;
   applySiteMode();
   document.addEventListener('keydown', function (e) {
+    // Account dialogs and menu handle their own keys (onAccountKeydown); while
+    // one is open, no key reaches the chart shortcuts below.
+    if (accountUiOwnsKeys(e)) return;
     // The remove-confirm sits ABOVE the reorder modal (it can be opened from
     // a reorder row), so it claims keys first while open.
     var removeDialog = document.getElementById('removeTickerDialog');
@@ -2908,8 +3242,6 @@ function buildDropdown() {
       if (e.key === ' ') { e.preventDefault(); tourTogglePlay(); return; }
       return;
     }
-    var _cta = document.getElementById('drawCta');                   // Esc closes the signup CTA first
-    if (e.key === 'Escape' && _cta && _cta.classList.contains('open')) { _cta.classList.remove('open'); return; }
     if (e.key === 'Escape' && measure) { clearMeasure(); return; }   // Esc clears the ruler first
     if (e.key === 't' && current && !drawMode && !onField) { startTour(); return; }
     if (e.key === 'Escape') {
@@ -4148,6 +4480,8 @@ document.addEventListener('keydown', function (ev) {
 window.addEventListener('hashchange', routeHash);
 buildLegend(); routeHash();
 
+applySiteChrome();
+initSiteAccount();
 start();
 </script>
 </body>
