@@ -11,8 +11,6 @@
     "check": "tsc",
     "check:snapshot": "node scripts/check-snapshot-sync.mjs",
     "db:push": "drizzle-kit push",
-    "sync:charts": "node scripts/sync-charts.mjs",
-    "check:charts": "node scripts/sync-charts.mjs --check",
     "sync:snapshot": "node scripts/sync-snapshot.mjs",
     "test": "tsx --test \"client/src/**/*.test.{ts,tsx}\" \"shared/*.test.ts\" \"server/*.test.{ts,mjs}\" \"scripts/*.test.mjs\""
   },

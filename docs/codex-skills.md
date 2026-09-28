@@ -134,6 +134,7 @@ real project. It proves selective file adoption and preserved customization, not
 | babysit-ci | claude, codex | native | No additional gate | authorization | None |
 | brainstorming | claude, codex | native | No additional gate | proportion | None |
 | bro | claude, codex | native | No additional gate | style | None |
+| build-kinefractal-ui | claude, codex | native | No additional gate | evidence, scope | None |
 | caveman | claude, codex | native | No additional gate | style | None |
 | claude-review | claude, codex | native | subscription-routed-claude-cli | evidence | Cross-vendor only when the author runtime uses a different vendor; subscription routing is proved locally. |
 | codex-fullreview | claude | none | authenticated-codex-cli | independence, evidence | Claude launcher for a full multi-agent Codex review; from Codex use $impartial-review directly. |

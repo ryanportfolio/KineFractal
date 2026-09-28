@@ -24,9 +24,6 @@ Without the Railway environment variables the site still runs: engine data route
 
 Merging to `main` deploys the `web` service. Build and data flow: `.claude/reference/deployment.md`.
 
-Two files are copies of engine output and are refreshed from the range repo, not edited here:
+The FearLab snapshot (`client/public/fearlab/`, `client/src/data/fearlab-snapshot.generated.json`) is a copy of engine output. Refresh it with `npm run sync:snapshot`, which needs the GitHub CLI logged in with access to `ryanportfolio/range`.
 
-- `server/charts-app/charts.html`: `npm run sync:charts`
-- the FearLab snapshot (`client/public/fearlab/`, `client/src/data/fearlab-snapshot.generated.json`): `npm run sync:snapshot`
-
-Both need the GitHub CLI logged in with access to `ryanportfolio/range`.
+The `/charts/` page, `server/charts-app/charts.html`, belongs to this repo and is edited here.

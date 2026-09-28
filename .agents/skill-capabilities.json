@@ -218,6 +218,33 @@
       "resources": [],
       "exceptions": []
     },
+    "build-kinefractal-ui": {
+      "coverage": [
+        "claude",
+        "codex"
+      ],
+      "owners": {
+        "claude": "source",
+        "codex": "native"
+      },
+      "entrypoints": [
+        "build-kinefractal-ui"
+      ],
+      "requiredTools": [],
+      "sharedContracts": [
+        "evidence",
+        "scope"
+      ],
+      "resources": [
+        ".agents/skills/build-kinefractal-ui/NOTICE.md",
+        ".agents/skills/build-kinefractal-ui/references/charts-app.md",
+        ".agents/skills/build-kinefractal-ui/references/site-react.md",
+        ".claude/skills/build-kinefractal-ui/NOTICE.md",
+        ".claude/skills/build-kinefractal-ui/references/charts-app.md",
+        ".claude/skills/build-kinefractal-ui/references/site-react.md"
+      ],
+      "exceptions": []
+    },
     "caveman": {
       "coverage": [
         "claude",

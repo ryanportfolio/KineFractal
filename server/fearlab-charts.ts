@@ -1,11 +1,13 @@
-// FearLab charts-app proxy.
+// /charts/ page and its data proxy.
 //
-// Serves the owner's LOCAL fearlab/charts.html (183KB self-contained
-// lightweight-charts app) at /charts, byte-identical — the file is published
-// nightly by the Railway worker (range repo, worker/eod.py) under the staged
-// run's `charts-app/` prefix and rides the latest.json pointer:
+// The page DOCUMENT is this site's own chart app, server/charts-app/charts.html,
+// edited in this repo and shipped with the image (Dockerfile COPY
+// server/charts-app). It started as a copy of the engine repo's local chart
+// viewer; the two are now separate files and this one is not synced from range.
 //
-//   <env-prefix>/runs/<td>/charts-app/charts.html
+// Chart DATA still comes from the engine: the nightly Railway worker publishes
+// it under the staged run's `charts-app/` prefix and the latest.json pointer:
+//
 //   <env-prefix>/runs/<td>/charts-app/assets/lightweight-charts.standalone.production.js
 //   <env-prefix>/runs/<td>/charts-app/assets/kf-theme.css
 //   <env-prefix>/runs/<td>/charts-app/assets/fonts/{jetbrainsmono,spacegrotesk,orbitron}.woff2
@@ -14,21 +16,9 @@
 //   <env-prefix>/runs/<td>/charts-app/dashboard/data-<key>.js
 //   <env-prefix>/runs/<td>/charts-app/dashboard/overlays-<key>.js
 //
-// The layout mirrors the file's own RELATIVE references ("dashboard/...",
-// "assets/...") so charts.html is NEVER edited — it stays the single source
-// shared by local + site. The page must therefore be served at the
-// trailing-slash path /charts/ (GET /charts 301s there) so its relative URLs
-// resolve to /charts/dashboard/* and /charts/assets/*.
-//
-// UI FAST LANE (the DOCUMENT only): the worker publish is nightly + prod-gated,
-// so a pure charts.html UI tweak would otherwise wait for a data-pipeline run.
-// To decouple UI from data, the /charts DOCUMENT is served from a copy bundled
-// with THIS service (server/charts-app/charts.html), which the pre-commit hook
-// keeps byte-identical to fearlab/charts.html — so it ships on merge to main and
-// goes live in minutes, no prod promote / no worker run. If that local file is
-// missing (unbundled build) the route FALLS BACK to the store copy, i.e. exactly
-// the prior behavior. Everything ELSE (dashboard/*, assets/*, fonts) still proxies
-// the nightly worker store, so the real DATA stays release-gated on prod.
+// The page loads those through RELATIVE paths ("dashboard/...", "assets/..."),
+// so it is served at the trailing-slash path /charts/ (GET /charts 301s there)
+// and the relative URLs resolve to /charts/dashboard/* and /charts/assets/*.
 //
 // Graceful degradations on the site (charts.html handles all of these
 // client-side already; the /labels + /watchlist stubs below only make sure
@@ -42,7 +32,7 @@
 //   - "+ Add" ticker: signed-in users get live per-account ticker builds
 //     (chart_symbols/symbol_requests tables + the chart-builder service —
 //     see registerChartSymbolRoutes); signed-out users get a signup CTA;
-//   - the "email" button is a local-only feature;
+//   - the "email" button opens the site's /alerts page;
 //   - darkpool/gex/uoa layers are absent from cloud overlays (null-guarded).
 //
 // Failure model matches the /api/fearlab/* routes: bucket env unset or
@@ -64,24 +54,23 @@ import {
 
 const CHARTS_CACHE = "public, max-age=300"; // worker publishes 1x/night;
 // charts.html additionally cache-busts its dashboard/* loads with ?v=Date.now()
-// The bundled HTML is the UI fast lane and must revalidate on every navigation;
+// The page document ships with each deploy and must revalidate on every navigation;
 // otherwise a just-deployed interaction fix can remain stale in an open browser.
 const CHARTS_DOCUMENT_CACHE = "no-cache";
 
-// The DOCUMENT bundled with this service (Dockerfile COPY server/charts-app),
-// kept byte-identical to fearlab/charts.html by the pre-commit hook. cwd is the
-// service root in both dev (`npm run dev` from web/) and prod (WORKDIR /app),
-// so this resolves to <root>/server/charts-app/charts.html either way.
+// The page document bundled with this service (Dockerfile COPY server/charts-app).
+// cwd is the service root in both dev and prod (WORKDIR /app), so this resolves
+// to <root>/server/charts-app/charts.html either way.
 const LOCAL_CHARTS_HTML_PATH = path.resolve(process.cwd(), "server/charts-app/charts.html");
 // Read once, then serve from memory. `undefined` = not yet read; `null` = read
-// failed (unbundled build) -> the route falls back to the nightly store copy.
+// failed (file missing from the build) -> the route answers 503.
 let localChartsHtml: string | null | undefined;
 async function readLocalChartsHtml(): Promise<string | null> {
   if (localChartsHtml !== undefined) return localChartsHtml;
   try {
     localChartsHtml = await readFile(LOCAL_CHARTS_HTML_PATH, "utf8");
   } catch {
-    localChartsHtml = null; // absent -> fall back to the store (prior behavior)
+    localChartsHtml = null; // absent -> 503
   }
   return localChartsHtml;
 }
@@ -184,21 +173,16 @@ export function registerFearlabChartsRoutes(app: Express): void {
       if (!req.path.endsWith("/")) {
         return res.redirect(301, "/charts/");
       }
-      // UI fast lane: serve the DOCUMENT bundled with this service (ships on merge
-      // to main); fall back to the nightly store copy if it isn't bundled.
       const local = await readLocalChartsHtml();
-      if (local != null) {
-        res.set("Content-Type", "text/html; charset=utf-8");
-        res.set("Cache-Control", CHARTS_DOCUMENT_CACHE);
-        // Override the helmet CSP for this inline-script page (see CHARTS_CSP).
-        res.set("Content-Security-Policy", CHARTS_CSP);
-        res.send(local);
+      if (local == null) {
+        res.status(503).json({ error: "charts unavailable" });
         return;
       }
-      await serveChartsObject(res, "charts.html", "text/html; charset=utf-8", {
-        // Override the helmet CSP for this inline-script page (see CHARTS_CSP).
-        "Content-Security-Policy": CHARTS_CSP,
-      });
+      res.set("Content-Type", "text/html; charset=utf-8");
+      res.set("Cache-Control", CHARTS_DOCUMENT_CACHE);
+      // Override the helmet CSP for this inline-script page (see CHARTS_CSP).
+      res.set("Content-Security-Policy", CHARTS_CSP);
+      res.send(local);
     } catch (error: any) {
       console.error("[FearLab charts] page route error:", error?.message ?? error);
       res.status(500).json({ error: "Failed to load charts" });
@@ -253,38 +237,28 @@ export function registerFearlabChartsRoutes(app: Express): void {
 
   // --- per-account hand-drawn lines ---------------------------------------
   // charts.html persists its "mine" layer via same-origin POST /labels/save +
-  // GET /labels/hand-lines-<key>.json — the exact protocol of the owner's
-  // LOCAL label server (py fearlab/label_server.py). Implementing that
-  // protocol here, scoped to the Better Auth session user, gives signed-in
-  // site users per-account lines with ZERO charts.html edits (the file stays
-  // the single byte-verbatim source shared by local + site):
+  // GET /labels/hand-lines-<key>.json (a protocol inherited from the engine
+  // repo's local label server), scoped here to the Better Auth session user:
   //   - signed out: GET 404 / POST 401 -> the page silently falls back to its
-  //     browser-localStorage copy, exactly today's behavior;
+  //     browser-localStorage copy;
   //   - signed in: lines round-trip through chart_lines keyed
-  //     (user_id, chart_key) -> they follow the account across devices. The
-  //     owner's LOCAL lines never reach the site: local charts.html targets
-  //     127.0.0.1:8777, and nothing uploads localStorage to these routes
-  //     unless drawn while signed in on the site itself.
-  // CSRF posture: charts.html can't carry a CSRF token (shared artifact,
-  // never edited), so /labels/save is exempt from csrfProtection. The POST is
+  //     (user_id, chart_key) -> they follow the account across devices.
+  // CSRF posture: the page sends no CSRF token on this call, so /labels/save
+  // is exempt from csrfProtection. The POST is
   // a text/plain "simple request" and Better Auth's session cookie is
   // SameSite=Lax, so a cross-site page can't send it — and the payload is the
   // user's own cosmetic line list, validated + size-capped below.
   registerHandLinesRoutes(app);
 
   // --- per-account chart tickers -----------------------------------------
-  // charts.html's "+ Add" posts {sym} to /watchlist/add — the exact protocol
-  // of the owner's LOCAL label server (label_server.py -> add_ticker.py).
-  // Implementing it here gives signed-in site users live ticker adds with
-  // ZERO charts.html forks: validate + record in the DB, ask the always-on
-  // chart-builder service (range repo, worker/chart_builder.py) to build the
-  // symbol's full MTF super into the CURRENT published run, and return the
-  // same {ok, entry} shape the local server returns. The nightly worker
+  // charts.html's "+ Add" posts {sym} to /watchlist/add. For signed-in users
+  // this validates + records in the DB, asks the always-on chart-builder
+  // service (range repo, worker/chart_builder.py) to build the symbol's full
+  // MTF super into the CURRENT published run, and returns {ok, entry}. The nightly worker
   // unions symbol_requests(pending|built) into its chart build, so a live
   // build that dies (or a missing builder) degrades to next-morning
   // availability, never a lost request.
-  // CSRF posture: same as /labels/save — charts.html is a shared artifact
-  // that can't carry a token. The POST is application/json (cross-site
+  // CSRF posture: same as /labels/save — the page sends no token. The POST is application/json (cross-site
   // browsers preflight it and there are no CORS headers) and the Better Auth
   // cookie is SameSite=Lax, so cross-site forgery can't reach it.
   registerChartSymbolRoutes(app);

@@ -1,8 +1,7 @@
 // Read a file from the FearLab engine repo (ryanportfolio/range) on GitHub.
 //
-// The site and the engine live in separate repos. A few site files are copies
-// of, or are checked against, engine files (fearlab/charts.html,
-// fearlab/bridge/cells.py). This helper fetches the engine's copy through the
+// The site and the engine live in separate repos. The FearLab snapshot scripts
+// read or check against engine files (fearlab/bridge/cells.py). This helper fetches the engine's copy through the
 // GitHub CLI, so it works on any machine where `gh auth status` passes, with
 // no local range checkout.
 //

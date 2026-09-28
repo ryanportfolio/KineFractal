@@ -959,10 +959,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // FearLab charts-app: serves the owner's charts.html + its data sidecars
-  // straight from the bucket's charts-app/ run prefix at /charts (see
-  // server/fearlab-charts.ts for layout, CSP override, and local-label-server
-  // stub behavior).
+  // /charts/: the page document is this repo's server/charts-app/charts.html;
+  // its data sidecars proxy the bucket's charts-app/ run prefix (see
+  // server/fearlab-charts.ts for layout, CSP override, and per-account routes).
   registerFearlabChartsRoutes(app);
   registerAccountRoutes(app);
   registerAlertsRoutes(app);

@@ -225,15 +225,15 @@ export function setupSecurity(app: Express) {
   app.use('/api/watchlist', strictLimiter, csrfProtection);
   app.use('/api/alerts/prefs', alertPrefsLimiter, csrfProtection);
 
-  // charts.html hand-lines sync. NO csrfProtection by design: the page is a
-  // shared byte-verbatim artifact that can't carry a token; the POST is a
+  // charts.html hand-lines sync. NO csrfProtection: the page sends no token
+  // on this call; the POST is a
   // text/plain simple request, the session cookie is SameSite=Lax (cross-site
   // POSTs don't send it), and the payload is the user's own line list
   // (validated + size-capped in fearlab-charts.ts).
   app.use('/labels', linesLimiter);
 
   // charts.html "+ Add" ticker (site build path). Same no-CSRF posture as
-  // /labels (shared artifact, no token; JSON POST preflights cross-site and
+  // /labels (no token; JSON POST preflights cross-site and
   // the session cookie is SameSite=Lax) — but builds are expensive, so the
   // strict limiter applies.
   app.use('/watchlist', strictLimiter);

@@ -21,3 +21,9 @@ User clarification: the homepage ignition Lissajous and visuals like it are deco
 ### 2026-09-28: `launchPlacedChrome()` needs Playwright, which the repo does not install
 
 `scripts/lib/launch-chrome.mjs` imports `playwright` or `playwright-core`, but neither is in `package.json`, so a fresh worktree fails with `launch-chrome needs playwright or playwright-core installed`. Run `npm i --no-save playwright-core` before a headed-browser check; it drives the system Chrome channel, so no browser download is needed. `--no-save` keeps `package.json` and the lockfile clean, and the next `npm ci` removes it.
+
+### 2026-09-28: `/charts/` belongs to this repo; range's chart file is a separate local tool
+
+This repo was split out of range so the public site and the owner's local tools stop sharing files. `server/charts-app/charts.html` is the site's own page and is edited here. Range's `fearlab/charts.html` is the local viewer; it is not this page's source and nothing syncs between them. Only chart DATA (`/charts/dashboard/*`, `/charts/assets/*`) still comes from the engine worker.
+
+Symptom: docs and comments carried over from range (kernel, README, deployment/tech-stack/commands references, `server/fearlab-charts.ts`, a `sync:charts` script) said the page was a byte-identical copy to be edited in range and synced in. A session built a UI skill on that and routed a charts login change through a range PR; the user corrected it. Those references and the sync script were removed. If "edit range, then sync" reappears anywhere for the chart page, it is stale.

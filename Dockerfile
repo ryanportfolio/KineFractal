@@ -18,9 +18,8 @@ RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
 COPY server/python ./server/python
 # charts-app/charts.html: the /charts UI document, served from this image
-# (fearlab-charts.ts reads it via process.cwd()). Pulled from the range repo's
-# fearlab/charts.html with `npm run sync:charts`. Chart data still proxies the
-# nightly worker store.
+# (fearlab-charts.ts reads it via process.cwd()). Edited in this repo; chart
+# data still proxies the nightly worker store.
 COPY server/charts-app ./server/charts-app
 COPY client/public ./client/public
 RUN useradd -m app && chown -R app /app

@@ -5,5 +5,5 @@
 # to CRLF produces a whole-file diff for everyone with core.autocrlf off.
 *.yml text eol=lf
 
-# Byte-identical copy of range fearlab/charts.html (npm run sync:charts / check:charts).
+# The /charts/ page: kept LF so edits never produce a whole-file diff.
 server/charts-app/charts.html text eol=lf

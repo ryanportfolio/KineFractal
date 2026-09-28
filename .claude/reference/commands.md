@@ -11,7 +11,6 @@
 | `npm start` | Run the built server (`dist/index.js`, `NODE_ENV=production`). |
 | `npm run dev` | Express + Vite dev server. The script sets `NODE_ENV` with POSIX syntax, which fails under Windows cmd; on Windows run `npx tsx server/index-dev.ts` or use `.claude/launch.json`. |
 | `npm run db:push` | drizzle-kit schema push. Hand to the user; never run blind against the shared database. |
-| `npm run sync:charts` | Copy range's `fearlab/charts.html` → `server/charts-app/charts.html` (needs `gh` logged in). `-- --check` or `npm run check:charts` only reports drift. |
 | `npm run sync:snapshot` | Fetch range's `cells.py`, then run `scripts/regen_fearlab_snapshot.py` to rewrite the static FearLab snapshot from the live API. Needs `gh` and Python 3. |
 | `npm run check:snapshot` | Exit 1 if the snapshot's deploy versions differ from range's `cells.py`. |
 | `py -m unittest scripts/test_regen_fearlab_snapshot.py` | Tests for the snapshot regen script. |
