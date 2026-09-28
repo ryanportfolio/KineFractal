@@ -35,7 +35,7 @@ const CONTROL_HELP = {
   confluence: "Adds an extra buy-limit zone when an unfilled gap and a fresh bullish order block sit close together below price",
   confluenceDistance: "Maximum percentage separation allowed between the unfilled gap and fresh bullish order block",
   tripleDistance: "Maximum spread among an unfilled gap, fresh bullish order block, and S/R level; their midpoint becomes the major level",
-  dedupDays: "Suppresses a symbol and level already emailed to you within this many days; it returns to your inbox once the window passes. Set zero to send the standing plan every run",
+  dedupDays: "Suppresses a symbol and level already emailed to you within this many days, then lets it back into your inbox once the window passes; set zero to send the standing plan every run",
   dedupTolerance: "Two levels within this percentage of each other count as the same setup; a level that moves more than this is treated as new and sends again",
 } as const;
 

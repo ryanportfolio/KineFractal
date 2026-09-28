@@ -67,9 +67,10 @@ test("logo glow filter uses generous user-space bounds", () => {
   assert.match(filter, /x="-20" y="-20" width="140" height="140"/);
 });
 
-test("Home replays logo motion for returning sessions unless reduced motion is requested", () => {
-  assert.match(heroSignal, /<KfLogo animate=\{!reduce\} revealFx \/>/);
-  assert.doesNotMatch(heroSignal, /<KfLogo animate=\{!instant\}/);
+test("Home replays logo motion for every session, returning or not", () => {
+  // DESIGN.md: never branch on prefers-reduced-motion (owner call, 2026-08-02).
+  assert.match(heroSignal, /<KfLogo animate revealFx \/>/);
+  assert.doesNotMatch(heroSignal, /<KfLogo animate=\{/);
 });
 
 test("About and Alerts rely on the single app-shell footer", () => {
@@ -120,7 +121,7 @@ test("About omits the trailing terminal-question hint", () => {
 test("Home replaces the yearly raster with the SPY monthly record", () => {
   assert.match(home, /SpyMonthlyRecord/);
   assert.doesNotMatch(home, /RasterMatrix/);
-  assert.match(monthlyRecord, /EVERY MONTH/);
+  assert.match(monthlyRecord, /text=\{`SPY \$\{SPY_VARIANT\} Strategy`\}/);
   assert.match(monthlyRecord, /B&amp;H YEAR/);
   assert.match(monthlyRecord, /overflow-x-auto/);
   assert.match(monthlyRecord, /sticky left-0/);
