@@ -10,6 +10,7 @@ import { ShieldCheck, MailCheck, MailWarning, LogOut, FileCheck2, ListChecks, Be
 import { useSession, signIn, signUp, signOut, authClient, csrfFetch } from "@/lib/auth-client";
 import { TOS_VERSION, TOS_POINTS } from "@shared/tos";
 import { safeNext, nextLabel } from "@/lib/safe-next";
+import { clearChartLineCache } from "@/lib/chart-line-cache";
 
 // Where to send the visitor after signing in (?next=, same-origin paths only).
 function readNext(): string | null {
@@ -41,10 +42,12 @@ function AuthForms() {
       if (mode === "signup") {
         const r = await signUp.email({ email, password, name: email.split("@")[0] });
         if (r.error) throw new Error(r.error.message || "sign up failed");
+        clearChartLineCache();
         setNotice("Account created. Check your inbox for a verification link.");
       } else {
         const r = await signIn.email({ email, password });
         if (r.error) throw new Error(r.error.message || "sign in failed");
+        clearChartLineCache();
         const next = readNext();
         if (next) window.location.assign(next);
       }
@@ -381,7 +384,10 @@ export default function Account() {
                   </button>
                 )}
                 <button
-                  onClick={() => signOut()}
+                  onClick={async () => {
+                    const r = await signOut();
+                    if (!r?.error) clearChartLineCache();
+                  }}
                   className="flex items-center gap-1.5 text-xs font-mono border border-border rounded px-3 py-1.5 hover:border-primary/60"
                 >
                   <LogOut className="w-3.5 h-3.5" /> sign out

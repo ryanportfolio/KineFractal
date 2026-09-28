@@ -19,7 +19,7 @@ test("the account control renders only after the /api/me probe answers", () => {
 
 test("sign-in happens in the page against Better Auth and returns to the same chart", () => {
   assert.match(html, /fetch\('\/api\/auth\/sign-in\/email'/);
-  assert.match(html, /if \(r\.ok\) \{ location\.reload\(\); return; \}/);
+  assert.match(html, /if \(r\.ok\) \{ clearLineCache\(\); location\.reload\(\); return; \}/);
   assert.match(html, /fetch\('\/api\/auth\/sign-out'/);
   assert.match(html, /var SIGNUP_HREF = '\/account\?mode=signup&next=%2Fcharts%2F';/);
 });
@@ -52,8 +52,12 @@ test("account UI swallows its keys and never keeps a typed password", () => {
   assert.match(html, /document\.getElementById\('signInPassword'\)\.value = '';/);
 });
 
-test("sign-out drops cached drawn lines and every chart entry to /account returns to the chart", () => {
+test("sign-in and sign-out drop cached drawn lines and every chart entry to /account returns to the chart", () => {
   assert.match(html, /if \(k && k\.indexOf\(LS_HAND\) === 0\) localStorage\.removeItem\(k\);/);
+  assert.match(html, /clearLineCache\(\);\s*location\.reload\(\);\s*\}\)/);
+  assert.match(html, /<a href="\/account\?next=%2Fcharts%2F">Account<\/a>/);
+  assert.doesNotMatch(html, /id="acctBtn"[^>]*aria-haspopup/);
+  assert.match(html, /if \(!el\.contains\(document\.activeElement\)\) \{ event\.preventDefault\(\);/);
   assert.match(html, /\['account', '\/account\?next=%2Fcharts%2F'\]/);
   assert.match(html, /#signInDialog \.box \{[^}]*max-height:calc\(100vh - 40px\); overflow-y:auto;/);
 });

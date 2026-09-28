@@ -1711,11 +1711,11 @@ function buildAccountControl() {
   wrap.hidden = true;
   wrap.innerHTML =
     '<button id="signInBtn" type="button" hidden>SIGN IN</button>' +
-    '<button id="acctBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="acctMenu" hidden>' +
+    '<button id="acctBtn" type="button" aria-expanded="false" aria-controls="acctMenu" hidden>' +
       '<span class="dot" aria-hidden="true"></span><span id="acctEmail"></span></button>' +
     '<div id="acctMenu" hidden>' +
       '<p id="acctMenuWho"></p>' +
-      '<a href="/account">Account</a>' +
+      '<a href="/account?next=%2Fcharts%2F">Account</a>' +
       '<a href="/alerts">Email alerts</a>' +
       '<button id="signOutBtn" type="button">Sign out</button>' +
       '<p id="acctMenuErr" role="status" aria-live="polite"></p>' +
@@ -1770,14 +1770,7 @@ function signOut() {
   })
     .then(function (r) {
       if (!r.ok) throw new Error('sign-out failed');
-      // Drawn lines are cached per chart in localStorage; the account keeps its
-      // own copy, so drop the cache or the next visitor on this browser sees them.
-      try {
-        for (var i = localStorage.length - 1; i >= 0; i--) {
-          var k = localStorage.key(i);
-          if (k && k.indexOf(LS_HAND) === 0) localStorage.removeItem(k);
-        }
-      } catch (e) {}
+      clearLineCache();
       location.reload();
     })
     .catch(function () {
@@ -1873,12 +1866,26 @@ function onAccountKeydown(e) {
     if (e.key === 'Escape') { e.preventDefault(); closeAccountMenu(true); }
   }
 }
+// Drawn lines are cached per chart in localStorage (LS_HAND) with no account
+// scope; the account keeps its own server copy. Clear the cache whenever the
+// signed-in account changes so one visitor's lines never show for another.
+// /account does the same through client/src/lib/chart-line-cache.ts.
+function clearLineCache() {
+  try {
+    for (var i = localStorage.length - 1; i >= 0; i--) {
+      var k = localStorage.key(i);
+      if (k && k.indexOf(LS_HAND) === 0) localStorage.removeItem(k);
+    }
+  } catch (e) {}
+}
 function trapSignInFocus(event) {
   var el = document.getElementById('signInDialog');
   var focusable = Array.prototype.slice.call(
     el.querySelectorAll('input, a[href], button:not(:disabled)'));
   if (!focusable.length) return;
   var first = focusable[0], last = focusable[focusable.length - 1];
+  // A button disabled while focused (mid-request) drops focus to <body>; pull it back in.
+  if (!el.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
   if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 }
@@ -1897,7 +1904,7 @@ function submitSignIn() {
     body: JSON.stringify({ email: email, password: password })
   })
     .then(function (r) {
-      if (r.ok) { location.reload(); return; }
+      if (r.ok) { clearLineCache(); location.reload(); return; }
       throw { userMsg: r.status === 401 || r.status === 400 ? 'That email and password do not match an account.'
                      : r.status === 429 ? 'Too many attempts. Wait a minute and try again.'
                      : null };
