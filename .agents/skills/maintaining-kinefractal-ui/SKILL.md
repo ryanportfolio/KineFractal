@@ -17,7 +17,7 @@ For Kine Fractal production UI, this repository-specific skill supersedes generi
 
 Follow current instructions first, then read the sources relevant to the surface:
 
-1. `AGENTS.md`, `CLAUDE.md`, and the `.claude/reference/` files they route to
+1. `AGENTS.md`, the three `CLAUDE.md` sections it names, and `.claude/reference/`
 2. `PRODUCT.md` and `DESIGN.md`
 3. `client/src/index.css`
 4. The real route, components, primitives, tests, and data contracts
@@ -37,7 +37,7 @@ Production target = Railway `kinefractal.com`. Local presentation may stay basic
 
 Read [references/build.md](references/build.md) for implementation or [references/audit.md](references/audit.md) for review. Read both only when the request genuinely includes both.
 
-A brief is not palette/font exploration or multi-concept ceremony. It records the user task, evidence question, canonical data source, placement, affected states, and interaction/motion budget. The seven homepage movements in `PRODUCT.md`/`DESIGN.md` remain fixed unless the user explicitly requests a structural change; reconcile those documents when an approved change alters them.
+A brief is not palette/font exploration or multi-concept ceremony. It records the user task, evidence question, canonical data source, placement, affected states, and interaction/motion budget. The six homepage movements in `PRODUCT.md`/`DESIGN.md` remain fixed unless the user explicitly requests a structural change; reconcile those documents when an approved change alters them.
 
 ## Always-on laws
 

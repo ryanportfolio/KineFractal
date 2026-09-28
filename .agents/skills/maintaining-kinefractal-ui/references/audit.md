@@ -39,7 +39,6 @@ Check first because a polished false claim is the worst outcome.
 - WCAG 2.2 AA contrast, non-color cues, 24×24 CSS px minimum target size with documented exceptions.
 - 200% zoom and 320 CSS px reflow.
 - Drag/reorder/pan functions have non-drag alternatives where required.
-- Reduced motion produces stable, meaningful final states.
 
 ### D. Responsive and interaction behavior
 
@@ -63,7 +62,7 @@ Identity review asks “does this strengthen the shipped system?” It does not 
 
 - One active beam only; no concurrent canvases, raster scans, or ambient loops.
 - Off-screen and hidden-document work pauses; one-shot entrances release the beam.
-- Reduced-motion path settles without broken state.
+- No `prefers-reduced-motion` branch: every visitor gets the same motion path (`DESIGN.md`), and it settles without broken state.
 - No layout-property animation or unbounded blur/filter/shadow/WebGL cost.
 - DPR caps, context-loss fallback, quality degradation, and theme swaps remain intact where applicable.
 - Passive/deduplicated listeners, batched DOM reads/writes, deferred below-fold work, route splitting, and bounded bundle imports.

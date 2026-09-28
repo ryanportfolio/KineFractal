@@ -87,7 +87,6 @@ Read `DESIGN.md` and `client/src/lib/beam-scheduler.ts` before adding motion.
 - Only one active movement receives the beam. Register through the existing scheduler where applicable.
 - Revoked/off-screen sections stop work and hold or settle their final composited state.
 - Pause work while `document.hidden`.
-- Reduced motion renders meaningful final states without spatial choreography.
 - Use the existing `cubic-bezier(0.16,1,0.3,1)` family. No bounce or constant glitch/flicker loops.
 - Prefer transforms/opacity for routine motion. Keep filters, glows, WebGL, masks, and paint-heavy effects bounded, measured, and justified by the tube model.
 - Preserve the persistence engine’s DPR cap, visibility pause, context-loss recovery, theme-aware uniforms, SVG fallback, and slow-frame degradation.
@@ -99,7 +98,7 @@ Read `DESIGN.md` and `client/src/lib/beam-scheduler.ts` before adding motion.
 
 ### Homepage
 
-Preserve the documented seven-movement order and each section’s single question. A user-requested structural addition must reconcile `PRODUCT.md` and `DESIGN.md`; do not silently create an eighth movement. A new section earns its place through legibility and named evidence, not spectacle.
+Preserve the documented six-movement order and each section’s single question. A user-requested structural addition must reconcile `PRODUCT.md` and `DESIGN.md`; do not silently create a seventh movement. A new section earns its place through legibility and named evidence, not spectacle.
 
 ### Board and lab reports
 
