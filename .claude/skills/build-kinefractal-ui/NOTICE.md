@@ -13,4 +13,4 @@ Ideas adapted:
 
 Rejected: new palette or type-system generation (anthropics frontend-design, nextlevelbuilder/ui-ux-pro-max), React-only rules, and browser acceptance only on request (conflicts with `CLAUDE.md`).
 
-Written for this repository with no outside source: visible account state, return to the starting page after sign-in, the range-first edit path for `charts.html`, and the site-mode / local-mode split.
+Written for this repository with no outside source: visible account state, return to the starting page after sign-in, site ownership of `charts.html`, and the site-mode / local-mode split.

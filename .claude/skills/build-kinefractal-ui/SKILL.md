@@ -5,7 +5,7 @@ description: Build or audit user-facing UI on kinefractal.com, the FearLab site.
 
 # Build KineFractal UI
 
-Change or review an interface on kinefractal.com so it keeps the site's evidence rules, fits the surface's existing design system, and works for a signed-out visitor, a signed-in visitor, and the owner's local tool.
+Change or review an interface on kinefractal.com so it keeps the site's evidence rules, fits the surface's existing design system, and works for both signed-out and signed-in visitors.
 
 ## Authority
 
@@ -17,7 +17,7 @@ The site has two UI systems with different sources of truth. Pick before editing
 
 | Surface | Code | Design source | Reference |
 |---|---|---|---|
-| `/charts/` chart app | `server/charts-app/charts.html` (copy of range's `fearlab/charts.html`) | its own `:root` block and existing CSS in that file | [references/charts-app.md](references/charts-app.md) |
+| `/charts/` chart app | `server/charts-app/charts.html`, edited here | its own `:root` block and existing CSS in that file | [references/charts-app.md](references/charts-app.md) |
 | Every other page | `client/src/` React + Tailwind, routes in `client/src/App.tsx` | `DESIGN.md`, tokens in `client/src/index.css` | [references/site-react.md](references/site-react.md) |
 
 Read the matching reference completely before the first edit. A change that spans both (for example, a sign-in flow that starts on `/charts/` and finishes on `/account`) reads both.
@@ -51,4 +51,4 @@ Follow `CLAUDE.md` verification rules and the surface reference's verification s
 
 ## 5. Handover
 
-Report: surface and files changed, states covered and how each was verified, anything left unverified, and for chart-app changes which repo each edit landed in (range, site, or both) and whether the copies match.
+Report: surface and files changed, states covered and how each was verified, anything left unverified, and for chart-app changes which site-mode and local-mode paths you exercised.

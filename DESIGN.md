@@ -120,7 +120,7 @@ The evidence stamp is explicit:
 
 ## Chrome
 
-- **Navbar:** one compact bar, traced wordmark, no more than five links, active
+- **Navbar:** one compact bar, traced wordmark, active
   cursor segment and optional current fear readout. Avoid a second status tier.
 - **Footer:** a static calibration plate with one low-energy breathing dot.
 - **CRT tube:** global vignette, corner glare and slow scan drift. Flicker is a

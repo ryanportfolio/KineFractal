@@ -453,17 +453,18 @@
 
 <script>
 /* ---- bootstrap: ensure the chart lib, then the board index, then render ----
-   This viewer lives at fearlab/charts.html and reads the artifacts report.py /
-   refresh.py already emit into fearlab/dashboard/ (read-only). report.py untouched. */
+   Chart data comes from the engine worker's published run, proxied by the site at
+   /charts/dashboard/* (read-only). */
 var DATA = 'dashboard/';  // data-index.js, data-<key>.js, overlays-<key>.js live here
 var LIB_LOCAL = 'assets/lightweight-charts.standalone.production.js';
 var LIB_CDN = 'https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js';
 
-// SITE mode: this exact file is served byte-identical on kinefractal.com (/charts/) AND used
-// locally (file:// or label_server.py on 127.0.0.1). Owner-only affordances (send,
-// email_settings.html, py-command error hints, engineering legend detail) are gated OFF for
-// site visitors; per-account hand-line persistence (/labels, P2) stays on — the site serves
-// those routes itself. Local behavior is unchanged.
+// SITE mode: true when served over http(s) from a non-localhost host (kinefractal.com/charts/).
+// This file belongs to the site repo. The local-mode branches (file://, localhost, 127.0.0.1)
+// are left over from when it was shared with the engine repo's local viewer; today only this
+// repo's dev server on localhost reaches them.
+// Owner-only affordances (send, email_settings.html, py-command error hints, engineering legend
+// detail) are gated OFF in site mode; per-account hand-line persistence (/labels) stays on.
 var SITE = /^https?:$/.test(location.protocol) &&
            !/^(127\.0\.0\.1|localhost)$/.test(location.hostname);
 // SITE only: is the visitor signed in? null = unknown (probe pending/failed —

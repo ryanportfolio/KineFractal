@@ -23,5 +23,5 @@ A merge to this repo's `main` redeploys `web` only. Engine changes ship from ran
 ## Data served from the engine
 
 - `/api/fearlab/*` and `/charts/dashboard/*`, `/charts/assets/*` read the worker's S3 bucket (`server/fearlab-live.ts`), following the `latest.json` pointer. Bucket unset or unreachable → 503.
-- `/charts/` document: the bundled `server/charts-app/charts.html`, a byte-identical copy of range's `fearlab/charts.html`. Refresh with `npm run sync:charts` after the range change merges; `npm run check:charts` reports drift. Falls back to the S3 copy if the file is missing.
+- `/charts/` document: `server/charts-app/charts.html`, owned and edited in this repo, shipped in the image. Missing file → 503. Only its data (`dashboard/*`, `assets/*`) comes from the worker.
 - Static fallback snapshot: `client/public/fearlab/*.json` and `client/src/data/fearlab-snapshot.generated.json`, written by `npm run sync:snapshot` from the live API. `npm run check:snapshot` compares deploy versions against range's `fearlab/bridge/cells.py`.

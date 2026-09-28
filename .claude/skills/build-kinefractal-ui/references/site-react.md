@@ -13,7 +13,7 @@ Every route except `/charts/`. Vite + React + wouter + Tailwind, shadcn-style pr
 - Better Auth, email + password only (`server/auth.ts`, client helpers in `client/src/lib/auth-client`: `useSession`, `signIn`, `signUp`, `signOut`). Browsing never requires an account.
 - `/account` (`client/src/pages/account.tsx`) holds sign in, sign up (`?mode=signup`), verification notice and ToS acceptance. `GET /api/me` returns `{user:null}` signed out and `{user, tosAccepted, tosVersion}` signed in.
 - State-changing calls use `csrfFetch` (`client/src/lib/csrf-fetch.ts`).
-- The navbar (`client/src/components/navbar.tsx`) links `account`. `DESIGN.md` sets a target of five links and one status tier; the navbar currently has six (board, sectors, charts, about, alerts, account). Adding a link needs a plan that also meets the target.
+- The navbar (`client/src/components/navbar.tsx`) links `account` and keeps one status tier (`DESIGN.md`).
 - A return-to parameter on `/account` must accept only same-origin relative paths and default to `/account` when invalid.
 
 ## Motion
