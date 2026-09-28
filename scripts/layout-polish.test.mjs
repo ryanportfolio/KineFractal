@@ -4,7 +4,6 @@ import test from "node:test";
 
 const root = new URL("../", import.meta.url);
 const read = (path) => readFile(new URL(path, root), "utf8");
-const readOptional = (path) => read(path).catch(() => "");
 const [
   about,
   aboutPage,
@@ -14,8 +13,6 @@ const [
   footer,
   logo,
   heroSignal,
-  home,
-  monthlyRecord,
   ratioRelevance,
   sectorRotation,
 ] = await Promise.all([
@@ -27,8 +24,6 @@ const [
   read("client/src/components/footer.tsx"),
   read("client/src/components/kf-logo.tsx"),
   read("client/src/components/hero-signal.tsx"),
-  read("client/src/pages/home.tsx"),
-  readOptional("client/src/components/spy-monthly-record.tsx"),
   read("client/src/pages/ratio-relevance.tsx"),
   read("client/src/pages/sector-rotation.tsx"),
 ]);
@@ -67,9 +62,10 @@ test("logo glow filter uses generous user-space bounds", () => {
   assert.match(filter, /x="-20" y="-20" width="140" height="140"/);
 });
 
-test("Home replays logo motion for returning sessions unless reduced motion is requested", () => {
-  assert.match(heroSignal, /<KfLogo animate=\{!reduce\} revealFx \/>/);
-  assert.doesNotMatch(heroSignal, /<KfLogo animate=\{!instant\}/);
+test("Home replays logo motion for every session, returning or not", () => {
+  // DESIGN.md: never branch on prefers-reduced-motion (owner call, 2026-08-02).
+  assert.match(heroSignal, /<KfLogo animate revealFx \/>/);
+  assert.doesNotMatch(heroSignal, /<KfLogo animate=\{/);
 });
 
 test("About and Alerts rely on the single app-shell footer", () => {
@@ -115,16 +111,6 @@ test("Alerts omits redundant channel and format explainers", () => {
 
 test("About omits the trailing terminal-question hint", () => {
   assert.equal(aboutPage.includes("questions the site doesn't answer"), false);
-});
-
-test("Home replaces the yearly raster with the SPY monthly record", () => {
-  assert.match(home, /SpyMonthlyRecord/);
-  assert.doesNotMatch(home, /RasterMatrix/);
-  assert.match(monthlyRecord, /EVERY MONTH/);
-  assert.match(monthlyRecord, /B&amp;H YEAR/);
-  assert.match(monthlyRecord, /overflow-x-auto/);
-  assert.match(monthlyRecord, /sticky left-0/);
-  assert.match(monthlyRecord, /instant \? "raster-done" : "raster-scanning"/);
 });
 
 test("Ratio Relevance and Sector Rotation rely on the app-shell footer", () => {

@@ -20,6 +20,8 @@ function sentenceStops(source, fileName) {
   const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const hits = [];
   function visit(node) {
+    // Search-snippet metadata, not on-page prose; every page's description ends with a stop.
+    if (ts.isCallExpression(node) && node.expression.getText(file) === "useDocumentMeta") return;
     if (
       ts.isStringLiteral(node) ||
       ts.isNoSubstitutionTemplateLiteral(node) ||
