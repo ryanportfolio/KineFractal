@@ -151,6 +151,7 @@ real project. It proves selective file adoption and preserved customization, not
 | long-horizon | claude, codex | native | fresh-context-review | independence, evidence | None |
 | long-horizon-swarm | claude | none | fresh-context-review, authenticated-codex-cli | independence, evidence, authorization | Claude Code only: Opus peers run through the Claude Agent tool beside Codex peers; from Codex the cross-vendor mix is lost, so Codex uses long-horizon. |
 | long-horizon-workflows | claude | none | fresh-context-review, workflow-tool | independence, evidence | Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon. |
+| maintaining-kinefractal-ui | claude, codex | native | No additional gate | evidence, scope | None |
 | optimize-context | claude, codex | native | No additional gate | scope | Measure the executing runtime catalog/kernel and verify retrieval after relocation; Claude hook measurements are not Codex measurements. |
 | opus-fullreview | codex | native | subscription-routed-claude-cli | independence, evidence | Codex-only launcher: Claude CLI runs the Claude impartial-review skill as Manager with Opus sub-reviewers. Claude sessions use impartial-review directly. |
 | perf-loop | claude, codex | native | fresh-context-review, repeatable-measurement | independence, evidence | None |

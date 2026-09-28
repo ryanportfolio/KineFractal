@@ -27,6 +27,7 @@
     "long-horizon": "native",
     "long-horizon-swarm": "disabled",
     "long-horizon-workflows": "disabled",
+    "maintaining-kinefractal-ui": "native",
     "optimize-context": "native",
     "opus-fullreview": "native",
     "perf-loop": "native",

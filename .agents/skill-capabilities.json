@@ -607,6 +607,33 @@
         "Claude Code only: rounds run through the Claude Code Workflow tool, which Codex does not expose; Codex uses long-horizon."
       ]
     },
+    "maintaining-kinefractal-ui": {
+      "coverage": [
+        "claude",
+        "codex"
+      ],
+      "owners": {
+        "claude": "source",
+        "codex": "native"
+      },
+      "entrypoints": [
+        "maintaining-kinefractal-ui"
+      ],
+      "requiredTools": [],
+      "sharedContracts": [
+        "evidence",
+        "scope"
+      ],
+      "resources": [
+        ".claude/skills/maintaining-kinefractal-ui/NOTICE.md",
+        ".claude/skills/maintaining-kinefractal-ui/references/build.md",
+        ".claude/skills/maintaining-kinefractal-ui/references/audit.md",
+        ".agents/skills/maintaining-kinefractal-ui/NOTICE.md",
+        ".agents/skills/maintaining-kinefractal-ui/references/build.md",
+        ".agents/skills/maintaining-kinefractal-ui/references/audit.md"
+      ],
+      "exceptions": []
+    },
     "optimize-context": {
       "coverage": [
         "claude",
