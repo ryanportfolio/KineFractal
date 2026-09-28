@@ -20,6 +20,9 @@ test("anything that could leave the site is rejected", () => {
     "/charts/\u0000",
     "/\tevil",
     "/" + "a".repeat(600),
+    "/%2e%2e//evil.example/",
+    "/.//evil.example",
+    "/a/..//evil.example",
   ]) {
     assert.equal(safeNext(raw), null, JSON.stringify(raw));
   }

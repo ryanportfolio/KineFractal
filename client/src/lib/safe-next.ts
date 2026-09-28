@@ -14,7 +14,11 @@ export function safeNext(raw: string | null | undefined): string | null {
   try {
     const url = new URL(raw, "https://kinefractal.invalid");
     if (url.origin !== "https://kinefractal.invalid") return null;
-    return url.pathname + url.search + url.hash;
+    const out = url.pathname + url.search + url.hash;
+    // Dot segments can normalize "/%2e%2e//host" into "//host", which a browser
+    // reads as another site; check the normalized result, not just the input.
+    if (!out.startsWith("/") || out.startsWith("//") || out.startsWith("/\\")) return null;
+    return out;
   } catch {
     return null;
   }

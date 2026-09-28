@@ -45,3 +45,21 @@ test("the account control and its keys start at page load, independent of chart 
   assert.match(html, /document\.addEventListener\('keydown', onAccountKeydown\);/);
   assert.match(html, /if \(accountUiOwnsKeys\(e\)\) return;/);
 });
+
+test("account UI swallows its keys and never keeps a typed password", () => {
+  const fn = html.slice(html.indexOf("function onAccountKeydown(e)"), html.indexOf("function trapSignInFocus(event)"));
+  assert.equal((fn.match(/e\.stopImmediatePropagation\(\);/g) || []).length, 3);
+  assert.match(html, /document\.getElementById\('signInPassword'\)\.value = '';/);
+});
+
+test("sign-out drops cached drawn lines and every chart entry to /account returns to the chart", () => {
+  assert.match(html, /if \(k && k\.indexOf\(LS_HAND\) === 0\) localStorage\.removeItem\(k\);/);
+  assert.match(html, /\['account', '\/account\?next=%2Fcharts%2F'\]/);
+  assert.match(html, /#signInDialog \.box \{[^}]*max-height:calc\(100vh - 40px\); overflow-y:auto;/);
+});
+
+test("site chrome (home link, site menu, trimmed toolbar) is applied at page load", () => {
+  assert.match(html, /applySiteChrome\(\);\s*initSiteAccount\(\);\s*start\(\);/);
+  const mode = html.slice(html.indexOf("function applySiteMode()"), html.indexOf("function applySiteChrome()"));
+  assert.doesNotMatch(mode, /siteNav|SITE_HIDE_LAYERS/);
+});

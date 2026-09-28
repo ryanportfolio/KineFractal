@@ -203,7 +203,8 @@
                   background:rgba(0,0,0,.72); align-items:center; justify-content:center; }
   #signInDialog.open { display:flex; }
   #signInDialog .box { width:min(380px,100%); background:var(--panel); border:1px solid rgba(0,255,136,.45);
-                       padding:22px; box-shadow:0 12px 38px rgba(0,0,0,.72); display:flex; flex-direction:column; }
+                       padding:22px; box-shadow:0 12px 38px rgba(0,0,0,.72); display:flex; flex-direction:column;
+                       max-height:calc(100vh - 40px); overflow-y:auto; overscroll-behavior:contain; }
   #signInDialog .eyebrow { margin-bottom:8px; color:#00ff88; font:11px monospace; letter-spacing:.16em;
                            text-transform:uppercase; }
   #signInDialog h3 { margin:0 0 6px; color:var(--fg); font-size:18px; letter-spacing:.03em; }
@@ -232,6 +233,10 @@
     #topActions #acctBtn { max-width:150px; }
     #acctMenu a, #acctMenu button { min-height:44px; }
     #signInDialog input, #signInDialog button { min-height:44px; }
+    #signInDialog { padding:10px; }
+    #drawCta .row { flex-wrap:wrap; }
+    #drawCta button.go, #drawCta a.alt, #drawCta button.later { min-height:44px; display:inline-flex;
+                                                                 align-items:center; justify-content:center; }
   }
   /* build-ticker overlay (site "+ Add": the beam draws while the pipeline runs) */
   #buildOvl { display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.72);
@@ -1573,14 +1578,9 @@ function initSiteAccount() {
   } catch (e) {}
 }
 
+// Data-dependent site setup, run once chart data has loaded (buildDropdown).
 function applySiteMode() {
   if (!SITE) return;
-  // owner-only controls: send (explicit repo push — auto-save already covers the
-  // site). "+ Add" stays VISIBLE on the site: signed-in users get live ticker
-  // builds through the site's /watchlist/add, signed-out users get the signup CTA.
-  ['sendBtn'].forEach(function (id) {
-    var el = document.getElementById(id); if (el) el.style.display = 'none';
-  });
   // which tickers this visitor's button row shows (curated + their adds);
   // endpoint down -> _chartAccess stays null -> every button shows (fail open)
   try {
@@ -1591,6 +1591,18 @@ function applySiteMode() {
       })
       .catch(function () {});
   } catch (e) {}
+}
+
+// Static site chrome (SITE only), run at page load so the home link, site menu
+// and trimmed toolbar appear even when chart data fails to load.
+function applySiteChrome() {
+  if (!SITE) return;
+  // owner-only controls: send (explicit repo push — auto-save already covers the
+  // site). "+ Add" stays VISIBLE on the site: signed-in users get live ticker
+  // builds through the site's /watchlist/add, signed-out users get the signup CTA.
+  ['sendBtn'].forEach(function (id) {
+    var el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
   // empty board-combo dropdown (cloud publishes no v2 combos -> nav is the super-symbol
   // + timeframe buttons) and the unsupported layer toggles (data key-gated, local-only)
   var cb = document.getElementById('combo'); if (cb) cb.style.display = 'none';
@@ -1615,10 +1627,11 @@ function applySiteMode() {
     home.href = '/'; home.className = 'kf-brand'; home.title = 'KineFractal — home';
     home.textContent = 'KINEFRACTAL';
     var menuBtn = document.createElement('button');
-    menuBtn.id = 'siteMenuBtn'; menuBtn.title = 'site menu'; menuBtn.innerHTML = '&#9776;';
+    menuBtn.id = 'siteMenuBtn'; menuBtn.type = 'button'; menuBtn.title = 'site menu';
+    menuBtn.setAttribute('aria-label', 'Site menu'); menuBtn.innerHTML = '&#9776;';
     var menu = document.createElement('div'); menu.id = 'siteMenu';
     [['board', '/'], ['lab', '/lab'], ['sectors', '/sector-rotation'],
-     ['about', '/about'], ['account', '/account']]
+     ['about', '/about'], ['account', '/account?next=%2Fcharts%2F']]
       .forEach(function (it) {
         var a = document.createElement('a'); a.href = it[1]; a.textContent = it[0];
         menu.appendChild(a);
@@ -1757,6 +1770,14 @@ function signOut() {
   })
     .then(function (r) {
       if (!r.ok) throw new Error('sign-out failed');
+      // Drawn lines are cached per chart in localStorage; the account keeps its
+      // own copy, so drop the cache or the next visitor on this browser sees them.
+      try {
+        for (var i = localStorage.length - 1; i >= 0; i--) {
+          var k = localStorage.key(i);
+          if (k && k.indexOf(LS_HAND) === 0) localStorage.removeItem(k);
+        }
+      } catch (e) {}
       location.reload();
     })
     .catch(function () {
@@ -1807,6 +1828,7 @@ function closeSignInDialog() {
   var el = document.getElementById('signInDialog');
   if (!el || !el.classList.contains('open')) return;
   if (document.getElementById('signInSubmit').disabled) return;   // mid-request
+  document.getElementById('signInPassword').value = '';           // never keep a typed password around
   el.classList.remove('open');
   el.setAttribute('aria-hidden', 'true');
   if (_signInReturnFocus && document.body.contains(_signInReturnFocus)) _signInReturnFocus.focus();
@@ -1823,13 +1845,18 @@ function accountUiOwnsKeys(e) {
   var menu = document.getElementById('acctMenu');
   return !!(menu && !menu.hidden && e.key === 'Escape');
 }
+// Registered at page load, before the chart's own keydown listener, so
+// stopImmediatePropagation() keeps every key pressed while account UI is open
+// (including the Escape that closes it) away from the chart shortcuts.
 function onAccountKeydown(e) {
   if (isOpen('signInDialog')) {
+    e.stopImmediatePropagation();
     if (e.key === 'Escape') { e.preventDefault(); closeSignInDialog(); }
     else if (e.key === 'Tab') trapSignInFocus(e);
     return;
   }
   if (isOpen('drawCta')) {
+    e.stopImmediatePropagation();
     var cta = document.getElementById('drawCta');
     if (e.key === 'Escape') { e.preventDefault(); closeSignupCta(); }
     else if (e.key === 'Tab') {
@@ -1841,7 +1868,10 @@ function onAccountKeydown(e) {
     return;
   }
   var menu = document.getElementById('acctMenu');
-  if (menu && !menu.hidden && e.key === 'Escape') { e.preventDefault(); closeAccountMenu(true); }
+  if (menu && !menu.hidden) {
+    e.stopImmediatePropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeAccountMenu(true); }
+  }
 }
 function trapSignInFocus(event) {
   var el = document.getElementById('signInDialog');
@@ -4443,6 +4473,7 @@ document.addEventListener('keydown', function (ev) {
 window.addEventListener('hashchange', routeHash);
 buildLegend(); routeHash();
 
+applySiteChrome();
 initSiteAccount();
 start();
 </script>
