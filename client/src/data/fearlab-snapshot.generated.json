@@ -1,0 +1,176 @@
+{
+  "generated": "2026-07-14",
+  "funds": [
+    {
+      "sym": "SPY",
+      "variant": "v4.6",
+      "reportKey": "spy-1d-full-v4.6",
+      "tf": "1d",
+      "sinceYear": "1993",
+      "full": {
+        "sym": "SPY",
+        "tf": "1d",
+        "label": "Full",
+        "window": "1993-01-29..2026-07-13",
+        "ret": 1263.55,
+        "bench_ret": 488.77,
+        "irr": 12.73,
+        "bench_irr": 9,
+        "dd": 52.82,
+        "trades": 920
+      },
+      "years": [
+        {
+          "sym": "SPY",
+          "tf": "1d",
+          "label": "2024",
+          "window": "2024-01-02..2026-07-13",
+          "ret": 43,
+          "bench_ret": 25.79,
+          "irr": 30.29,
+          "bench_irr": 18.88,
+          "dd": 15.09,
+          "trades": 90
+        },
+        {
+          "sym": "SPY",
+          "tf": "1d",
+          "label": "2025",
+          "window": "2025-01-02..2026-07-13",
+          "ret": 30.52,
+          "bench_ret": 16.45,
+          "irr": 38.78,
+          "bench_irr": 21.01,
+          "dd": 11.6,
+          "trades": 53
+        },
+        {
+          "sym": "SPY",
+          "tf": "1d",
+          "label": "2026",
+          "window": "2026-01-02..2026-07-13",
+          "ret": 11.88,
+          "bench_ret": 6.64,
+          "irr": 48.22,
+          "bench_irr": 25.49,
+          "dd": 5.3,
+          "trades": 22
+        }
+      ]
+    },
+    {
+      "sym": "QQQ",
+      "variant": "v4.2",
+      "reportKey": "qqq-1d-full-v4.2",
+      "tf": "1d",
+      "sinceYear": "1999",
+      "full": {
+        "sym": "QQQ",
+        "tf": "1d",
+        "label": "Full",
+        "window": "1999-03-10..2026-07-13",
+        "ret": 1287.54,
+        "bench_ret": 950.49,
+        "irr": 15.91,
+        "bench_irr": 14.38,
+        "dd": 51.48,
+        "trades": 2655
+      },
+      "years": [
+        {
+          "sym": "QQQ",
+          "tf": "1d",
+          "label": "2024",
+          "window": "2024-01-02..2026-07-13",
+          "ret": 56.69,
+          "bench_ret": 36.42,
+          "irr": 38.82,
+          "bench_irr": 26.02,
+          "dd": 15.42,
+          "trades": 141
+        },
+        {
+          "sym": "QQQ",
+          "tf": "1d",
+          "label": "2025",
+          "window": "2025-01-02..2026-07-13",
+          "ret": 39.09,
+          "bench_ret": 23.99,
+          "irr": 49.52,
+          "bench_irr": 30.56,
+          "dd": 12.01,
+          "trades": 89
+        },
+        {
+          "sym": "QQQ",
+          "tf": "1d",
+          "label": "2026",
+          "window": "2026-01-02..2026-07-13",
+          "ret": 19.48,
+          "bench_ret": 10.23,
+          "irr": 85.41,
+          "bench_irr": 40.81,
+          "dd": 5.72,
+          "trades": 37
+        }
+      ]
+    },
+    {
+      "sym": "IWM",
+      "variant": "v4.7",
+      "reportKey": "iwm-1d-full-v4.7",
+      "tf": "1d",
+      "sinceYear": "2000",
+      "full": {
+        "sym": "IWM",
+        "tf": "1d",
+        "label": "Full",
+        "window": "2000-05-26..2026-07-13",
+        "ret": 422.42,
+        "bench_ret": 241.44,
+        "irr": 10.94,
+        "bench_irr": 8.34,
+        "dd": 55.54,
+        "trades": 885
+      },
+      "years": [
+        {
+          "sym": "IWM",
+          "tf": "1d",
+          "label": "2024",
+          "window": "2024-01-02..2026-07-13",
+          "ret": 51.46,
+          "bench_ret": 30.29,
+          "irr": 35.61,
+          "bench_irr": 21.94,
+          "dd": 15.15,
+          "trades": 154
+        },
+        {
+          "sym": "IWM",
+          "tf": "1d",
+          "label": "2025",
+          "window": "2025-01-02..2026-07-13",
+          "ret": 36.42,
+          "bench_ret": 24.67,
+          "irr": 46.18,
+          "bench_irr": 31.42,
+          "dd": 13.05,
+          "trades": 89
+        },
+        {
+          "sym": "IWM",
+          "tf": "1d",
+          "label": "2026",
+          "window": "2026-01-02..2026-07-13",
+          "ret": 10.45,
+          "bench_ret": 9.75,
+          "irr": 41.77,
+          "bench_irr": 38.71,
+          "dd": 2.86,
+          "trades": 31
+        }
+      ]
+    }
+  ]
+}

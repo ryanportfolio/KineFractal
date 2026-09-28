@@ -2,11 +2,16 @@
 
 > Kernel rules. Read first. Cross-cutting only. Topical detail lives in `.claude/reference/`.
 
-<!-- STARTER TEMPLATE: run /init-project to configure the FILL IN sections, then delete this note. -->
-
 ## What this project is
 
-<!-- FILL IN (via /init-project): two or three sentences — what this is and who it serves; a short "won't compromise on" list; optional glossary of terms the team uses. Cap ~10 lines: this file loads every turn, and direction earns its weight only while it stays short. A model that knows what the product refuses to compromise on tests for it without being told. -->
+kinefractal.com: the public website for FearLab, an end-of-day trading research engine for SPY, QQQ and IWM that buys into fear and trims into strength. Audience: numerate, skeptical traders and technical evaluators. Product brief: `PRODUCT.md`; visual system: `DESIGN.md`.
+
+Won't compromise on:
+- Actual end-of-day decisions and simulated backtest results stay visibly separate. Backtest fills are hypothetical and say so.
+- No invented numbers presented as real data. Decorative motion is fine.
+- The site never places orders.
+
+The engine itself (Python: `fearlab/`, `worker/`) lives in the private `ryanportfolio/range` repo. This repo holds only the site.
 
 ## Default prose mode: caveman ultra
 
@@ -21,10 +26,8 @@ Caveman covers chat replies only. Anything written to a file or for another read
 
 ## CRITICAL: Verification
 
-<!-- FILL IN (via /init-project): what can this sandbox verify? Installs/builds/type-checks meaningful? Can the user reach a dev server you start? What is the AUTHORITATIVE signal (CI, deploy log, local tests)? -->
-
-Defaults until configured:
-
+- Local checks run for real: `npm run check` (tsc), `npm test`, `npm run build`. No CI is wired, so these plus the Railway deploy log are the authoritative signals. Commands: `.claude/reference/commands.md`.
+- A dev server you start is reachable in the browser (`.claude/launch.json`). Without Railway secrets, FearLab data routes return 503 locally and pages fall back to the bundled snapshot; live data paths can only be confirmed on the deployed site.
 - Inspect logs / run scripts / read code yourself before claiming anything works.
 - Never claim visual/UI verification you didn't actually perform.
 - Can't run the authoritative check → flag the risk plainly, don't claim it passes.
@@ -58,9 +61,10 @@ Defaults until configured:
 
 ## Environment & deploy target
 
-<!-- FILL IN (via /init-project): where the app runs (host, DB, secrets); install policy (can sessions run npm/pip for app-runtime deps?); migration policy; anything that ALWAYS requires user action. -->
-
-Defaults until configured: ask before installing app-runtime dependencies; provide migrations as copy/paste-ready artifacts rather than running them blind.
+- Host: Railway project `kinefractal`, service `web` (Dockerfile build, deploys on merge to `main`). Postgres and all secrets are Railway service variables; changing them goes through the user. Detail: `.claude/reference/deployment.md`.
+- Chart and signal DATA comes from the engine's Railway services (`worker`, `chart-builder`, `chart-refresh`), built from range's `prod` branch. Nothing merged here changes them.
+- `server/charts-app/charts.html` and the FearLab snapshot are copies of engine output. Never hand-edit them; refresh with `npm run sync:charts` / `npm run sync:snapshot`.
+- `npm install` / `npm ci` are fine; ask before adding an app-runtime dependency. Migrations (`npm run db:push`) are handed to the user as a copy/paste step, never run against the shared database blind.
 
 ## Project reference library
 

@@ -1,0 +1,1178 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  
+  --radius: 0px; /* Brutalist: No rounded corners */
+  --font-sans: "Space Grotesk", sans-serif;
+  --font-mono: "JetBrains Mono", "IBM Plex Mono", monospace;
+  --font-display: "Orbitron", sans-serif;
+
+  /* Beam ramp (THE SIGNAL) — text-beam-mid, border-beam-ghost, bg-beam-hot… */
+  --color-beam-core: hsl(var(--beam-core));
+  --color-beam-hot: hsl(var(--beam-hot));
+  --color-beam-mid: hsl(var(--beam-mid));
+  --color-beam-dim: hsl(var(--beam-dim));
+  --color-beam-ghost: hsl(var(--beam-ghost));
+}
+
+:root {
+  /* ---- PHOSPHOR SYSTEM -------------------------------------------------
+     The whole tube derives from one phosphor hue. Change --phos-h/-s/-l (or
+     set data-phosphor on <html>) and every surface, glow, border, scanline
+     and the WebGL hero recolor together — one machine, one tube. */
+  --phos-h: 152;          /* emerald P1 */
+  --phos-s: 100%;
+  --phos-l: 50%;
+  --tube-h: 160;          /* glass tint hue (slightly cooler than the phosphor) */
+
+  /* Base: phosphor-tinted glass, never pure black */
+  --background: var(--tube-h) 28% 3.2%;
+  --foreground: var(--tube-h) 14% 88%;
+
+  /* Card: one step of chroma-elevation above the glass */
+  --card: var(--tube-h) 24% 5%;
+  --card-foreground: var(--tube-h) 14% 88%;
+
+  /* Popover */
+  --popover: var(--tube-h) 24% 5%;
+  --popover-foreground: var(--tube-h) 14% 88%;
+
+  /* Primary: the phosphor itself */
+  --primary: var(--phos-h) var(--phos-s) var(--phos-l);
+  --primary-foreground: var(--tube-h) 30% 4%;
+
+  /* Secondary: dark tinted steel / grid lines */
+  --secondary: var(--tube-h) 16% 14%;
+  --secondary-foreground: var(--tube-h) 14% 88%;
+
+  /* Muted: technical green-grey */
+  --muted: var(--tube-h) 15% 11%;
+  --muted-foreground: var(--tube-h) 9% 54%;
+
+  /* Accent: electric amber — fear, warnings, trims. The counter-color. */
+  --accent: 35 100% 50%;
+  --accent-foreground: 0 0% 0%;
+
+  /* Destructive */
+  --destructive: 0 100% 40%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: var(--tube-h) 20% 13.5%;
+  --input: var(--tube-h) 20% 13.5%;
+  --ring: var(--phos-h) var(--phos-s) var(--phos-l);
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  /* ---- THE BEAM RAMP ----------------------------------------------------
+     A trace is a white-hot electron core cooling through the phosphor hue as
+     it decays. Five energy stops, pure --phos-h math, so every tube theme
+     recolors the whole ramp for free. color = energy, never decoration. */
+  --beam-core: var(--phos-h) 30% 96%;   /* the electron spot; flashes only  */
+  --beam-hot: var(--phos-h) 95% 62%;    /* fresh trace, headlines, strokes  */
+  --beam-mid: var(--phos-h) 80% 45%;    /* persisting trace; default text   */
+  --beam-dim: var(--phos-h) 45% 40%;    /* afterglow; secondary TEXT (AA on all three tubes) */
+  --beam-ghost: var(--phos-h) 40% 13%;  /* nearly decayed; hairlines, grid — never text */
+}
+
+/* ---- PHOSPHOR THEMES ---------------------------------------------------
+   Whole-tube recolors, shell-style: one attribute swap on <html> and the
+   text, glow, rain, bezel LED and shader hero all follow. */
+[data-phosphor] {
+  /* Nested theme scopes (the About terminal cards) need their own beam ramp.
+     Otherwise the inherited ramp has already resolved against the outer tube. */
+  --beam-core: var(--phos-h) 30% 96%;
+  --beam-hot: var(--phos-h) 95% 62%;
+  --beam-mid: var(--phos-h) 80% 45%;
+  --beam-dim: var(--phos-h) 45% 40%;
+  --beam-ghost: var(--phos-h) 40% 13%;
+}
+
+[data-phosphor="emerald"] {
+  --phos-h: 152;
+  --phos-s: 100%;
+  --phos-l: 50%;
+  --tube-h: 160;
+  --accent: 35 100% 50%;
+}
+
+[data-phosphor="amber"] {
+  --phos-h: 40;
+  --phos-s: 100%;
+  --phos-l: 52%;
+  --tube-h: 38;
+  /* amber tube's counter-color slides to hot orange-red so fear still reads */
+  --accent: 14 100% 55%;
+}
+
+[data-phosphor="ice"] {
+  --phos-h: 192;
+  --phos-s: 100%;
+  --phos-l: 62%;
+  --tube-h: 200;
+  --accent: 35 100% 50%;
+}
+
+/* --- SCROLLBAR HIDING --- */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Full-bleed: the reserved native scrollbar was gutter-ing the full-width hero
+   (and every section) on the right — and under the desktop `zoom` it read as a
+   margin on both edges. Don't reserve the track; the page still scrolls via
+   wheel / trackpad / keyboard / touch, and every section now fills the whole
+   viewport width edge to edge. */
+html {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none;
+}
+html::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none; /* Chromium / WebKit / Edge */
+}
+
+/* --- FONT SCALING OVERRIDE --- */
+html {
+  font-size: 22px; /* Bump base size to ~120-135% for global zoom effect */
+}
+/* ----------------------------- */
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply font-sans antialiased bg-background text-foreground;
+    background-image:
+      linear-gradient(hsl(var(--primary) / 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--primary) / 0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    background-attachment: fixed; /* Parallax feel */
+    position: relative;
+    cursor: crosshair !important;
+  }
+
+  a, button, .clickable {
+    cursor: pointer;
+  }
+
+  /* Phosphor focus ring — keyboard users get the same glow language */
+  a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid hsl(var(--primary) / 0.85);
+    outline-offset: 2px;
+  }
+
+  input, textarea {
+    cursor: text;
+  }
+}
+
+/* ---- BEAM HEADING ------------------------------------------------------
+   Legible section headlines that still read as beam traces: real display-face
+   text, phosphor-hot with a soft glow, revealed by a left-to-right beam wipe
+   when data-drawn flips to 1. Replaces TracedText's skeleton font for interior
+   headings (unreadable below hero scale). See components/beam-heading.tsx. */
+.beam-heading {
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+  line-height: 1.06;
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  color: hsl(var(--beam-hot));
+  text-shadow:
+    0 0 14px hsl(var(--phos-h) var(--phos-s) 50% / 0.4),
+    0 0 4px hsl(var(--phos-h) var(--phos-s) 62% / 0.55);
+  /* beam-wipe reveal: hidden until data-drawn=1, then sweeps in left→right */
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  transition:
+    clip-path 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.5s ease;
+}
+.beam-heading[data-drawn="1"] {
+  clip-path: inset(0 0 0 0);
+  opacity: 1;
+}
+@layer utilities {
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  /* Breathing animations for terminal feel */
+  .breathing-glow {
+    animation: breathing-glow 6s cubic-bezier(0.4, 0.2, 0.2, 0.8) infinite;
+  }
+
+  @keyframes breathing-glow {
+    0%, 100% {
+      opacity: 0.6;
+      box-shadow: 0 0 15px hsl(var(--primary) /0.2);
+    }
+    50% {
+      opacity: 0.9;
+      box-shadow: 0 0 30px hsl(var(--primary) /0.4);
+    }
+  }
+
+  /* Text-only pulse for headers (no box-shadow) */
+  .text-pulse-glow {
+    animation: text-pulse-glow 6s cubic-bezier(0.4, 0.2, 0.2, 0.8) infinite;
+  }
+
+  @keyframes text-pulse-glow {
+    0%, 100% {
+      opacity: 0.6;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+
+  /* Terminal shadow glow for founding words */
+  .text-shadow-glow {
+    text-shadow: 0 0 10px hsl(var(--primary) /0.5), 0 0 20px hsl(var(--primary) /0.3);
+    animation: text-shadow-pulse 3s ease-in-out infinite;
+  }
+
+  @keyframes text-shadow-pulse {
+    0%, 100% {
+      text-shadow: 0 0 10px hsl(var(--primary) /0.5), 0 0 20px hsl(var(--primary) /0.3);
+    }
+    50% {
+      text-shadow: 0 0 15px hsl(var(--primary) /0.8), 0 0 30px hsl(var(--primary) /0.5);
+    }
+  }
+
+  .ambient-glow {
+    animation: ambient-glow 4s ease-in-out infinite;
+  }
+
+  @keyframes ambient-glow {
+    0%, 100% { opacity: 0.7; }
+    50% { opacity: 1; }
+  }
+
+  .subtle-pulse {
+    animation: subtle-pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes subtle-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.02); }
+  }
+
+  .terminal-flicker {
+    animation: terminal-flicker 0.15s infinite;
+  }
+
+  @keyframes terminal-flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+    20%, 24%, 55% { opacity: 0.95; }
+  }
+
+  /* HUD Status Indicator Pulse */
+  .hud-pulse {
+    animation: hud-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  @keyframes hud-pulse {
+    0%, 100% {
+      opacity: 0.7;
+      filter: drop-shadow(0 0 2px hsl(var(--primary) /0.3));
+    }
+    50% {
+      opacity: 1;
+      filter: drop-shadow(0 0 8px hsl(var(--primary) /0.6));
+    }
+  }
+
+  /* HUD Scan Line Animation */
+  .hud-scan {
+    animation: hud-scan 3s linear infinite;
+  }
+
+  @keyframes hud-scan {
+    0% { transform: translateX(-100%); opacity: 0; }
+    50% { opacity: 0.6; }
+    100% { transform: translateX(100%); opacity: 0; }
+  }
+
+  /* Status Badge Throb */
+  .status-throb {
+    animation: status-throb 2.5s ease-in-out infinite;
+  }
+
+  @keyframes status-throb {
+    0%, 100% {
+      background-color: hsl(var(--primary) /0.1);
+      box-shadow: 0 0 0 0 hsl(var(--primary) /0.4);
+    }
+    50% {
+      background-color: hsl(var(--primary) /0.2);
+      box-shadow: 0 0 8px 2px hsl(var(--primary) /0.3);
+    }
+  }
+
+  /* Ping Indicator Float */
+  .ping-float {
+    animation: ping-float 2.5s ease-in-out infinite;
+  }
+
+  @keyframes ping-float {
+    0%, 100% { transform: translateY(0) scale(1); }
+    50% { transform: translateY(-2px) scale(1.05); }
+  }
+
+  /* Clock Time Glow */
+  .time-glow {
+    animation: time-glow 3s ease-in-out infinite;
+  }
+
+  @keyframes time-glow {
+    0%, 100% { text-shadow: 0 0 5px hsl(var(--primary) /0.3); }
+    50% { text-shadow: 0 0 15px hsl(var(--primary) /0.6); }
+  }
+
+  .text-stroke {
+    -webkit-text-stroke: 1px rgba(255,255,255,0.2);
+    color: transparent;
+  }
+  .text-stroke-primary {
+    -webkit-text-stroke: 1px hsl(var(--primary));
+    color: transparent;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* HERO HOVER EFFECTS */
+  .group:hover .text-stroke-primary {
+    color: hsl(var(--primary));
+    text-shadow: 0 0 30px hsl(var(--primary) / 0.8), 0 0 10px hsl(var(--primary) / 0.5);
+    -webkit-text-stroke: 0px;
+  }
+
+  /* Smooth Chromatic Split — settles the idle slicing into a calm, faint
+     misconvergence on hover instead of amplifying it */
+  .group:hover .glitch-effect::before {
+    animation: none;
+    left: -1.5px;
+    opacity: 0.3;
+    clip-path: inset(0 0 0 0);
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .group:hover .glitch-effect::after {
+    animation: none;
+    left: 1.5px;
+    opacity: 0.3;
+    clip-path: inset(0 0 0 0);
+    transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  
+  .scanlines {
+    background: linear-gradient(
+      to bottom,
+      rgba(255,255,255,0),
+      rgba(255,255,255,0) 50%,
+      rgba(0,0,0,0.2) 50%,
+      rgba(0,0,0,0.2)
+    );
+    background-size: 100% 4px;
+  }
+
+  .glitch-hover:hover {
+    animation: glitch 0.3s cubic-bezier(.25, .46, .45, .94) both infinite;
+  }
+
+  @keyframes glitch {
+    0% { transform: translate(0) }
+    20% { transform: translate(-2px, 2px) }
+    40% { transform: translate(-2px, -2px) }
+    60% { transform: translate(2px, 2px) }
+    80% { transform: translate(2px, -2px) }
+    100% { transform: translate(0) }
+  }
+
+  /* --- GLITCH EFFECT FOR DIVERGENCE --- */
+  .glitch-effect {
+    position: relative;
+    color: white;
+    display: inline-block;
+  }
+
+  .glitch-effect::before,
+  .glitch-effect::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: inherit;
+  }
+
+  .glitch-effect::before {
+    left: 1.5px;
+    opacity: 0.45;
+    text-shadow: -1.5px 0 #ff00c1;
+    clip-path: inset(0 0 0 0); /* Use clip-path */
+    animation: glitch-anim-1 5s infinite linear alternate-reverse;
+  }
+
+  .glitch-effect::after {
+    left: -1.5px;
+    opacity: 0.45;
+    text-shadow: -1.5px 0 #00fff9;
+    clip-path: inset(0 0 0 0); /* Use clip-path */
+    animation: glitch-anim-2 7s infinite linear alternate-reverse;
+  }
+
+  @keyframes glitch-anim-1 {
+    0% { clip-path: inset(20% 0 80% 0); }
+    20% { clip-path: inset(60% 0 10% 0); }
+    40% { clip-path: inset(40% 0 50% 0); }
+    60% { clip-path: inset(80% 0 5% 0); }
+    80% { clip-path: inset(10% 0 60% 0); }
+    100% { clip-path: inset(30% 0 30% 0); }
+  }
+
+  @keyframes glitch-anim-2 {
+    0% { clip-path: inset(10% 0 60% 0); }
+    20% { clip-path: inset(80% 0 5% 0); }
+    40% { clip-path: inset(30% 0 20% 0); }
+    60% { clip-path: inset(10% 0 80% 0); }
+    80% { clip-path: inset(50% 0 40% 0); }
+    100% { clip-path: inset(20% 0 70% 0); }
+  }
+
+  /* SUBTLE GLITCH FOR HEADERS */
+  .glitch-subtle {
+    position: relative;
+    display: inline-block;
+  }
+  
+  .glitch-subtle:hover {
+    animation: glitch-skew 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) both infinite;
+    color: hsl(var(--primary));
+  }
+
+  .glitch-subtle::before {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    left: 2px;
+    text-shadow: -1px 0 #ff00c1;
+    clip-path: inset(0 0 0 0);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .glitch-subtle:hover::before {
+    opacity: 1;
+    animation: glitch-anim-1 2s infinite linear alternate-reverse;
+  }
+
+  @keyframes glitch-skew {
+    0% { transform: skew(0deg); }
+    20% { transform: skew(-10deg); }
+    40% { transform: skew(10deg); }
+    60% { transform: skew(-5deg); }
+    80% { transform: skew(5deg); }
+    100% { transform: skew(0deg); }
+  }
+
+  /* UNIQUE DEPLOY EFFECT - HIGH VOLTAGE */
+  .glitch-deploy {
+    position: relative;
+    display: inline-block;
+    color: white;
+    transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    animation: deploy-idle-pulse 4s infinite ease-in-out;
+  }
+
+  @keyframes deploy-idle-pulse {
+    0%, 100% { text-shadow: 0 0 0 transparent; opacity: 1; }
+    50% { text-shadow: 0 0 15px rgba(255, 255, 255, 0.3); opacity: 0.9; }
+    52% { text-shadow: 0 0 2px rgba(255, 255, 255, 0.8); opacity: 1; }
+    54% { text-shadow: 0 0 15px rgba(255, 255, 255, 0.3); opacity: 0.9; }
+  }
+
+  .glitch-deploy:hover {
+    color: hsl(var(--primary));
+    text-shadow: 0 0 10px black, 0 0 20px black;
+    transform: scale(1.02);
+    animation: none;
+  }
+
+  .glitch-deploy::before,
+  .glitch-deploy::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    background: black;
+  }
+
+  /* Hover Effect: Smooth Glow (No Glitch) */
+  .glitch-deploy:hover::before,
+  .glitch-deploy:hover::after {
+    animation: none;
+    opacity: 0;
+  }
+
+  /* Active/Click Effect: Violent Glitch */
+  .glitch-deploy-active {
+    animation: glitch 0.1s cubic-bezier(.25, .46, .45, .94) both infinite !important;
+    color: hsl(var(--primary));
+    text-shadow: 0 0 5px black;
+  }
+
+  .glitch-deploy-active::before {
+    opacity: 1;
+    animation: deploy-glitch-1 0.2s infinite linear alternate-reverse;
+  }
+
+  .glitch-deploy-active::after {
+    opacity: 1;
+    animation: deploy-glitch-2 0.2s infinite linear alternate-reverse;
+  }
+
+  @keyframes deploy-glitch-1 {
+    0% { clip-path: inset(20% 0 80% 0); transform: translate(-2px, 1px); }
+    20% { clip-path: inset(60% 0 10% 0); transform: translate(2px, -1px); }
+    40% { clip-path: inset(40% 0 50% 0); transform: translate(-2px, 2px); }
+    60% { clip-path: inset(80% 0 5% 0); transform: translate(2px, -2px); }
+    80% { clip-path: inset(10% 0 60% 0); transform: translate(-2px, 1px); }
+    100% { clip-path: inset(30% 0 30% 0); transform: translate(2px, 0); }
+  }
+
+  @keyframes deploy-glitch-2 {
+    0% { clip-path: inset(10% 0 60% 0); transform: translate(2px, 1px); }
+    20% { clip-path: inset(80% 0 5% 0); transform: translate(-2px, -1px); }
+    40% { clip-path: inset(30% 0 20% 0); transform: translate(2px, 2px); }
+    60% { clip-path: inset(10% 0 80% 0); transform: translate(-2px, -2px); }
+    80% { clip-path: inset(50% 0 40% 0); transform: translate(2px, 1px); }
+    100% { clip-path: inset(20% 0 70% 0); transform: translate(-2px, 0); }
+  }
+
+  /* NEON DOT PULSE - Navbar Indicators */
+  .neon-dot-pulse {
+    background-color: hsl(var(--primary));
+    box-shadow: 0 0 6px hsl(var(--primary) / 0.6), 0 0 12px hsl(var(--primary) / 0.3);
+    animation: neon-pulse 4s infinite ease-in-out;
+  }
+
+  .neon-dot-idle {
+    background-color: hsl(var(--primary) / 0.2);
+    border: 1px solid hsl(var(--primary) / 0.3);
+    opacity: 0.8;
+    transition: all 0.3s ease;
+  }
+
+  .group:hover .neon-dot-idle {
+    background-color: hsl(var(--primary) / 0.6);
+    border-color: hsl(var(--primary));
+    opacity: 1;
+    box-shadow: 0 0 6px hsl(var(--primary) / 0.4);
+  }
+
+  @keyframes neon-pulse {
+    0%, 100% {
+      opacity: 1;
+      box-shadow: 0 0 6px hsl(var(--primary) / 0.8), 0 0 12px hsl(var(--primary) / 0.4);
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.8;
+      box-shadow: 0 0 3px hsl(var(--primary) / 0.4), 0 0 6px hsl(var(--primary) / 0.2);
+      transform: scale(0.9);
+    }
+  }
+
+  .animate-marquee {
+    animation: marquee-bounce 8s ease-in-out infinite;
+  }
+
+  @keyframes marquee-bounce {
+    0% {
+      transform: translateX(100%);
+    }
+    50% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(100%);
+    }
+  }
+
+  /* CRT MONITOR EFFECT */
+  .crt-monitor {
+    position: relative;
+    background: #0a0a0a;
+    border: 8px solid #1a1a1a;
+    box-shadow: 
+      inset 0 0 20px rgba(0, 0, 0, 0.8),
+      inset 0 0 50px hsl(var(--primary) /0.1),
+      0 0 40px hsl(var(--primary) /0.3);
+    border-radius: 2px;
+  }
+
+  .crt-screen {
+    position: relative;
+    overflow: hidden;
+    background: #000000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 250px;
+  }
+
+  .crt-content {
+    text-align: center;
+    z-index: 2;
+    position: relative;
+    filter: drop-shadow(0 0 10px hsl(var(--primary) /0.6)) drop-shadow(0 0 20px hsl(var(--primary) /0.2));
+  }
+
+  .crt-scanlines {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      to bottom,
+      transparent 0%,
+      transparent 49%,
+      rgba(0, 0, 0, 0.25) 49%,
+      rgba(0, 0, 0, 0.25) 51%,
+      transparent 51%,
+      transparent 100%
+    );
+    background-size: 100% 6px;
+    z-index: 3;
+    pointer-events: none;
+    animation: scanline-drift 8s linear infinite;
+  }
+
+  @keyframes scanline-drift {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(6px); }
+  }
+
+  .crt-glow {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, transparent 0%, rgba(0, 0, 0, 0.3) 100%);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .crt-label {
+    font-size: 0.75rem;
+    letter-spacing: 2px;
+    color: hsl(var(--primary) /0.4);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    animation: crt-flicker 0.15s infinite;
+  }
+
+  .crt-value {
+    font-size: 3.5rem;
+    font-weight: 900;
+    letter-spacing: 3px;
+    color: hsl(var(--primary));
+    text-shadow: 
+      0 0 10px hsl(var(--primary) /0.8),
+      0 0 20px hsl(var(--primary) /0.5),
+      0 0 30px hsl(var(--primary) /0.3);
+    animation: crt-pulse 2s ease-in-out infinite;
+    font-family: "JetBrains Mono", monospace;
+  }
+
+  @keyframes crt-pulse {
+    0%, 100% {
+      opacity: 1;
+      text-shadow: 
+        0 0 10px hsl(var(--primary) /0.8),
+        0 0 20px hsl(var(--primary) /0.5),
+        0 0 30px hsl(var(--primary) /0.3);
+    }
+    50% {
+      opacity: 0.9;
+      text-shadow: 
+        0 0 15px hsl(var(--primary) /1),
+        0 0 30px hsl(var(--primary) /0.7),
+        0 0 50px hsl(var(--primary) /0.4);
+    }
+  }
+
+  @keyframes crt-flicker {
+    0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 0.7; }
+    20%, 24%, 55% { opacity: 0.6; }
+  }
+
+  .crt-bezel {
+    position: absolute;
+    inset: -8px;
+    border: 8px solid;
+    border-color: #222 #000 #000 #222;
+    pointer-events: none;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
+  }
+
+  /* MATRIX GLOBAL EFFECTS */
+  .matrix-bg-grid {
+    background-size: 40px 40px;
+    background-image: 
+      linear-gradient(to right, hsl(var(--primary) /0.03) 1px, transparent 1px),
+      linear-gradient(to bottom, hsl(var(--primary) /0.03) 1px, transparent 1px);
+  }
+
+  .matrix-scan-line {
+    position: absolute;
+    pointer-events: none;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(to right, transparent, hsl(var(--primary) /0.5), transparent);
+    box-shadow: 0 0 15px hsl(var(--primary) /0.3);
+    animation: matrix-scan-infinite 6s linear infinite;
+    opacity: 0;
+  }
+
+  @keyframes matrix-scan-infinite {
+    0% { top: -10%; opacity: 0; }
+    10% { opacity: 1; }
+    90% { opacity: 1; }
+    100% { top: 110%; opacity: 0; }
+  }
+
+  .section-fade-top {
+    mask-image: linear-gradient(to bottom, transparent, black 20%);
+    -webkit-mask-image: linear-gradient(to bottom, transparent, black 20%);
+  }
+
+  /* DIAMOND CRYSTALLIZE ANIMATION - Unique faceted wave effect */
+  .diamond-crystallize {
+    position: relative;
+    display: inline-block;
+    color: #ffffff;
+    animation: diamond-wave 4s ease-in-out infinite;
+  }
+
+  .diamond-crystallize::before,
+  .diamond-crystallize::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .diamond-crystallize::before {
+    color: hsl(var(--primary));
+    opacity: 0;
+    animation: diamond-refract-1 4s ease-in-out infinite;
+    text-shadow: -3px 0 8px hsl(var(--primary) /0.6);
+  }
+
+  .diamond-crystallize::after {
+    color: #00ccff;
+    opacity: 0;
+    animation: diamond-refract-2 4s ease-in-out infinite;
+    text-shadow: 3px 0 8px rgba(0, 204, 255, 0.5);
+  }
+
+  @keyframes diamond-wave {
+    0%, 100% {
+      color: #ffffff;
+      text-shadow: 0 0 0 transparent;
+      filter: brightness(1);
+    }
+    25% {
+      text-shadow: 0 0 15px hsl(var(--primary) /0.4), inset -2px 0 8px hsl(var(--primary) /0.2);
+      filter: brightness(1.1);
+    }
+    50% {
+      color: hsl(var(--primary));
+      text-shadow: 0 0 25px hsl(var(--primary) /0.6), 0 0 35px hsl(var(--primary) /0.3);
+      filter: brightness(0.95);
+    }
+    75% {
+      text-shadow: 0 0 15px rgba(0, 204, 255, 0.4), inset 2px 0 8px rgba(0, 204, 255, 0.2);
+      filter: brightness(1.1);
+    }
+  }
+
+  @keyframes diamond-refract-1 {
+    0%, 100% { opacity: 0; transform: translateX(0) scaleY(1); }
+    25% { opacity: 0.3; transform: translateX(-2px) scaleY(0.98); }
+    50% { opacity: 0.6; transform: translateX(0) scaleY(1); }
+    75% { opacity: 0.2; transform: translateX(-1px) scaleY(0.99); }
+  }
+
+  @keyframes diamond-refract-2 {
+    0%, 100% { opacity: 0; transform: translateX(0) scaleY(1); }
+    25% { opacity: 0.2; transform: translateX(2px) scaleY(0.99); }
+    50% { opacity: 0.4; transform: translateX(0) scaleY(1); }
+    75% { opacity: 0.3; transform: translateX(1px) scaleY(0.98); }
+  }
+
+  /* ---- FearLab homepage: extracted terminal frames (tokenized to --primary) ---- */
+  .terminal-container {
+    position: relative;
+    background: linear-gradient(135deg, hsl(var(--primary) / 0.025), hsl(var(--primary) / 0.01));
+    border: 1px solid hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.08) inset, 0 0 10px hsl(var(--primary) / 0.05);
+    overflow: hidden;
+  }
+  .terminal-container::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.55), transparent);
+    z-index: 1; pointer-events: none;
+  }
+  .terminal-container::after {
+    content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+    background: repeating-linear-gradient(0deg, hsl(var(--primary) / 0.02), hsl(var(--primary) / 0.02) 1px, transparent 1px, transparent 3px);
+  }
+
+  .terminal-description {
+    position: relative; overflow: hidden;
+    border: 1px solid hsl(var(--primary) / 0.22);
+    background-image: linear-gradient(135deg, hsl(var(--primary) / 0.045), transparent 42%);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.06) inset;
+  }
+  .terminal-description::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.3), transparent);
+    animation: scan-line-pulse 3s ease-in-out infinite;
+  }
+  @keyframes scan-line-pulse { 0%, 100% { opacity: 0.2; } 50% { opacity: 0.7; } }
+}
+
+::selection { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+::-moz-selection { background: hsl(var(--primary)); color: hsl(var(--primary-foreground)); }
+
+/* ---- WORDMARK PHOSPHOR FOLLOW ----------------------------------------------
+   The candlestick wordmark SVG bakes emerald fills (seeded generation, stable
+   geometry). Instead of regenerating per theme, rotate its hue to follow the
+   tube's phosphor. 152° is the baked emerald hue. */
+[data-phosphor="amber"] .kf-wordmark { filter: hue-rotate(-112deg) saturate(1.1); }
+[data-phosphor="ice"] .kf-wordmark { filter: hue-rotate(40deg); }
+
+/* ---- WORDMARK MISCONVERGENCE ----------------------------------------------
+   Red/cyan fringe of a slightly mis-aligned CRT gun on the wordmark only —
+   always on, sub-pixel subtle, stronger for a beat on hover. */
+.kf-misconverge {
+  filter: drop-shadow(0.6px 0 hsl(350 100% 60% / 0.12)) drop-shadow(-0.6px 0 hsl(190 100% 60% / 0.12));
+}
+
+/* ---- HERO CTA ---------------------------------------------------------------
+   Phosphor button: glass body, charge-up on hover (fill sweeps up from the
+   baseline like a gun warming), no layout-affecting properties animated. */
+.kf-cta {
+  position: relative;
+  background: hsl(var(--tube-h) 30% 3% / 0.6);
+  overflow: hidden;
+  transition: color 0.3s var(--ease-out-expo), box-shadow 0.45s var(--ease-out-expo);
+}
+.kf-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: hsl(var(--primary) / 0.14);
+  transform: scaleY(0);
+  transform-origin: bottom;
+  transition: transform 0.45s var(--ease-out-expo);
+}
+.kf-cta:hover::before { transform: scaleY(1); }
+.kf-cta:hover { box-shadow: 0 0 24px hsl(var(--primary) / 0.25), inset 0 0 12px hsl(var(--primary) / 0.12); }
+.kf-cta > * { position: relative; }
+
+/* ---- THE TUBE ------------------------------------------------------------
+   One global CRT overlay stack (rendered by <CrtTube/> in App.tsx). The page
+   doesn't have CRT effects; the page is INSIDE a CRT. Layers, back to front:
+   vignette (barrel falloff) -> corner glare -> rolling scan bar -> flicker.
+   All fixed, pointer-events:none, and derived from the phosphor tokens so
+   theme swaps recolor the tube itself. */
+.tube-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tube-vignette {
+  z-index: 90;
+  background:
+    radial-gradient(ellipse 120% 100% at 50% 45%, transparent 62%, hsl(var(--tube-h) 40% 1% / 0.25) 88%, hsl(var(--tube-h) 45% 0.6% / 0.5) 100%);
+}
+
+.tube-glare {
+  z-index: 91;
+  background:
+    radial-gradient(ellipse 34% 22% at 8% 4%, hsl(var(--tube-h) 30% 88% / 0.045), transparent 70%),
+    radial-gradient(ellipse 30% 20% at 94% 97%, hsl(var(--primary) / 0.03), transparent 70%);
+  mix-blend-mode: screen;
+}
+
+/* A single soft scan bar rolling down the whole tube every ~9s (shell-style
+   slow roll, not per-widget scanlines). Kept faint so text never shimmers. */
+.tube-scanroll {
+  z-index: 92;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    hsl(var(--primary) / 0.014) 46%,
+    hsl(var(--primary) / 0.028) 50%,
+    hsl(var(--primary) / 0.014) 54%,
+    transparent 100%
+  );
+  height: calc(22vh / var(--pz, 1));
+  top: calc(-22vh / var(--pz, 1));
+  bottom: auto;
+  animation: tube-scanroll 16s linear infinite;
+}
+
+@keyframes tube-scanroll {
+  to { transform: translateY(calc((100vh + 22vh) / var(--pz, 1))); }
+}
+
+/* Fine static raster over everything — the glass texture. Very low alpha. */
+.tube-raster {
+  z-index: 89;
+  background: repeating-linear-gradient(
+    0deg,
+    hsl(var(--tube-h) 30% 0% / 0.07),
+    hsl(var(--tube-h) 30% 0% / 0.07) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+/* FearLab page-level zoom (equivalent to browser zoom +25%) */
+.fl-zoom { zoom: 1.25; }
+
+/* ====== THE SIGNAL ========================================================
+   Single-beam storage oscilloscope utilities. See DESIGN.md. Everything here
+   derives from the beam ramp tokens; nothing introduces a new hue. */
+
+/* Etched label — the graticule/plaque register. 13px caps, tracked wide,
+   afterglow-dim: text that reads as engraved into the glass, not lit. */
+.etched {
+  font-family: "IBM Plex Mono", monospace;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: hsl(var(--beam-dim));
+}
+
+/* Graticule — scope grid painted with layered hairlines. */
+.graticule {
+  background-image:
+    linear-gradient(hsl(var(--beam-ghost) / 0.55) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--beam-ghost) / 0.55) 1px, transparent 1px);
+  background-size: 72px 72px;
+}
+
+/* The trace bus — 1px vertical rule at the content's left margin; a segment
+   brightens beside whichever movement holds the beam. */
+.trace-bus { background: hsl(var(--beam-ghost) / 0.7); }
+.trace-bus-seg {
+  background: hsl(var(--beam-hot));
+  box-shadow: 0 0 8px hsl(var(--beam-hot) / 0.55);
+  transition: opacity 0.28s var(--ease-out-expo), transform 0.28s var(--ease-out-expo);
+}
+
+/* Rubber stamp — the site's one closing gesture. Plays once when .stamped
+   lands on the element (IntersectionObserver adds it). */
+.kf-stamp {
+  display: inline-block;
+  padding: 0.5em 1em;
+  border: 2px solid hsl(var(--accent) / 0.85);
+  color: hsl(var(--accent));
+  font-family: "IBM Plex Mono", monospace;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: rotate(-3deg);
+  opacity: 0;
+}
+.kf-stamp.stamped { animation: kf-stamp-in 0.42s cubic-bezier(0.34, 1.56, 0.64, 1) forwards; }
+@keyframes kf-stamp-in {
+  0% { opacity: 0; transform: rotate(-3deg) scale(1.35); }
+  60% { opacity: 1; }
+  100% { opacity: 0.92; transform: rotate(-3deg) scale(1); }
+}
+
+/* Degauss thump — one-shot on phosphor theme switch. JS adds .kf-degauss to
+   <html>, removes it on animationend. The tube physically reacts. */
+.kf-degauss body { animation: kf-degauss 0.32s cubic-bezier(0.34, 1.56, 0.64, 1); }
+@keyframes kf-degauss {
+  0% { filter: brightness(1.35) saturate(1.2); transform: scale(1.006); }
+  100% { filter: brightness(1) saturate(1); transform: scale(1); }
+}
+
+/* Beam cursor — the navbar's sliding 2px segment lives on this class. */
+.beam-cursor {
+  background: hsl(var(--beam-hot));
+  box-shadow: 0 0 6px hsl(var(--beam-hot) / 0.6);
+  transition: left 0.28s var(--ease-out-expo), width 0.28s var(--ease-out-expo), opacity 0.28s;
+}
+
+/* Typed line caret */
+.beam-caret {
+  display: inline-block;
+  width: 0.55em;
+  height: 1.05em;
+  vertical-align: text-bottom;
+  background: hsl(var(--beam-hot));
+  animation: beam-caret-blink 1.06s steps(1) infinite;
+}
+@keyframes beam-caret-blink { 50% { opacity: 0; } }
+
+/* Raster scan — a bright line sweeps a matrix top to bottom exactly once;
+   cells ignite as it passes (per-cell transition-delay set inline). */
+.raster-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: hsl(var(--beam-hot) / 0.9);
+  box-shadow: 0 0 12px hsl(var(--beam-mid) / 0.8);
+  pointer-events: none;
+  opacity: 0;
+}
+.raster-scanning .raster-line { animation: raster-pass var(--raster-ms, 900ms) linear forwards; }
+@keyframes raster-pass {
+  0% { opacity: 1; top: 0; }
+  96% { opacity: 1; }
+  100% { opacity: 0; top: 100%; }
+}
+.raster-cell {
+  opacity: 0;
+  transition: opacity 0.3s var(--ease-out-expo);
+}
+.raster-scanning .raster-cell, .raster-done .raster-cell { opacity: 1; }
+
+/* Highlight mark — emulates dragging a text selection across a phrase.
+   Sweeps in left→right on beam grant (inside an .anno-in container), then
+   holds: phosphor block behind near-black glass-tinted text. */
+.hl-mark {
+  background-image: linear-gradient(hsl(var(--beam-hot)), hsl(var(--beam-hot)));
+  background-repeat: no-repeat;
+  background-size: 0% 100%;
+  color: hsl(var(--beam-hot));
+  padding: 0.05em 0.3em;
+  margin-left: -0.1em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  transition: background-size 0.55s var(--ease-out-expo) 0.35s, color 0.25s ease 0.5s;
+}
+.anno-in .hl-mark, .hl-mark.on {
+  background-size: 100% 100%;
+  color: hsl(var(--tube-h) 28% 5%);
+}
+
+/* Annotation rise — etched rows fading up 4px on grant (stagger inline). */
+.anno { opacity: 0; transform: translateY(4px); }
+.anno-in .anno {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.35s var(--ease-out-expo), transform 0.35s var(--ease-out-expo);
+  transition-delay: var(--anno-delay, 0ms);
+}
+
+@keyframes hero-signal-fallback-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.hero-signal-fallback-in {
+  animation: hero-signal-fallback-in 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ---- DESKTOP SCALE ---------------------------------------------------------
+   The site reads ~40% bigger on large desktops (the user call: 140% browser
+   zoom "looks right"). CSS zoom scales every length INCLUDING viewport units
+   — which browser zoom does not — so viewport-sized pieces divide the factor
+   back out via --pz to keep true screen fit (the full-screen hero, the sticky
+   sweep, drawer heights). Unlayered on purpose: must beat @layer utilities. */
+:root { --pz: 1; }
+@media (min-width: 1440px) { :root { zoom: 1.2; --pz: 1.2; } }
+@media (min-width: 1800px) { :root { zoom: 1.4; --pz: 1.4; } }
+
+.min-h-\[100svh\] { min-height: calc(100svh / var(--pz)); }
+.h-\[100svh\] { height: calc(100svh / var(--pz)); }
+.h-\[190svh\] { height: calc(190svh / var(--pz)); }
+.min-h-\[90vh\] { min-height: calc(90vh / var(--pz)); }
+.h-\[50vh\] { height: calc(50vh / var(--pz)); }
+.max-h-\[46vh\] { max-height: calc(46vh / var(--pz)); }
+.max-h-\[60vh\] { max-height: calc(60vh / var(--pz)); }
+.max-h-\[85vh\] { max-height: calc(85vh / var(--pz)); }
+.max-h-\[90vh\] { max-height: calc(90vh / var(--pz)); }
+.max-w-\[90vw\] { max-width: calc(90vw / var(--pz)); }
+.pt-\[30vh\] { padding-top: calc(30vh / var(--pz)); }
+.mt-\[3vh\] { margin-top: calc(3vh / var(--pz)); }
+
+/* ---- ASCII HEADINGS ---------------------------------------------------------
+   Section headlines as figlet banners (components/ascii-heading). Beam-hot
+   phosphor + soft glow; wiped in left-to-right when granted, like a line
+   printing. Unlayered so it wins over utilities. */
+.ascii-heading {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  line-height: 1.12;
+  white-space: pre;
+  color: hsl(var(--beam-hot));
+  text-shadow:
+    0 0 6px hsl(var(--beam-hot) / 0.55),
+    0 0 22px hsl(var(--beam-hot) / 0.22);
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  transition:
+    clip-path 0.9s var(--ease-out-expo, cubic-bezier(0.16, 1, 0.3, 1)),
+    opacity 0.35s ease;
+}
+.ascii-heading.on {
+  clip-path: inset(0 -2% 0 0); /* -2%: don't shave the glow's right edge */
+  opacity: 1;
+}
+.ascii-heading.instant {
+  transition: none;
+}

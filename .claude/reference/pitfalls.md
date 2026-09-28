@@ -2,4 +2,18 @@
 
 > Accumulated project-specific gotchas. Dated entries, newest at the bottom. If this file exceeds ~200 lines, split by area (`pitfalls-<area>.md`) and update the CLAUDE.md index.
 
-_(empty. Confirmed quirks land here as they bite, via recall)_
+### 2026-06-23: Dead-code component trap: edit the file that's actually rendered
+
+`client/src/components/hero.tsx` is NOT on the live site; only `client/src/pages/home-legacy.tsx` imports it. The `/` route (`client/src/App.tsx`) renders `client/src/pages/home.tsx`, which defines its own inline `Hero()` holding the hero `<h1>`. The persistent "KINE FRACTAL" logo is the navbar's ASCII `<pre>` in `client/src/components/navbar.tsx`.
+
+Symptom: an edit to `components/hero.tsx` merged and nothing changed on screen. Before editing "the hero", "the logo" or any section, trace route in `App.tsx` → page file → inline JSX. Pages inline their sections and stale same-named components (`*-legacy.tsx`) remain, so a `components/<name>.tsx` matching the concept is not proof it's wired in.
+
+### 2026-07-01: The site can silently serve a stale engine generation
+
+The site showed FearLab v2 numbers for about two weeks after v3.8 became the deployed default, because the engine's site emitter hard-filtered the old variant and nothing on the site side noticed.
+
+When the engine flips a deployed version, the site snapshot must follow: run `npm run check:snapshot`, and once the prod worker has republished, `npm run sync:snapshot`. Fast audit: compare `client/public/fearlab/board.json` `generated`/`variant` with the live `/api/fearlab/board.json`, and grep `client/src` for the previous variant string.
+
+### 2026-07-12: DESIGN.md "no fabricated data as texture" is not a ban on decorative visuals
+
+User clarification: the homepage ignition Lissajous and visuals like it are decoration and are fine. The DESIGN.md rule targets fake data VALUES presented as real (invented numbers, made-up curves labeled as history), not ornamental motion.

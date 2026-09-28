@@ -1,0 +1,7 @@
+# https://kinefractal.com
+User-agent: *
+Allow: /
+Disallow: /account
+Disallow: /api/
+
+Sitemap: https://kinefractal.com/sitemap.xml

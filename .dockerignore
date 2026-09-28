@@ -1,0 +1,19 @@
+# Whitelist: exclude everything, re-include only what the Dockerfile builds from.
+# Keeps the agent harness (.claude/, .agents/), docs and scratch out of the image.
+*
+
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts
+!vite-plugin-meta-images.ts
+!postcss.config.js
+!components.json
+!drizzle.config.ts
+!client/
+!server/
+!shared/
+!attached_assets/
+
+**/*.test.*
+**/node_modules
