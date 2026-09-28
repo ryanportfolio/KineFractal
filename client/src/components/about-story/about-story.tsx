@@ -10,7 +10,10 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { DEPLOY } from "@/data/fearlab-board";
 import { fetchBoardCached, fetchReportCached } from "@/data/lab-data";
-import { BEATS, buildStory, clamp01, episodeClock, windowAlpha, type Episode, type StoryData } from "@/lib/about-story-model";
+import {
+  BEATS, StoryPlayback, buildStory, clamp01, episodeClock, readSecs, windowAlpha,
+  type Episode, type PaceWindow, type StoryData,
+} from "@/lib/about-story-model";
 import { buildGeometry, drawStory, type Label, type Palette } from "./story-scene";
 import { StoryRenderer, hslTriplet } from "./story-renderer";
 
@@ -24,6 +27,8 @@ interface Caption {
   eyebrow?: string;
   body: ReactNode;
   stamp?: string;
+  /** reading time in seconds; string bodies derive it from their word count */
+  read?: number;
 }
 
 const shortDate = (d: string) =>
@@ -152,6 +157,7 @@ function buildCaptions(d: StoryData): Caption[] {
         </>
       ),
       stamp: "buys fear in SPY, QQQ and IWM → trims into strength",
+      read: 5,
     },
   );
   return caps;
@@ -213,6 +219,7 @@ export function AboutStory() {
   const labelsRef = useRef<HTMLDivElement | null>(null);
   const hudRef = useRef<HTMLDivElement | null>(null);
   const barRef = useRef<HTMLDivElement | null>(null);
+  const skipRef = useRef<HTMLButtonElement | null>(null);
   const capRefs = useRef<(HTMLDivElement | null)[]>([]);
   const [data, setData] = useState<StoryData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -234,6 +241,10 @@ export function AboutStory() {
   }, []);
 
   const captions = useMemo(() => (data ? buildCaptions(data) : []), [data]);
+  const pace = useMemo<PaceWindow[]>(
+    () => captions.map((c) => ({ a: c.a, b: c.b, read: c.read ?? readSecs(typeof c.body === "string" ? c.body : "") })),
+    [captions],
+  );
 
   useEffect(() => {
     const section = sectionRef.current, canvas = canvasRef.current, labelHost = labelsRef.current;
@@ -248,14 +259,31 @@ export function AboutStory() {
     const themeObs = new MutationObserver(() => { ({ pal, bg } = readPalette()); renderer.bg = bg; });
     themeObs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-phosphor"] });
 
-    let target = 0, shown = 0;
-    const measure = () => {
+    // StoryPlayback (about-story-model) decides where the film is and when the
+    // page must be held or carried; this effect only reads and moves the scroll.
+    const span = () => {
       const rect = section.getBoundingClientRect();
-      const total = rect.height - window.innerHeight;
-      target = total > 0 ? clamp01(-rect.top / total) : 0;
+      return { top: rect.top + window.scrollY, total: rect.height - window.innerHeight, rectTop: rect.top };
     };
-    measure();
-    shown = target;
+    const pageNow = () => {
+      const { total, rectTop } = span();
+      return total > 0 ? clamp01(-rectTop / total) : 0;
+    };
+    const scrollToP = (p: number) => {
+      const { top, total } = span();
+      if (total > 0) window.scrollTo(0, top + p * total);
+    };
+    const play = new StoryPlayback(pace, pageNow());
+    const measure = () => {
+      const hold = play.onScroll(pageNow(), performance.now());
+      if (hold != null) scrollToP(hold);
+    };
+    const skip = () => {
+      play.skip();
+      scrollToP(1);
+    };
+    const skipBtn = skipRef.current;
+    skipBtn?.addEventListener("click", skip);
 
     let inView = false, raf = 0, last = performance.now();
     const t0 = last;
@@ -264,9 +292,14 @@ export function AboutStory() {
       const dt = Math.min(0.1, (now - last) / 1000);
       const ms = now - last;
       last = now;
-      shown += (target - shown) * (1 - Math.exp(-dt * 6));
-      if (Math.abs(target - shown) < 1e-5) shown = target;
-      const p = shown, time = (now - t0) / 1000;
+      const carry = play.tick(dt);
+      if (carry != null) scrollToP(carry);
+      const p = play.shown, time = (now - t0) / 1000;
+      if (skipBtn) {
+        const on = play.skipOffered(now);
+        skipBtn.style.opacity = on ? "1" : "0";
+        skipBtn.style.pointerEvents = on ? "auto" : "none";
+      }
 
       if (renderer.ok) {
         renderer.resize();
@@ -311,16 +344,27 @@ export function AboutStory() {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       document.removeEventListener("visibilitychange", kick);
+      skipBtn?.removeEventListener("click", skip);
       renderer.destroy();
       labelHost.replaceChildren();
     };
-  }, [data, captions]);
+  }, [data, captions, pace]);
 
   return (
-    <section ref={sectionRef} aria-label="How FearLab works, as a scrolling story" className="relative" style={{ height: `calc(${SCROLL_VH}vh / var(--pz))` }}>
+    <section ref={sectionRef} data-about-story aria-label="How FearLab works, as a scrolling story" className="relative" style={{ height: `calc(${SCROLL_VH}vh / var(--pz))` }}>
       {/* viewport units divide out the desktop CSS zoom (--pz, index.css) */}
       <div className="sticky top-0 w-full overflow-hidden" style={{ height: "calc(100vh / var(--pz))" }}>
-        <canvas ref={canvasRef} aria-hidden="true" className="absolute inset-0 block h-full w-full" style={{ visibility: noGl ? "hidden" : "visible" }} />
+        {/* the top edge feathers into the page so the film never enters as a hard line */}
+        <canvas
+          ref={canvasRef}
+          aria-hidden="true"
+          className="absolute inset-0 block h-full w-full"
+          style={{
+            visibility: noGl ? "hidden" : "visible",
+            maskImage: "linear-gradient(to bottom, transparent, black 14%)",
+            WebkitMaskImage: "linear-gradient(to bottom, transparent, black 14%)",
+          }}
+        />
         <div ref={labelsRef} aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[46%] bg-gradient-to-t from-background via-background/70 to-transparent" />
 
@@ -351,6 +395,15 @@ export function AboutStory() {
             </div>
           ))}
         </div>
+
+        <button
+          ref={skipRef}
+          type="button"
+          className="etched absolute right-5 text-beam-dim transition-opacity duration-300 hover:text-beam-hot md:right-[6vw]"
+          style={{ bottom: "calc(4vh / var(--pz) + 12px)", opacity: 0, pointerEvents: "none" }}
+        >
+          skip to the end ↓
+        </button>
 
         <div aria-hidden="true" className="absolute left-5 right-5 h-px bg-[hsl(var(--beam-ghost))] md:left-[6vw] md:right-[6vw]" style={{ bottom: "calc(4vh / var(--pz))" }}>
           <div ref={barRef} className="h-px origin-left bg-[hsl(var(--beam-hot))]" style={{ transform: "scaleX(0)" }} />

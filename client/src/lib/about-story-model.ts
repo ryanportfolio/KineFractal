@@ -41,6 +41,129 @@ export function windowAlpha(p: number, a: number, b: number, edge = 0.012): numb
   return Math.min(clamp01((p - a) / e), clamp01((b - p) / e));
 }
 
+// ---- playback pace ----------------------------------------------------------------
+// Scroll sets where the reader wants to be; the film moves there no faster than
+// these limits, so a hard flick still plays every beat. Inside a caption's
+// window the limit stretches the window over the caption's reading time;
+// between captions (camera flights, scene reveals) the film may move at most
+// FREE_RATE. Rewinding is allowed REWIND_MULT times faster.
+export const FREE_RATE = 1 / 45; // progress per second with no caption up
+export const REWIND_MULT = 4;
+/** how far scroll may run ahead of the film before the page is held */
+export const SCROLL_LEAD = 0.01;
+
+export interface PaceWindow { a: number; b: number; read: number }
+
+/** seconds to read a caption: ~210 words a minute plus a beat to notice it */
+export function readSecs(text: string): number {
+  const words = text.trim().split(/\s+/).filter(Boolean).length;
+  return Math.min(7, Math.max(2.5, 1.5 + words * 0.29));
+}
+
+/** fastest allowed forward progress per second at progress p */
+export function paceLimit(windows: PaceWindow[], p: number): number {
+  let lim = FREE_RATE;
+  for (const w of windows) {
+    if (p >= w.a && p < w.b) lim = Math.min(lim, (w.b - w.a) / w.read);
+  }
+  return lim;
+}
+
+/** one playback step: eased toward target, clamped to the pace limit */
+export function stepShown(windows: PaceWindow[], shown: number, target: number, dt: number): number {
+  const eased = (target - shown) * (1 - Math.exp(-dt * 6));
+  const lim = paceLimit(windows, shown) * dt;
+  const next = shown + Math.max(-lim * REWIND_MULT, Math.min(lim, eased));
+  return Math.abs(target - next) < 1e-5 ? target : next;
+}
+
+// ---- playback ----------------------------------------------------------------------
+// Scroll position (`page`, 0..1 through the film section) and film position
+// (`shown`) are decoupled:
+//   before AUTOPLAY_AT   the film follows scroll at the capped pace, and the page
+//                        is held SCROLL_LEAD ahead of it
+//   autoplay             once the reader has pushed a little way into the film
+//                        (the spot has lit), the film plays to the end at its own pace; the page
+//                        is carried along and scrolling down cannot outrun it.
+//                        Scrolling up rewinds and pauses autoplay; scrolling down
+//                        again resumes it.
+//   finished             after the film has reached the end once (or was
+//                        skipped), scroll drives it directly with no cap
+export const AUTOPLAY_AT = 0.015;
+const REWIND_EPS = 0.002;
+
+export class StoryPlayback {
+  shown: number;
+  page: number;
+  wanted: number;
+  auto = false;
+  finished: boolean;
+  private heldAt = -1e9;
+
+  constructor(private pace: PaceWindow[], start: number) {
+    this.shown = this.page = this.wanted = start;
+    this.finished = start >= 1;
+  }
+
+  /** the reader scrolled to `page`; returns a progress to hold the page at, or null */
+  onScroll(page: number, now: number): number | null {
+    this.page = page;
+    if (this.finished) {
+      this.wanted = page;
+      return null;
+    }
+    if (page < this.shown - REWIND_EPS) {
+      this.auto = false;
+      this.wanted = page;
+      return null;
+    }
+    if (page > this.wanted) this.wanted = page;
+    if (!this.auto && this.shown >= AUTOPLAY_AT && page > this.shown + 1e-4) this.auto = true;
+    const max = this.shown + (this.auto ? 0 : SCROLL_LEAD);
+    if (page > max + 1e-4) {
+      this.heldAt = now;
+      this.page = max;
+      return max;
+    }
+    return null;
+  }
+
+  /** advance the film; returns a progress to carry the page to, or null */
+  tick(dt: number): number | null {
+    if (this.finished) {
+      const next = this.shown + (this.wanted - this.shown) * (1 - Math.exp(-dt * 6));
+      this.shown = Math.abs(this.wanted - next) < 1e-5 ? this.wanted : next;
+      return null;
+    }
+    if (!this.auto && this.shown >= AUTOPLAY_AT && this.wanted > this.shown + 1e-4) this.auto = true;
+    if (this.auto) this.wanted = 1;
+    this.shown = stepShown(this.pace, this.shown, this.wanted, dt);
+    if (this.shown >= 1) {
+      this.finished = true;
+      this.auto = false;
+    }
+    if (this.wanted > this.page) {
+      const carry = this.auto || this.finished ? this.shown : Math.min(this.wanted, this.shown + SCROLL_LEAD);
+      if (carry > this.page + 1e-4) {
+        this.page = carry;
+        return carry;
+      }
+    }
+    return null;
+  }
+
+  skip() {
+    this.shown = this.wanted = this.page = 1;
+    this.finished = true;
+    this.auto = false;
+  }
+
+  /** offer a skip while the film is autoplaying or holding the reader back */
+  skipOffered(now: number): boolean {
+    return !this.finished && (this.auto || now - this.heldAt < 2500);
+  }
+}
+
 // ---- the 2020 episode's narrated events ---------------------------------------
 // Date -> caption. Each must match a fill of the same side in the episode file
 // (enforced by the model test); the copy mirrors the homepage rulebook callouts.

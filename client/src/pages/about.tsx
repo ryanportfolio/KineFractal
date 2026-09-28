@@ -1,12 +1,14 @@
 // About — the story page, told as a scroll film.
 //
-// The hero introduces the brand; AboutStory then pins a full-screen canvas
+// The hero introduces the brand while AboutRail draws the ignition figure in
+// the margin; AboutStory then pins a full-screen canvas
 // and plays the engine's story from bundled report data as the reader
 // scrolls. The short note underneath keeps the page's standing caveats.
 import { Link } from "wouter";
 import { Navbar } from "@/components/navbar";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
 import { AboutHero } from "@/components/about-hero";
+import { AboutRail } from "@/components/about-rail";
 import { AboutStory } from "@/components/about-story/about-story";
 import { DEPLOY } from "@/data/fearlab-board";
 import { useEngineLabel } from "@/hooks/use-fearlab-live";
@@ -26,8 +28,10 @@ export default function About() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Navbar />
+      <AboutRail />
       <main className="pb-24">
-        <div className="px-5 pt-28 md:px-10">
+        {/* above the margin figure, so its coils pass behind the hero cards */}
+        <div className="relative z-10 px-5 pt-28 md:px-10">
           <AboutHero />
         </div>
         <AboutStory />
