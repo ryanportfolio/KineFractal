@@ -10,6 +10,7 @@
     "babysit-ci": "native",
     "brainstorming": "native",
     "bro": "native",
+    "build-kinefractal-ui": "native",
     "caveman": "native",
     "claude-review": "native",
     "codex-fullreview": "disabled",
