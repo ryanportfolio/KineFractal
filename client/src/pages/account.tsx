@@ -9,6 +9,12 @@ import { Link } from "wouter";
 import { ShieldCheck, MailCheck, MailWarning, LogOut, FileCheck2, ListChecks, BellRing } from "lucide-react";
 import { useSession, signIn, signUp, signOut, authClient, csrfFetch } from "@/lib/auth-client";
 import { TOS_VERSION, TOS_POINTS } from "@shared/tos";
+import { safeNext, nextLabel } from "@/lib/safe-next";
+
+// Where to send the visitor after signing in (?next=, same-origin paths only).
+function readNext(): string | null {
+  return safeNext(new URLSearchParams(window.location.search).get("next"));
+}
 
 type Me = {
   user: { id: string; email: string; name: string; emailVerified: boolean } | null;
@@ -39,6 +45,8 @@ function AuthForms() {
       } else {
         const r = await signIn.email({ email, password });
         if (r.error) throw new Error(r.error.message || "sign in failed");
+        const next = readNext();
+        if (next) window.location.assign(next);
       }
     } catch (err: any) {
       setError(err.message);
@@ -306,6 +314,7 @@ export default function Account() {
   const { data: session, isPending } = useSession();
   const [me, setMe] = useState<Me | null>(null);
   const [resent, setResent] = useState(false);
+  const [next] = useState(readNext);
 
   useDocumentMeta({ title: "Account", description: "Manage your Kine Fractal account and alert preferences." });
 
@@ -333,6 +342,16 @@ export default function Account() {
         <h1 className="text-2xl font-bold uppercase tracking-tighter mb-8">
           Account<span className="text-primary">_</span>
         </h1>
+
+        {session?.user && next && (
+          <a
+            href={next}
+            className="mb-6 flex items-center justify-between gap-4 border border-primary/60 rounded-lg px-5 py-4 font-mono text-sm text-primary hover:bg-primary/5"
+          >
+            <span>Signed in. Your account is ready to use on {nextLabel(next)}.</span>
+            <span className="uppercase tracking-widest text-xs">Back to {nextLabel(next)} →</span>
+          </a>
+        )}
 
         {isPending ? (
           <div className="text-xs font-mono text-muted-foreground">loading…</div>
