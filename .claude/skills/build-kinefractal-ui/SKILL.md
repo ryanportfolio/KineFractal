@@ -43,7 +43,7 @@ When improving an existing screen, fix in this order and stop once the request i
 7. **One wording per action.** The sign-in call to action reads the same in the toolbar, the dialogs and the navbar.
 8. **Keyboard and screen reader.** Every new control is a real `<button>`, `<a>` or form element with a visible focus style and an accessible name that does not depend on `title` alone. Dialogs trap focus, close on Esc, return focus to the opener, and announce status changes through an `aria-live="polite"` region. Fixed bars and overlays must not cover the focused element.
 9. **Targets and widths.** Hit targets are at least 24 px on desktop and 44 px below 600 px; a checkbox and its label form one target. Check at 375 px and at the user's desktop width (1920 px when unknown). Toolbars wrap; they must not push account controls off-screen. Native `<select>` and inputs get explicit dark background and text colours.
-10. **Security stays server-side.** UI hides or shows affordances; the server enforces access. Never read secrets, tokens or session cookies in page script, and keep CSRF helpers on state-changing calls.
+10. **Security stays server-side.** UI hides or shows affordances; the server enforces access. Never read secrets, tokens or session cookies in page script, and keep the existing CSRF posture per route: React pages send state-changing `/api/*` calls through `csrfFetch`; the chart app cannot carry a token, so its writes follow the reference's chart-route rules.
 
 ## 4. Verify honestly
 

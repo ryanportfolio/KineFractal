@@ -29,6 +29,8 @@ If the user asks for a site-only prototype first, build it in `.tmp/` and say it
 - Hand lines persist through `/labels/*` per account; signed out they fall back to localStorage and save errors say "sign in at /account".
 - `/account` (React, `client/src/pages/account.tsx`) reads `?mode=signup` but has no return-to parameter today. A sign-in entry point on charts needs one: accept only same-origin relative paths (reject `//host`, schemes and backslashes) so it cannot become an open redirect, and carry the chart's ticker and timeframe.
 
+Chart writes (`/labels/save`, `/watchlist/add`) use raw `fetch` with no CSRF token, by design: the page is a shared artifact and cannot carry one. Their protection is the SameSite=Lax session cookie, a simple or preflighted request shape, server validation and the rate limiters in `server/security.ts`. A new chart write route copies that posture and gets its own limiter there; do not add `csrfProtection` to it or route it under `/api/` paths that require the token.
+
 When adding an account indicator, drive it from `siteUser` and re-render when the probe resolves; do not add a second `/api/me` call. Signed-in state should reach every consumer that currently checks `siteUser` or `_chartAccess` without a page reload where practical.
 
 ## Design system of this file
