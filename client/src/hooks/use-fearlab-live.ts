@@ -8,7 +8,7 @@
 // - age_hours: hours since the artifact was generated (null when unknown/static)
 import { useQuery } from "@tanstack/react-query";
 import {
-  fetchBoardLive,
+  fetchBoardLiveShared,
   type Board,
   type LiveMeta,
   type LiveResult,
@@ -79,7 +79,7 @@ const FIVE_MIN = 5 * 60 * 1000;
 export function useBoard() {
   const q = useQuery<LiveResult<Board>>({
     queryKey: ["fearlab", "board"],
-    queryFn: fetchBoardLive,
+    queryFn: fetchBoardLiveShared,
     staleTime: FIVE_MIN,
     retry: 1,
   });

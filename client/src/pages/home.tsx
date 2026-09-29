@@ -12,7 +12,7 @@
 // at a time. No cards, no glass, no idle glow — darkness, hairlines, light.
 // Every animated value comes from board.json, a report JSON, the replay cast
 // or the live fear state. See DESIGN.md.
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { HeroSignal } from "@/components/hero-signal";
 import { VerdictChannels } from "@/components/verdict-channels";
@@ -27,6 +27,75 @@ import {
   DEPLOY,
   BOARD_GENERATED,
 } from "@/data/fearlab-board";
+
+// ---- /#rulebook ------------------------------------------------------------
+// The rulebook sits behind Defer, so a link or a direct load of /#rulebook
+// finds no target. When the hash names it, the sections down to it mount at
+// once and the page scrolls there, re-aiming while the sections above it
+// finish sizing, until the reader scrolls themselves.
+function useRulebookHash(): boolean {
+  const read = () => typeof window !== "undefined" && window.location.hash === "#rulebook";
+  // bumps on every arrival at #rulebook, including a same-page link click
+  // (wouter navigates with pushState, which fires no hashchange: it dispatches
+  // its own "pushState" / "replaceState" events instead)
+  const [visit, setVisit] = useState(() => (read() ? 1 : 0));
+  const on = visit > 0;
+  useEffect(() => {
+    const onNav = () => { if (read()) setVisit((n) => n + 1); };
+    const evs = ["hashchange", "popstate", "pushState", "replaceState"];
+    evs.forEach((e) => window.addEventListener(e, onNav));
+    return () => evs.forEach((e) => window.removeEventListener(e, onNav));
+  }, []);
+  useEffect(() => {
+    if (!visit) return;
+    let stopped = false;
+    const stop = () => { stopped = true; };
+    const opts = { passive: true, once: true } as const;
+    window.addEventListener("wheel", stop, opts);
+    window.addEventListener("touchstart", stop, opts);
+    window.addEventListener("pointerdown", stop, opts);
+    window.addEventListener("keydown", stop, { once: true });
+    // The section's top goes 1 px above the viewport, not to its scroll margin:
+    // with any sliver of the gauges above still on screen the beam scheduler
+    // ties them with this tall section and the rulebook never draws. Its own
+    // top padding keeps the "05" heading clear of the navbar.
+    let focused = false;
+    const aim = () => {
+      const el = document.getElementById("rulebook");
+      if (!stopped && el) window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY + 1);
+      // keyboard and screen-reader users land in the rulebook too, once it exists
+      if (el && !focused) {
+        focused = true;
+        if (!el.hasAttribute("tabindex")) el.tabIndex = -1;
+        el.focus({ preventScroll: true });
+      }
+    };
+    // keep aiming while the sections above it load and size (a slow report
+    // can swap a short placeholder for a tall table seconds later): stop only
+    // when the reader takes over, the hash no longer names it (Back), or 10 s
+    // have passed. aim() does nothing while the target is already in place.
+    const t0 = performance.now();
+    const timer = setInterval(() => {
+      if (stopped || window.location.hash !== "#rulebook" || performance.now() - t0 > 10000) { clearInterval(timer); return; }
+      const el = document.getElementById("rulebook");
+      if (el && Math.abs(el.getBoundingClientRect().top + 1) >= 1) aim();
+    }, 150);
+    aim();
+    const onBack = () => { if (window.location.hash !== "#rulebook") stop(); };
+    window.addEventListener("popstate", onBack);
+    window.addEventListener("hashchange", onBack);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener("popstate", onBack);
+      window.removeEventListener("hashchange", onBack);
+      window.removeEventListener("wheel", stop);
+      window.removeEventListener("touchstart", stop);
+      window.removeEventListener("pointerdown", stop);
+      window.removeEventListener("keydown", stop);
+    };
+  }, [visit]);
+  return on;
+}
 
 // ---- Live board overlay -----------------------------------------------------
 // The static snapshot renders instantly; once board.json lands, its live
@@ -82,6 +151,7 @@ function liveNums<T extends { ret: number; bench_ret: number; dd: number }>(
 }
 
 export default function Home() {
+  const toRulebook = useRulebookHash();
   const board = useLiveBoard();
   const deploy = DEPLOY.map((d) => ({
     ...d,
@@ -99,12 +169,12 @@ export default function Home() {
         <HeroSignal />
         {/* Below-fold movements mount as they approach the viewport (Defer),
             so first paint builds only the hero. */}
-        <Defer><VerdictChannels deploy={deploy} /></Defer>
+        <Defer eager={toRulebook}><VerdictChannels deploy={deploy} /></Defer>
         {/* StorageSweep ("33 years in 60 seconds") hidden for now per request —
             re-enable by restoring <StorageSweep /> here */}
-        <Defer><SpyMonthlyRecord /></Defer>
-        <Defer><ArmingGauges /></Defer>
-        <Defer><Rulebook /></Defer>
+        <Defer eager={toRulebook}><SpyMonthlyRecord /></Defer>
+        <Defer eager={toRulebook}><ArmingGauges /></Defer>
+        <Defer eager={toRulebook}><Rulebook /></Defer>
         <Defer><LedgerSection generated={generated} /></Defer>
       </main>
     </>

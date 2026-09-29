@@ -10,6 +10,7 @@
 // Performance contract (same family as persistence-engine.ts):
 //   DPR cap 1.5 · bloom from half res · the caller pauses the loop off-screen
 //   and while hidden · context-loss re-init · slow frames drop render scale.
+import { FrameGovernor } from "@/lib/about-story-model";
 
 export type Vec3 = [number, number, number];
 export type RGB = [number, number, number];
@@ -57,7 +58,9 @@ void main() {
   float fog = 1.0 - smoothstep(u_fog.x, u_fog.y, depth);
   v_px = px; v_a = s0; v_b = s1; v_r = r; v_cap = a_cap;
   // a pulled-back (portrait) camera packs the same beams into fewer pixels
-  v_col = a_col.rgb * a_col.a * fog / pow(u_k, 0.45);
+  // beams passing right by the lens fade instead of blowing out the frame
+  float nearFade = smoothstep(0.6, 2.4, depth);
+  v_col = a_col.rgb * a_col.a * fog * nearFade / pow(u_k, 0.45);
   gl_Position = vec4(px / u_res * 2.0 - 1.0, 0.0, 1.0);
 }`;
 
@@ -126,7 +129,8 @@ uniform vec3 u_bg; uniform float u_time; uniform float u_flash; uniform float u_
 void main() {
   vec2 c = v_uv - 0.5;
   float r2 = dot(c, c);
-  vec2 uv = 0.5 + c * (1.0 + 0.04 * r2);
+  // slight barrel, normalised so the corners still sample inside the frame
+  vec2 uv = 0.5 + c * (1.0 + 0.04 * r2) / 1.02;
   float ab = 0.0012 + 0.006 * r2;
   vec3 s;
   s.r = texture(u_scene, uv + c * ab).r;
@@ -137,7 +141,8 @@ void main() {
   col = 1.0 - exp(-col * 1.15);
   float sl = 0.9 + 0.1 * sin(gl_FragCoord.y * 3.14159 / (1.5 * u_px));
   col *= sl;
-  float vig = smoothstep(0.82, 0.18, length(c * vec2(1.0, 1.15)));
+  // (edges in order: reversed smoothstep edges are undefined in GLSL)
+  float vig = 1.0 - smoothstep(0.18, 0.82, length(c * vec2(1.0, 1.15)));
   col = u_bg + col * mix(0.5, 1.0, vig);
   col *= mix(0.72, 1.0, vig);
   float n = fract(sin(dot(gl_FragCoord.xy + fract(u_time) * 97.0, vec2(12.9898, 78.233))) * 43758.5453);
@@ -201,7 +206,7 @@ export class StoryRenderer {
   private scale = 1; // governor-reduced render scale
   private builtScale = 1;
   private dpr = 1;
-  private slow = 0;
+  private governor = new FrameGovernor();
   private hdr = false;
   private fog: [number, number] = [40, 60];
   private k = 1; // portrait camera pull-back factor
@@ -213,8 +218,15 @@ export class StoryRenderer {
     this.init();
   }
 
-  private onLost = (e: Event) => { e.preventDefault(); this.ok = false; };
-  private onRestored = () => { this.init(); };
+  /** called with false when the WebGL context is lost and true once it is restored */
+  onContextChange: ((ok: boolean, restoring: boolean) => void) | null = null;
+  private onLost = (e: Event) => { e.preventDefault(); this.ok = false; this.onContextChange?.(false, false); };
+  private onRestored = () => {
+    // init() rebuilds programs and render targets once; a device that cannot
+    // is reported as a failed restore (ok false), not a pause
+    this.init();
+    this.onContextChange?.(this.ok, true);
+  };
 
   private init() {
     const gl = this.canvas.getContext("webgl2", { alpha: false, antialias: false, premultipliedAlpha: false, powerPreference: "high-performance" });
@@ -226,7 +238,9 @@ export class StoryRenderer {
       this.downProg = this.program(QUAD_VS, DOWN_FS);
       this.upProg = this.program(QUAD_VS, UP_FS);
       this.compProg = this.program(QUAD_VS, COMP_FS);
-    } catch {
+    } catch (e) {
+      // keep the diagnostic: the page itself only says WebGL2 is unavailable
+      console.error("about film: WebGL program build failed", e);
       return;
     }
     const quad = new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]);
@@ -254,8 +268,10 @@ export class StoryRenderer {
       gl.vertexAttribDivisor(loc, 1);
     }
     gl.bindVertexArray(null);
+    // (handles from a lost context are already dead; deleting them is a no-op)
+    for (const t of this.targets) { gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex); }
     this.targets = [];
-    this.cssW = this.cssH = 0; // force target rebuild on next resize
+    this.cssW = this.cssH = 0; // force target rebuild on the resize below
     this.ok = true;
     this.resize();
   }
@@ -305,23 +321,50 @@ export class StoryRenderer {
     const pz = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--pz")) || 1;
     this.cssW = w; this.cssH = h; this.dpr = dpr; this.builtScale = this.scale;
     this.px = Math.min(dpr, DPR_CAP) * pz * this.scale;
+    // never ask for a texture or drawing buffer larger than the device allows
+    const vp = gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array;
+    const lim = Math.min(gl.getParameter(gl.MAX_TEXTURE_SIZE), gl.getParameter(gl.MAX_RENDERBUFFER_SIZE), vp[0], vp[1]);
+    this.px = Math.min(this.px, lim / w, lim / h);
     this.canvas.width = Math.round(w * this.px);
     this.canvas.height = Math.round(h * this.px);
-    for (const t of this.targets) { gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex); }
-    this.targets = [];
-    let tw = this.canvas.width, th = this.canvas.height;
-    for (let i = 0; i < LEVELS; i++) {
-      this.targets.push(this.makeTarget(Math.max(1, tw), Math.max(1, th)));
-      tw = Math.round(tw / 2); th = Math.round(th / 2);
+    const build = () => {
+      for (const t of this.targets) { gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex); }
+      this.targets = [];
+      let tw = this.canvas.width, th = this.canvas.height;
+      for (let i = 0; i < LEVELS; i++) {
+        this.targets.push(this.makeTarget(Math.max(1, tw), Math.max(1, th)));
+        tw = Math.round(tw / 2); th = Math.round(th / 2);
+      }
+      return this.targets.every((t) => {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, t.fbo);
+        return gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+      });
+    };
+    let complete = build();
+    // half-float targets are optional: fall back to 8-bit before giving up
+    if (!complete && this.hdr) { this.hdr = false; complete = build(); }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (!complete) {
+      console.error("about film: render targets incomplete", this.canvas.width, this.canvas.height);
+      this.ok = false;
+      this.onFail?.();
     }
   }
 
-  /** frame-time governor: sustained slow frames drop render resolution */
-  reportFrame(ms: number) {
-    this.slow = ms > 26 ? this.slow + 1 : 0;
-    if (this.slow > 5 && this.scale > 0.6) {
-      this.scale = Math.max(0.6, this.scale - 0.2);
-      this.slow = 0;
+  /** called once if the device cannot build the film's render targets */
+  onFail: (() => void) | null = null;
+
+  /** height of the stage in CSS px */
+  cssHeight() { return this.cssH; }
+
+  /** width / height of the stage in CSS px */
+  aspect() { return this.cssW / Math.max(1, this.cssH); }
+
+  /** frame-time governor (see FrameGovernor): may change render resolution */
+  reportFrame(interval: number, work = 0) {
+    const next = this.governor.report(interval, work);
+    if (next !== this.scale) {
+      this.scale = next;
       this.resize();
     }
   }
@@ -331,7 +374,7 @@ export class StoryRenderer {
     const aspect = this.cssW / this.cssH;
     // Scenes are composed for landscape. Narrower screens pull the camera back
     // along its view line (and push the fog out with it) so the width still fits.
-    const k = aspect < 1.5 ? (1.5 / Math.max(aspect, 0.3)) ** 1.1 : 1;
+    const k = aspect < 1.5 ? 1.5 / Math.max(aspect, 0.3) : 1;
     const eye: Vec3 = [
       cam.target[0] + (cam.eye[0] - cam.target[0]) * k,
       cam.target[1] + (cam.eye[1] - cam.target[1]) * k,
@@ -472,10 +515,24 @@ export class StoryRenderer {
     gl.activeTexture(gl.TEXTURE0);
   }
 
+  /**
+   * Release the GPU objects this renderer made. The context itself is left
+   * alive: a canvas keeps one context for its whole life, so losing it here
+   * would leave the next renderer on the same canvas (the film effect running
+   * again) with a dead context. The browser frees it with the canvas.
+   */
   destroy() {
     this.canvas.removeEventListener("webglcontextlost", this.onLost);
     this.canvas.removeEventListener("webglcontextrestored", this.onRestored);
-    this.gl?.getExtension("WEBGL_lose_context")?.loseContext();
+    const gl = this.gl;
+    if (gl && !gl.isContextLost()) {
+      for (const t of this.targets) { gl.deleteFramebuffer(t.fbo); gl.deleteTexture(t.tex); }
+      for (const p of [this.lineProg, this.downProg, this.upProg, this.compProg]) if (p) gl.deleteProgram(p);
+      if (this.quadVao) gl.deleteVertexArray(this.quadVao);
+      if (this.lineVao) gl.deleteVertexArray(this.lineVao);
+      if (this.instBuf) gl.deleteBuffer(this.instBuf);
+    }
+    this.targets = [];
     this.ok = false;
   }
 }

@@ -36,6 +36,12 @@ export default function About() {
         </div>
         <AboutStory />
         <div className="mx-auto max-w-4xl px-5 pt-16 md:px-10">
+          <nav id="about-next" tabIndex={-1} aria-label="Where to go next" className="mb-10 flex flex-wrap gap-x-6 font-mono text-[15px] outline-none [&>a]:inline-flex [&>a]:min-h-[44px] [&>a]:items-center">
+            <Link href="/" className="text-beam-hot underline underline-offset-4">latest decision →</Link>
+            <Link href="/#rulebook" className="text-beam-hot underline underline-offset-4">rulebook →</Link>
+            <Link href="/lab" className="text-beam-hot underline underline-offset-4">backtest reports →</Link>
+            <a href="/charts/" className="text-beam-hot underline underline-offset-4">charts →</a>
+          </nav>
           <p className="etched mb-6 text-beam-dim">
             {funds} · engine {variants} · end-of-day · long only
           </p>

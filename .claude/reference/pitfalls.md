@@ -33,3 +33,21 @@ Symptom: docs and comments carried over from range (kernel, README, deployment/t
 At widths of 1440px and up, `index.css` sets `zoom: 1.2` (1.4 from 1800px) on `:root` and exposes the factor as `--pz`. CSS zoom scales `vh`/`vw` too, so a new `h-screen` sticky stage or `bottom-[9vh]` overlay renders 20 to 40% taller than the screen and its bottom captions fall off the page. The About scroll film hit this: captions and the progress bar were cut off until the heights moved to `calc(100vh / var(--pz))`.
 
 Two related traps: `canvas.clientWidth` reports unzoomed CSS px, so a WebGL canvas sized from it renders below screen resolution unless the backing store also multiplies by `--pz`; and `getBoundingClientRect()` returns zoomed px while `offsetHeight` does not, so scroll-progress math must not mix the two. Existing full-screen utilities get unlayered overrides in `index.css` (`.h-\[100svh\]` and friends); new ones need either an override there or an inline `calc(... / var(--pz))`.
+
+### 2026-09-28: A Playwright locator call skews frame-time measurements
+
+Any `page.locator(...)` call (even `.count()`) injects Playwright's helper script into the page, and from then on requestAnimationFrame intervals in headed Chrome can sit at 30-40 ms instead of the panel's 10 ms. It hit the untouched home page as well as the About film, so it is the harness, not the site. A frame-time check that called `locator().count()` before measuring failed at 30 ms; the same sweep without it measured 10 ms.
+
+Measure frame time in a page that has never had a locator call: find elements with `page.evaluate(() => document.querySelector(...))` instead, or take the timing before any locator runs.
+
+### 2026-09-28: A detached Codex review sends no completion notice
+
+`nohup codex exec ... &` inside a background Bash call returns as soon as Codex is launched, so the "command completed" notice arrives at launch, not when the review ends. One review finished 25 minutes before anyone looked, while the session sat waiting for a notice that never came.
+
+Run `codex exec` itself as the background command (Bash `run_in_background`, no `nohup` or `&`), so the notice fires when Codex exits and `report.md` is written.
+
+### 2026-09-28: The engine repo is readable; check engine semantics there
+
+`ryanportfolio/range` is private but this account can read it: `gh api repos/ryanportfolio/range/contents/<path> -H "Accept: application/vnd.github.raw"`. A caption was once hedged as unconfirmable instead of being checked there, and the user corrected it.
+
+Confirmed from it: in `fearlab/episodes/*.json` a fill's `d` is the day the order fills, not the signal day. `emit_episode.py` takes it from the broker's fill `ts`, and `broker.py` `on_bar_open` fills market orders queued on the previous close at this bar's open; limit and stop fills land intrabar on the same bar.
