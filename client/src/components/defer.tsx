@@ -14,11 +14,14 @@ interface DeferProps {
   minHeight?: number;
   /** how far ahead of the viewport to mount (IntersectionObserver rootMargin) */
   rootMargin?: string;
+  /** mount at once (a URL hash points at this section or one below it) */
+  eager?: boolean;
 }
 
-export function Defer({ children, minHeight = 480, rootMargin = "700px" }: DeferProps) {
+export function Defer({ children, minHeight = 480, rootMargin = "700px", eager = false }: DeferProps) {
   const ref = useRef<HTMLDivElement>(null);
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(eager);
+  useEffect(() => { if (eager) setShow(true); }, [eager]);
 
   useEffect(() => {
     if (show) return;

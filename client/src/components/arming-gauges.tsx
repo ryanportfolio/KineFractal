@@ -112,7 +112,7 @@ export function ArmingGauges() {
           ))}
         </div>
         <p className="etched mt-5 text-beam-dim">
-          <Link href="/about" className="hover:text-beam-mid">full methodology →</Link>
+          <Link href="/#rulebook" className="hover:text-beam-mid">full methodology →</Link>
         </p>
       </div>
     </section>

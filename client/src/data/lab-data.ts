@@ -167,20 +167,34 @@ function unwrapEnvelope<T>(j: any, looksRight: (d: any) => boolean): LiveResult<
   return looksRight(data) ? { data: data as T, meta } : null;
 }
 
+const LIVE_DEADLINE_MS = 8000;
+
 async function fetchLive<T>(
   apiPath: string,
   staticPath: string,
   looksRight: (d: any) => boolean,
   errMsg: string,
+  signal?: AbortSignal,
 ): Promise<LiveResult<T>> {
+  // a live request that hangs must not hold the page: give up and use the
+  // snapshot. The deadline covers the body too (a stalled stream), and the
+  // caller's signal (unmount, retry, its own deadline) cancels both requests.
+  // (AbortController + timer: AbortSignal.timeout is missing on older Safari)
+  if (signal?.aborted) throw new Error("aborted");
+  const ctl = new AbortController();
+  const onOuter = () => ctl.abort();
+  signal?.addEventListener("abort", onOuter);
+  const timer = setTimeout(() => ctl.abort(), LIVE_DEADLINE_MS);
   try {
-    const r = await fetch(apiPath);
+    const r = await fetch(apiPath, { signal: ctl.signal });
     if (r.ok) {
       const out = unwrapEnvelope<T>(await r.json(), looksRight);
       if (out) return out;
     }
-  } catch { /* API unreachable — fall through to the static snapshot */ }
-  const r = await fetch(staticPath);
+  } catch { /* API unreachable or too slow — fall through to the static snapshot */ }
+  finally { clearTimeout(timer); signal?.removeEventListener("abort", onOuter); }
+  if (signal?.aborted) throw new Error("aborted");
+  const r = await fetch(staticPath, { signal });
   if (!r.ok) throw new Error(errMsg);
   const data = await r.json();
   if (!looksRight(data)) throw new Error(errMsg);
@@ -244,12 +258,13 @@ function isNormalizedReport(d: any): d is LabReport {
   return true;
 }
 
-export function fetchReportLive(key: string): Promise<LiveResult<LabReport>> {
+export function fetchReportLive(key: string, signal?: AbortSignal): Promise<LiveResult<LabReport>> {
   return fetchLive<LabReport>(
     `/api/fearlab/combo/${encodeURIComponent(key)}`,
     `/fearlab/${key}.json`,
     isNormalizedReport,
     `no report for ${key}`,
+    signal,
   );
 }
 export function fetchBoardLive(): Promise<LiveResult<Board>> {
@@ -278,11 +293,11 @@ const keyStem = (key: string): string => key.replace(/-v[\d][\w.]*$/, "");
 // key for the same sym/tf/window first, so a version flip auto-heals the site the
 // night the worker republishes — no repo change needed. Board unreachable / no
 // match -> the original key (offline still renders its last-baked snapshot).
-async function resolveDeployKey(key: string): Promise<string> {
+async function resolveDeployKey(key: string, fromBoard?: Board): Promise<string> {
   const stem = keyStem(key);
   if (stem === key) return key; // not a version-suffixed key
   try {
-    const board = await fetchBoardCached();
+    const board = fromBoard ?? await fetchBoardCached();
     const hit = board.combos.find((c) => keyStem(c.key) === stem);
     return hit?.key ?? key;
   } catch {
@@ -292,6 +307,49 @@ async function resolveDeployKey(key: string): Promise<string> {
 
 export async function fetchReport(key: string): Promise<LabReport> {
   return (await fetchReportLive(await resolveDeployKey(key))).data;
+}
+/** a `generated` stamp without a zone is UTC (as server/fearlab-live.ts parseGeneratedMs reads it) */
+function parseGeneratedUtc(g: string | undefined): number {
+  if (!g) return NaN;
+  let s = g.trim().replace(" ", "T");
+  if (!/Z$|[+-]\d{2}:?\d{2}$/.test(s)) s += "Z";
+  return Date.parse(s);
+}
+
+/** hours after which a report counts as stale (the server's board rule, STALE_AFTER_HOURS) */
+const REPORT_STALE_HOURS = 36;
+
+/**
+ * Like fetchReport, but keeps the freshness envelope (live / stale / bundled).
+ * If the live board's newer key has no response and no bundled file, the
+ * original key is tried, keeping whatever provenance it returns. Combo responses carry
+ * no stale/age fields, so a live report's freshness comes from its `generated`.
+ */
+export async function fetchReportWithMeta(key: string, board?: Board, signal?: AbortSignal): Promise<LiveResult<LabReport>> {
+  // resolve against the same board the caller shows, not an older cached one
+  const resolved = await resolveDeployKey(key, board);
+  let out: LiveResult<LabReport>;
+  try {
+    out = await fetchReportLive(resolved, signal);
+  } catch (e) {
+    if (resolved === key) throw e;
+    // the original key: live or bundled, its own envelope says which
+    out = await fetchReportLive(key, signal);
+  }
+  // a report with no drawdown history cannot draw the film: use the bundled file instead
+  // (an empty yearly list is fine: the film leaves the years scene out)
+  if (!(out.data.drawdown?.length > 1)) {
+    const r = await fetch(`/fearlab/${key}.json`, { signal });
+    const d = r.ok ? await r.json() : null;
+    if (!d || !isNormalizedReport(d) || !(d.drawdown?.length > 1)) throw new Error(`no report history for ${key}`);
+    return { data: d as LabReport, meta: { live: false, stale: true, age_hours: null } };
+  }
+  if (out.meta.live && out.meta.age_hours == null) {
+    const t = parseGeneratedUtc(out.data.generated);
+    const age = Number.isFinite(t) ? (Date.now() - t) / 3.6e6 : null;
+    out = { data: out.data, meta: { live: true, age_hours: age, stale: out.meta.stale || age == null || age > REPORT_STALE_HOURS } };
+  }
+  return out;
 }
 export async function fetchBoard(): Promise<Board> {
   return (await fetchBoardLive()).data;
@@ -308,9 +366,20 @@ export function fetchReportCached(key: string): Promise<LabReport> {
   }
   return p;
 }
+// One board request shared by every reader on a page load (report-key
+// resolution, the About film, the engine label): reused for 60 s, so a
+// periodic refetch still gets fresh data.
+let boardShared: { p: Promise<LiveResult<Board>>; at: number } | null = null;
+export function fetchBoardLiveShared(): Promise<LiveResult<Board>> {
+  if (!boardShared || Date.now() - boardShared.at > 60_000) {
+    const p = fetchBoardLive().catch((e) => { boardShared = null; throw e; });
+    boardShared = { p, at: Date.now() };
+  }
+  return boardShared.p;
+}
 let boardCache: Promise<Board> | null = null;
 export function fetchBoardCached(): Promise<Board> {
-  boardCache ??= fetchBoard().catch((e) => { boardCache = null; throw e; });
+  boardCache ??= fetchBoardLiveShared().then((r) => r.data).catch((e) => { boardCache = null; throw e; });
   return boardCache;
 }
 
