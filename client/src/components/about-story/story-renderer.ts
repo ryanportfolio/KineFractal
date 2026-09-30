@@ -360,13 +360,15 @@ export class StoryRenderer {
   /** width / height of the stage in CSS px */
   aspect() { return this.cssW / Math.max(1, this.cssH); }
 
+  /** current governor render scale (1 = full resolution) */
+  get renderScale() { return this.scale; }
+
   /** frame-time governor (see FrameGovernor): may change render resolution */
   reportFrame(interval: number, work = 0) {
-    const next = this.governor.report(interval, work);
-    if (next !== this.scale) {
-      this.scale = next;
-      this.resize();
-    }
+    // resizing here would clear the frame just drawn (a canvas size change
+    // wipes its buffer) and show one black frame; the next frame's resize()
+    // rebuilds at the new scale before it draws
+    this.scale = this.governor.report(interval, work);
   }
 
   begin(cam: Camera) {

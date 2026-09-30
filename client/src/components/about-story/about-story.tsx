@@ -11,11 +11,16 @@ import { Link } from "wouter";
 import { DEPLOY } from "@/data/fearlab-board";
 import { fetchBoardLiveShared, fetchReportWithMeta, type LiveMeta } from "@/data/lab-data";
 import {
-  StoryPlayback, buildStory, fmtPct, yearsThrough, clamp01, episodeClock, readSecs, windowAlpha,
+  StoryPlayback, buildStory, fmtPct, yearsThrough, clamp01, episodeClock, readSecs, windowAlpha, paceLimit,
   type Episode, type PaceWindow, type StoryData,
 } from "@/lib/about-story-model";
 import { buildGeometry, drawStory, type Label, type Palette } from "./story-scene";
 import { StoryRenderer, hslTriplet } from "./story-renderer";
+import { FilmDebug } from "./film-debug";
+
+// /about?film=debug in dev builds: review harness (film-debug.ts), film starts at once
+const FILM_DEBUG = import.meta.env.DEV && typeof window !== "undefined"
+  && new URLSearchParams(window.location.search).get("film") === "debug";
 
 const SCROLL_VH = 1100;
 const EPISODE_URL = "/fearlab/episodes/spy-2020.json";
@@ -356,7 +361,7 @@ export function AboutStory() {
   const textOnly = failed || noGl === "unavailable" || short;
   const [source, setSource] = useState<Sources>(ALL_LIVE);
   // the WebGL context and its render targets are made only once the film nears view
-  const [near, setNear] = useState(false);
+  const [near, setNear] = useState(FILM_DEBUG);
   useEffect(() => {
     const section = sectionRef.current;
     if (near || !section) return;
@@ -475,6 +480,17 @@ export function AboutStory() {
     const { play, holdAt } = StoryPlayback.atLoad(pace, pageNow());
     if (scrub) { play.jumpTo(pageNow()); play.finished = true; }
     else if (holdAt != null) scrollToP(holdAt);
+    // ?film=debug (dev builds only): pause, scrub and a blank-frame log (film-debug.ts)
+    const seekDebug = (v: number) => {
+      play.jumpTo(v);
+      play.finished = v >= 1;
+      if (v < 1) { play.wanted = 1; play.auto = true; }
+      scrollToP(v);
+      kick();
+    };
+    const debug = FILM_DEBUG
+      ? new FilmDebug(section, { seek: seekDebug, stepBack: (v) => Math.max(0, v - paceLimit(pace, v) / 60) })
+      : null;
     // The End key scrolls smoothly, through the film: its first steps would be
     // held back. It means "take me past this", so an unfinished film parks.
     const onKey = (e: KeyboardEvent) => {
@@ -522,16 +538,22 @@ export function AboutStory() {
     const frame = (now: number) => {
       raf = 0;
       mode = modeNow();
-      const dt = Math.min(0.1, (now - last) / 1000);
+      // a frame started by kick() can carry a timestamp older than kick's own
+      // clock read: never step the film backwards by a negative dt
+      const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
       const ms = now - last;
       last = now;
       const live = mode === "live";
+      const stepping = !!debug && debug.paused && debug.steps > 0;
       if (live) {
         idleDrawn = false;
-        const carry = play.tick(dt);
-        if (carry != null) scrollToP(carry);
+        if (!debug?.paused || stepping) {
+          const carry = play.tick(stepping ? 1 / 60 : dt);
+          if (carry != null) scrollToP(carry);
+        }
       } else idleDrawn = true;
-      const p = live ? play.shown : 0, time = (now - t0) / 1000;
+      const p = live ? play.shown : 0, time = debug ? debug.clock(ms) : (now - t0) / 1000;
+      if (stepping) debug.steps--;
       // a lost context hides everything projected from the chart until it returns
       labelHost.style.visibility = renderer.ok ? "" : "hidden";
       if (!renderer.ok) {
@@ -628,6 +650,10 @@ export function AboutStory() {
         el.style.visibility = a > 0 ? "visible" : "hidden";
       });
       if (barRef.current) barRef.current.style.transform = `scaleX(${p.toFixed(4)})`;
+      debug?.frame({
+        p, ms, canvas, scale: renderer.renderScale,
+        beat: captions.filter((c) => p >= c.a && p < c.b).map((c) => c.key).join(" "),
+      });
       if (mode === "live" && !document.hidden) raf = requestAnimationFrame(frame);
     };
     // One beam on screen: the film animates only once its section has pinned
@@ -665,6 +691,7 @@ export function AboutStory() {
     const onResize = () => { idleDrawn = false; onScroll(); };
     window.addEventListener("resize", onResize);
     document.addEventListener("visibilitychange", kick);
+    if (debug) seekDebug(0);
 
     return () => {
       if (raf) cancelAnimationFrame(raf);
@@ -676,6 +703,7 @@ export function AboutStory() {
       skipBtn?.removeEventListener("click", skip);
       window.removeEventListener("keydown", onKey);
       document.fonts?.removeEventListener?.("loadingdone", remeasure);
+      debug?.destroy();
       renderer.destroy();
       labelHost.replaceChildren();
     };

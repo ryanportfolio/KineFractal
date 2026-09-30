@@ -51,3 +51,7 @@ Run `codex exec` itself as the background command (Bash `run_in_background`, no 
 `ryanportfolio/range` is private but this account can read it: `gh api repos/ryanportfolio/range/contents/<path> -H "Accept: application/vnd.github.raw"`. A caption was once hedged as unconfirmable instead of being checked there, and the user corrected it.
 
 Confirmed from it: in `fearlab/episodes/*.json` a fill's `d` is the day the order fills, not the signal day. `emit_episode.py` takes it from the broker's fill `ts`, and `broker.py` `on_bar_open` fills market orders queued on the previous close at this bar's open; limit and stop fills land intrabar on the same bar.
+
+### 2026-09-29: Resizing a WebGL canvas after drawing shows a black frame
+
+Setting `canvas.width` or `canvas.height` clears the drawing buffer. Done after the frame's draw calls but before the browser composites (the About film's governor did it inside `reportFrame`, called after `renderer.end`), the frame shows as pure black. Each render-scale change flashed once, and users saw it often. Only change canvas size at the start of a frame, before drawing. `/about?film=debug` in `npm run dev` has a blank-frame detector; `.tmp`-style probes can force governor changes with CDP `Emulation.setCPUThrottlingRate`.
