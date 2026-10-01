@@ -145,25 +145,35 @@ function validEntry(entry: MarketDataCacheEntry | undefined): MarketDataCacheEnt
   };
 }
 
-function refreshWindowDate(now: Date): string | null {
-  const parts = newYorkPartsFormatter.formatToParts(now);
+const WEEKDAY_INDEX: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+
+// New York date of the most recent weekday 18:30 refresh window that has opened
+// at `at`. A refresh is due whenever this moves past the last attempt, so a
+// window with no traffic is caught up by the next request instead of being
+// skipped until a request happens to land inside a later window.
+function latestRefreshWindowDate(at: Date): string {
+  const parts = newYorkPartsFormatter.formatToParts(at);
   const value = (type: Intl.DateTimeFormatPartTypes) => (
     parts.find((part) => part.type === type)?.value
   );
-  const weekday = value("weekday");
+  const weekday = WEEKDAY_INDEX[value("weekday") ?? ""] ?? 0;
   const hour = Number(value("hour"));
   const minute = Number(value("minute"));
-  if (!weekday || weekday === "Sat" || weekday === "Sun" || hour < 18 || (hour === 18 && minute < 30)) {
-    return null;
-  }
-  const year = value("year");
-  const month = value("month");
-  const day = value("day");
-  return year && month && day ? `${year}-${month}-${day}` : null;
+  const opened = hour > 18 || (hour === 18 && minute >= 30);
+
+  let daysBack = opened ? 0 : 1;
+  while ((weekday - daysBack + 7) % 7 === 0 || (weekday - daysBack + 7) % 7 === 6) daysBack += 1;
+
+  const windowDay = new Date(Date.UTC(
+    Number(value("year")),
+    Number(value("month")) - 1,
+    Number(value("day")) - daysBack,
+  ));
+  return windowDay.toISOString().slice(0, 10);
 }
 
-function attemptedInWindow(lastAttemptAt: Date, windowDate: string | null): boolean {
-  return windowDate === null || refreshWindowDate(lastAttemptAt) === windowDate;
+function attemptedSinceLatestWindow(lastAttemptAt: Date, now: Date): boolean {
+  return latestRefreshWindowDate(lastAttemptAt) >= latestRefreshWindowDate(now);
 }
 
 function classifyUpstreamFailure(error: unknown): UpstreamFailure {
@@ -510,8 +520,7 @@ export function createTiingoCache(options: {
       throw new MarketDataUnavailableError(ticker, warning, "unavailable");
     }
 
-    const windowDate = refreshWindowDate(currentTime);
-    if (verified && !retryDue && attemptedInWindow(verified.lastAttemptAt, windowDate)) {
+    if (verified && !retryDue && attemptedSinceLatestWindow(verified.lastAttemptAt, currentTime)) {
       logCacheEvent("hit", verified);
       return { bars: cloneBars(verified.bars), freshness: freshness("cache", verified) };
     }

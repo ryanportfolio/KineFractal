@@ -59,17 +59,14 @@ async function fetchTiingoDailyBars(ticker: string): Promise<DailyBar[]> {
     .sort((left, right) => left.date.localeCompare(right.date));
 }
 
-function aggregateMarketDataFreshness(
-  results: readonly MarketDataResult[],
-  marketDateBoundary: "latest" | "earliest" = "latest",
-): MarketDataFreshness {
+// Reports the oldest final bar across the series, so one fresh ticker cannot
+// make a set with lagging tickers look current.
+function aggregateMarketDataFreshness(results: readonly MarketDataResult[]): MarketDataFreshness {
   let marketDate = "";
   let lastSuccessfulAt = "";
   for (const result of results) {
     const actualMarketDate = result.bars[result.bars.length - 1]?.date ?? result.freshness.marketDate;
-    if (!marketDate
-      || (marketDateBoundary === "latest" && actualMarketDate > marketDate)
-      || (marketDateBoundary === "earliest" && actualMarketDate < marketDate)) {
+    if (!marketDate || actualMarketDate < marketDate) {
       marketDate = actualMarketDate;
     }
     if (!lastSuccessfulAt || result.freshness.lastSuccessfulAt < lastSuccessfulAt) {
@@ -527,7 +524,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Get last 756 trading days for fractal momentum analysis (3 years)
       const recentDates = commonDates.slice(-756);
       const freshness = {
-        ...aggregateMarketDataFreshness(marketDataResults, "earliest"),
+        ...aggregateMarketDataFreshness(marketDataResults),
         marketDate: recentDates[recentDates.length - 1],
       };
 
