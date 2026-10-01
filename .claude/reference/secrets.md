@@ -16,5 +16,6 @@ All are Railway variables on the `web` service. Unset locally, the matching feat
 | `CHART_BUILDER_URL`, `CHART_BUILDER_SECRET` | Engine `chart-builder` service for per-account tickers | `server/fearlab-charts.ts` |
 | `TIINGO_API_KEY` (legacy name `VITE_T`) | Tiingo market data | `server/routes.ts` |
 | `OPENROUTER_API` | Ratio Relevance analysis via OpenRouter | `server/openrouter-ratio.ts` |
-| `VITE_Google` | Google Gemini key for the legacy analyzer | `server/gemini-analyzer.ts` |
 | `PORT` | Listen port (default 5000) | `server/app.ts` |
+
+retired 2026-10-01: `VITE_Google`, the Gemini key for the legacy analyzer; reason: its last reader was removed in #13. The Railway variable is unused and can be deleted.

@@ -16,7 +16,7 @@ A merge to this repo's `main` redeploys `web` only. Engine changes ship from ran
 
 ## Build
 
-- `Dockerfile`, two stages on `node:22-slim`: `npm ci` + `npm run build`, then a runtime stage with `npm ci --omit=dev`, `dist/`, `server/python/`, `server/charts-app/` and `client/public/`. Starts `node dist/index.js` on `PORT` (default 5000).
+- `Dockerfile`, two stages on `node:22-slim`: `npm ci` + `npm run build`, then a runtime stage with `npm ci --omit=dev`, `dist/`, `server/charts-app/` and `client/public/`. Starts `node dist/index.js` on `PORT` (default 5000).
 - Build context is the repo root. `.dockerignore` is a whitelist; a new top-level file the build needs must be added there.
 - `npm run build` = `vite build` (client → `dist/public`) + esbuild (server → `dist/index.js`).
 

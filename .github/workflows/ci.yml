@@ -30,13 +30,9 @@ jobs:
       - run: npm test
       - run: npm run build
 
-      # Compares the bundled snapshot with fearlab/bridge/cells.py in the private
-      # range repo. The default GITHUB_TOKEN cannot read range, so without a
-      # RANGE_READ_TOKEN secret (read access to ryanportfolio/range) the script
-      # prints a notice and exits 0 instead of comparing.
-      - run: npm run check:snapshot
-        env:
-          GH_TOKEN: ${{ secrets.RANGE_READ_TOKEN || github.token }}
+      # npm run check:snapshot is not run here: it needs read access to the
+      # private range repo, and drift starts on the range side, not in this
+      # repo's PRs. Run it locally, where gh is signed in.
 
       - run: node .claude/scripts/sync-codex-skills.mjs --check
 
