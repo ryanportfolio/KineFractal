@@ -397,6 +397,77 @@ test("uses the 18:30 EST refresh boundary in winter", async () => {
   assert.deepEqual(atBoundary.bars, refreshedBars);
 });
 
+test("catches up missed refresh windows on the next request outside a window", async () => {
+  // Production state on 2026-10-01: last attempt 2026-08-20 18:37 New York, and
+  // no request had landed inside a weekday 18:30-24:00 window since.
+  const store = new MemoryStore();
+  const augustBars = [{ ...bars[0], date: "2026-08-20" }];
+  store.entries.set("SPY", {
+    ticker: "SPY", bars: augustBars, marketDate: "2026-08-20",
+    lastSuccessfulAt: new Date("2026-08-20T22:37:23Z"),
+    lastAttemptAt: new Date("2026-08-20T22:37:23Z"),
+    nextRetryAt: null, lastError: null,
+  });
+  const now = new Date("2026-10-01T21:55:00Z"); // Thursday 17:55 New York
+  const cache = createTiingoCache({ store, now: () => now });
+  const refreshedBars = [{ ...bars[0], date: "2026-09-30", close: 103, adjClose: 103 }];
+  let calls = 0;
+  const fetcher = async () => {
+    calls += 1;
+    return refreshedBars;
+  };
+
+  const first = await cache.getOrFetch("SPY", fetcher);
+  const second = await cache.getOrFetch("SPY", fetcher);
+
+  assert.equal(calls, 1);
+  assert.equal(first.freshness.state, "fresh");
+  assert.equal(first.freshness.marketDate, "2026-09-30");
+  assert.equal(second.freshness.state, "cache");
+});
+
+test("catches up a missed Friday window over the weekend", async () => {
+  const store = new MemoryStore();
+  const thursdayBars = [{ ...bars[0], date: "2026-07-09" }];
+  store.entries.set("SPY", {
+    ticker: "SPY", bars: thursdayBars, marketDate: "2026-07-09",
+    lastSuccessfulAt: new Date("2026-07-09T23:00:00Z"),
+    lastAttemptAt: new Date("2026-07-09T23:00:00Z"),
+    nextRetryAt: null, lastError: null,
+  });
+  const cache = createTiingoCache({ store, now: () => new Date("2026-07-11T15:00:00Z") });
+  let calls = 0;
+
+  const result = await cache.getOrFetch("SPY", async () => {
+    calls += 1;
+    return bars;
+  });
+
+  assert.equal(calls, 1);
+  assert.equal(result.freshness.state, "fresh");
+  assert.equal(result.freshness.marketDate, "2026-07-10");
+});
+
+test("serves the cache the morning after a refresh in the previous evening's window", async () => {
+  const store = new MemoryStore();
+  store.entries.set("SPY", {
+    ticker: "SPY", bars, marketDate: "2026-07-10",
+    lastSuccessfulAt: new Date("2026-07-13T23:00:00Z"),
+    lastAttemptAt: new Date("2026-07-13T23:00:00Z"),
+    nextRetryAt: null, lastError: null,
+  });
+  const cache = createTiingoCache({ store, now: () => new Date("2026-07-14T14:00:00Z") });
+  let calls = 0;
+
+  const result = await cache.getOrFetch("SPY", async () => {
+    calls += 1;
+    return bars;
+  });
+
+  assert.equal(calls, 0);
+  assert.equal(result.freshness.state, "cache");
+});
+
 test("serves a verified cache on a weekend without invoking the fetcher", async () => {
   const store = new MemoryStore();
   store.entries.set("SPY", {
