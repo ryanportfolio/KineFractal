@@ -195,12 +195,7 @@ export function setupSecurity(app: Express) {
         styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
         fontSrc: ["'self'", "https://fonts.gstatic.com"],
         imgSrc: ["'self'", "data:", "https:"],
-        connectSrc: [
-          "'self'", 
-          "https://api.tiingo.com", 
-          "https://www.alphavantage.co",
-          "wss://*.replit.dev"
-        ],
+        connectSrc: ["'self'"],
       },
     },
     crossOriginEmbedderPolicy: false,

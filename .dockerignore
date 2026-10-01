@@ -6,14 +6,11 @@
 !package-lock.json
 !tsconfig.json
 !vite.config.ts
-!vite-plugin-meta-images.ts
-!postcss.config.js
 !components.json
 !drizzle.config.ts
 !client/
 !server/
 !shared/
-!attached_assets/
 
 **/*.test.*
 **/node_modules
