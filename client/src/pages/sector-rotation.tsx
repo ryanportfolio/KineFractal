@@ -69,6 +69,7 @@ export default function SectorRotation() {
   const [macroStats, setMacroStats] = useState<MacroRatioStats[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [lastCacheDate, setLastCacheDate] = useState<string | null>(null);
+  const [cacheStale, setCacheStale] = useState(false);
 
   useDocumentMeta({
     title: "Sector rotation",
@@ -269,6 +270,7 @@ export default function SectorRotation() {
         }
         
         setLastCacheDate(bulkData.cacheDate);
+        setCacheStale(bulkData.freshness?.state === 'stale');
         processDataForChart(rawData);
         calculatePerformance(rawData);
         calculateMacroStats(macroData);
@@ -540,14 +542,24 @@ export default function SectorRotation() {
                      </div>
                    )}
 
-                   {status === 'COMPLETE' && (
+                   {status === 'COMPLETE' && !cacheStale && (
                      <div className="text-center space-y-2">
                         <div className="text-4xl">✔</div>
                         <div className="text-sm font-bold text-primary">DATA LOCKED & CACHED</div>
                         <div className="text-xs text-primary/50">
-                            Last Update: {lastCacheDate}
+                            Market data through <span className="whitespace-nowrap">{lastCacheDate}</span>
                         </div>
                      </div>
+                   )}
+
+                   {status === 'COMPLETE' && cacheStale && (
+                     <Alert className="bg-yellow-500/10 border-yellow-500/50 text-yellow-500" data-testid="alert-stale-data">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>STALE DATA</AlertTitle>
+                        <AlertDescription>
+                           Market data through <span className="whitespace-nowrap">{lastCacheDate}</span> • REFRESH FAILED
+                        </AlertDescription>
+                     </Alert>
                    )}
 
                    {status === 'ERROR' && (
@@ -577,13 +589,13 @@ export default function SectorRotation() {
                     <span>Type:</span>
                     <span className="text-primary">Server-side (daily)</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Last Refresh:</span>
-                    <span className="text-primary">{lastCacheDate || 'N/A'}</span>
+                  <div className="flex justify-between gap-2">
+                    <span>Data Through:</span>
+                    <span className={`whitespace-nowrap ${cacheStale ? "text-yellow-500" : "text-primary"}`}>{lastCacheDate || 'N/A'}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Next Reset:</span>
-                    <span className="text-primary/70">Tomorrow 00:00 UTC</span>
+                  <div className="flex justify-between gap-2">
+                    <span>Refreshes:</span>
+                    <span className="whitespace-nowrap text-primary/70">Weekdays 18:30 ET</span>
                   </div>
                 </CardContent>
               </Card>

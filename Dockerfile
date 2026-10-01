@@ -11,12 +11,9 @@ RUN npm run build
 FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
-# python3 for server/python/usd_correlations.py (spawned per-request);
-# yfinance not installed, so that endpoint degrades until its data path is ported.
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build /app/dist ./dist
-COPY server/python ./server/python
 # charts-app/charts.html: the /charts UI document, served from this image
 # (fearlab-charts.ts reads it via process.cwd()). Edited in this repo; chart
 # data still proxies the nightly worker store.
