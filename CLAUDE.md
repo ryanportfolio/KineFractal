@@ -26,7 +26,7 @@ Caveman covers chat replies only. Anything written to a file or for another read
 
 ## CRITICAL: Verification
 
-- Local checks run for real: `npm run check` (tsc), `npm test`, `npm run build`. No CI is wired, so these plus the Railway deploy log are the authoritative signals. Commands: `.claude/reference/commands.md`.
+- Local checks run for real: `npm run check` (tsc), `npm test`, `npm run build`. CI (`.github/workflows/ci.yml`) runs the same checks on every PR and push to `main`; CI, these, and the Railway deploy log are the authoritative signals. Commands: `.claude/reference/commands.md`.
 - A dev server you start is reachable in the browser (`.claude/launch.json`). Without Railway secrets, FearLab data routes return 503 locally and pages fall back to the bundled snapshot; live data paths can only be confirmed on the deployed site.
 - Inspect logs / run scripts / read code yourself before claiming anything works.
 - Never claim visual/UI verification you didn't actually perform.
