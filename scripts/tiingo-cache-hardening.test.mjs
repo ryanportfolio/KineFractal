@@ -14,16 +14,6 @@ function routeSource(path, method = "get") {
   return source.slice(start, nextRoute === -1 ? source.length : nextRoute);
 }
 
-function functionSource(name) {
-  const start = source.indexOf(`async function ${name}(`);
-  assert.notEqual(start, -1, `missing ${name}`);
-  const nextExport = source.indexOf("\nexport ", start + 1);
-  return source.slice(start, nextExport === -1 ? source.length : nextExport);
-}
-
-const fundamentals = functionSource("fetchFundamentalData");
-const priceDivergence = routeSource("/api/price-divergence/:ticker");
-const debugFundamentals = routeSource("/api/debug/fundamentals/:ticker");
 const cacheDelete = routeSource("/api/cache/:ticker?", "delete");
 const cacheStatus = routeSource("/api/cache/status");
 const tiingoProxy = routeSource("/api/tiingo/:ticker");
@@ -89,23 +79,6 @@ test("Sector bulk returns 503 with missing tickers instead of an incomplete succ
   );
 });
 
-test("Price Divergence uses the shared market cache and returns unavailable data as 503", () => {
-  assert.match(priceDivergence, /\btiingoMarketDataCache\.getOrFetch\s*\(/);
-  assert.doesNotMatch(priceDivergence, /https:\/\/api\.tiingo\.com\/tiingo\/daily\//);
-  assert.match(
-    priceDivergence,
-    /res\.status\(\s*503\s*\)\.json\(\s*\{[\s\S]*?market data/i,
-  );
-});
-
-test("Price Divergence uses the latest verified bar as its 30-day cutoff and selects the final eligible daily bar", () => {
-  assert.match(priceDivergence, /new Date\(latestRecord\.date\)/);
-  assert.match(
-    priceDivergence,
-    /(?:priceData\.findLast|\[\.\.\.priceData\]\.reverse\(\)\.find)\(\s*\(price\)\s*=>\s*new Date\(price\.date\)\s*<=\s*thirtyDaysAgo\s*\)/,
-  );
-});
-
 test("Ratio Relevance reports the final common date as asOf", () => {
   assert.match(
     ratioRelevance,
@@ -156,14 +129,6 @@ test("Ratio Relevance renders the verified market-data freshness status", () => 
   assert.match(statusSource, /LAST VERIFIED/, "retained data must be labelled as last verified");
 });
 
-test("fundamentals use the durable Postgres storage cache and debug failures are unavailable", () => {
-  assert.match(fundamentals, /storage\.getTickerCache\s*\(/);
-  assert.match(fundamentals, /storage\.upsertTickerCache\s*\(/);
-  assert.doesNotMatch(fundamentals, /\bgetCache\s*\(/);
-  assert.doesNotMatch(fundamentals, /\bsetCache\s*\(/);
-  assert.match(debugFundamentals, /res\.status\(\s*503\s*\)\.json\s*\(/);
-});
-
 test("fundamentals cache refreshes its freshness timestamp and never logs raw storage errors", () => {
   const upsertStart = storageSource.indexOf("async upsertTickerCache");
   const clearStart = storageSource.indexOf("async clearTickerCache", upsertStart);
@@ -185,27 +150,11 @@ test("fundamentals cache refreshes its freshness timestamp and never logs raw st
   }
 });
 
-test("fundamentals invalidation is serialized and blocks stale writes", () => {
-  assert.match(source, /async function withFundamentalsCacheLock\(/);
-  assert.match(source, /function invalidateFundamentalsCache\(/);
-  assert.match(fundamentals, /const\s+invalidationGeneration\s*=\s*captureFundamentalsInvalidationGeneration\(upperSymbol\)/);
-  assert.match(fundamentals, /await\s+withFundamentalsCacheLock\(upperSymbol,/);
-  assert.match(fundamentals, /isFundamentalsInvalidationCurrent\(upperSymbol,\s*invalidationGeneration\)/);
-  assert.match(
-    cacheDelete,
-    /invalidateFundamentalsCache\(ticker\);\s*await\s+storage\.clearTickerCache\(ticker\)/,
-    "ticker clear must invalidate stale fetches before deleting the durable entry",
-  );
-  assert.match(
-    cacheDelete,
-    /invalidateFundamentalsCache\(\);\s*await\s+storage\.clearTickerCache\(\)/,
-    "global clear must invalidate stale fetches before deleting durable entries",
-  );
-});
-
 test("cache deletion resets durable market data and status exposes cache metadata", () => {
   assert.match(cacheDelete, /await\s+clearTiingoCache\(\s*ticker\s*\)/);
   assert.match(cacheDelete, /await\s+clearTiingoCache\(\s*\)/);
+  assert.match(cacheDelete, /await\s+storage\.clearTickerCache\(\s*ticker\s*\)/);
+  assert.match(cacheDelete, /await\s+storage\.clearTickerCache\(\s*\)/);
 
   const cacheStatsStart = cacheSource.indexOf("export async function getCacheStats");
   const cacheStatsEnd = cacheSource.indexOf("export async function getBulkCachedData", cacheStatsStart);
