@@ -4,8 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { validateCapabilities } from "./check-skill-capabilities.mjs";
-import { parseJson, printWarnings } from "./removed-skills.mjs";
+import { parseJson, printWarnings, readRemovedSkills, readTemplateManifest } from "./removed-skills.mjs";
 
 // Unreadable input fails with one line naming the file, not a stack trace.
 process.on("uncaughtException", (error) => {
@@ -18,11 +17,8 @@ const root = path.resolve(scriptDir, "..", "..");
 const failures = [];
 // Missing or unregistered skills are warnings: projects add and remove skills freely.
 const warnings = [];
-const capabilities = validateCapabilities(root);
-failures.push(...capabilities.errors);
-// Capability warnings are printed once, by check-skill-capabilities.mjs.
 // Skills deleted on purpose and listed in .agents/removed-skills.json.
-const removed = capabilities.removed;
+const removed = new Set(readRemovedSkills(root));
 const maxCatalogChars = 7000;
 
 function read(relativePath) {
@@ -77,10 +73,8 @@ const modes = exists(".agents/skill-modes.json") ? parseJson(read(".agents/skill
 for (const [name, mode] of Object.entries(modes.skills)) if (mode === "disabled") disabled.add(name);
 for (const name of disabled) if (exists(`.agents/skills/${name}/SKILL.md`)) warnings.push(`${name}: disabled skill remains discoverable in .agents/skills/`);
 const skillsRoot = path.join(root, ".claude", "skills");
-// A retired skill that reappears is reported by check-skill-capabilities.mjs with its replacement.
-const retired = new Set(Object.keys(capabilities.manifest.retired ?? {}));
 const canonicalEntries = fs.readdirSync(skillsRoot, { withFileTypes: true })
-  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name) && !retired.has(entry.name))
+  .filter((entry) => entry.isDirectory() && !disabled.has(entry.name) && !removed.has(entry.name))
   .filter((entry) => fs.existsSync(path.join(skillsRoot, entry.name, "SKILL.md")))
   .map((entry) => ({name: entry.name}));
 const activeNames = new Set(canonicalEntries.map(entry => entry.name));
@@ -148,11 +142,16 @@ for (const skill of classifications.keys()) {
   }
 }
 
+// The template manifest ships into projects; an unusable one fails here. Its full rules
+// (which paths are template-only, skill groups) are checked in the template by
+// bootstrap/tests/check-template-manifest.mjs.
+readTemplateManifest(root);
+
 // Content contracts for specific skills apply only while those skills are installed.
-if (exists(".claude/skills/init-project/SKILL.md") && exists(".claude/skills/init-project/references/profiles.md")) {
-  const initProject = read(".claude/skills/init-project/SKILL.md") + read(".claude/skills/init-project/references/profiles.md");
-  for (const target of [".claude-plugin/", "bootstrap/", ".github/workflows/validate-template.yml", ".github/ISSUE_TEMPLATE/", "CHANGELOG.md", "CONTRIBUTING.md"]) {
-    if (!initProject.includes(target)) warnings.push(`init-project: cleanup contract omits ${target}`);
+for (const runtime of [".claude", ".agents"]) {
+  const profiles = `${runtime}/skills/init-project/references/profiles.md`;
+  if (exists(`${runtime}/skills/init-project/SKILL.md`) && exists(profiles) && !read(profiles).includes(".agents/template-manifest.json")) {
+    warnings.push(`${profiles}: cleanup contract does not point at .agents/template-manifest.json`);
   }
 }
 
@@ -170,46 +169,52 @@ if (exists(".claude/skills/long-horizon/SKILL.md") && exists(".agents/skills/lon
   }
 }
 
-const corePath = "bootstrap/NewProjectCore.psm1";
-if (!exists(corePath)) {
-  failures.push(`${corePath}: shared project generator is missing`);
-} else {
-  const core = read(corePath);
-  for (const target of ["bootstrap", ".claude-plugin", ".github\\workflows\\validate-template.yml"]) {
-    if (!core.includes(target)) failures.push(`${corePath}: cleanup contract omits ${target}`);
+// The project creators live in bootstrap/, which only the template repository has. A project
+// created from the template has no bootstrap/ folder, so these checks apply only where it exists.
+if (exists("bootstrap")) {
+  const corePath = "bootstrap/NewProjectCore.psm1";
+  if (!exists(corePath)) {
+    failures.push(`${corePath}: shared project generator is missing`);
+  } else {
+    const core = read(corePath);
+    if (!core.includes("template-manifest.json")) failures.push(`${corePath}: cleanup does not read .agents/template-manifest.json`);
+    for (const command of ["Test-NewProjectName", "Get-NewProjectMode", "Invoke-NewProject"]) {
+      if (!core.includes(command)) failures.push(`${corePath}: does not expose ${command}`);
+    }
+    if (!core.includes("'archive'")) failures.push(`${corePath}: local repo copies must use a tracked Git archive`);
   }
-  for (const command of ["Test-NewProjectName", "Get-NewProjectMode", "Invoke-NewProject"]) {
-    if (!core.includes(command)) failures.push(`${corePath}: does not expose ${command}`);
-  }
-  if (!core.includes("'archive'")) failures.push(`${corePath}: local repo copies must use a tracked Git archive`);
-}
 
-for (const wrapper of ["bootstrap/new-claude-project.ps1", "bootstrap/new-claude-project-ui.ps1"]) {
-  const text = read(wrapper);
-  if (!text.includes("NewProjectCore.psm1")) failures.push(`${wrapper}: does not load the shared project generator`);
-  for (const duplicatedCommand of ["gh repo create", "robocopy"]) {
-    if (text.includes(duplicatedCommand)) failures.push(`${wrapper}: duplicates core command ${duplicatedCommand}`);
+  for (const wrapper of ["bootstrap/new-claude-project.ps1", "bootstrap/new-claude-project-ui.ps1"]) {
+    const text = read(wrapper);
+    if (!text.includes("NewProjectCore.psm1")) failures.push(`${wrapper}: does not load the shared project generator`);
+    for (const duplicatedCommand of ["gh repo create", "robocopy"]) {
+      if (text.includes(duplicatedCommand)) failures.push(`${wrapper}: duplicates core command ${duplicatedCommand}`);
+    }
   }
-}
 
-const releaseBuilderPath = "bootstrap/Build-NewClaudeProjectUIRelease.ps1";
-if (!exists(releaseBuilderPath)) {
-  failures.push(`${releaseBuilderPath}: reproducible UI release builder is missing`);
-} else {
-  const releaseBuilder = read(releaseBuilderPath);
-  for (const asset of ["New-ClaudeProject-UI.cmd", "new-claude-project-ui.ps1", "NewProjectCore.psm1", "template"]) {
-    if (!releaseBuilder.includes(asset)) failures.push(`${releaseBuilderPath}: release manifest omits ${asset}`);
+  const releaseBuilderPath = "bootstrap/Build-NewClaudeProjectUIRelease.ps1";
+  if (!exists(releaseBuilderPath)) {
+    failures.push(`${releaseBuilderPath}: reproducible UI release builder is missing`);
+  } else {
+    const releaseBuilder = read(releaseBuilderPath);
+    for (const asset of ["New-ClaudeProject-UI.cmd", "new-claude-project-ui.ps1", "NewProjectCore.psm1", "template"]) {
+      if (!releaseBuilder.includes(asset)) failures.push(`${releaseBuilderPath}: release manifest omits ${asset}`);
+    }
+    if (!releaseBuilder.includes("archive")) failures.push(`${releaseBuilderPath}: template snapshot is not sourced from tracked Git files`);
   }
-  if (!releaseBuilder.includes("archive")) failures.push(`${releaseBuilderPath}: template snapshot is not sourced from tracked Git files`);
-}
 
-const generatorSmokePath = "bootstrap/tests/Test-NewProjectGenerator.ps1";
-if (!exists(generatorSmokePath)) {
-  failures.push(`${generatorSmokePath}: local generator smoke test is missing`);
-} else {
-  const workflow = read(".github/workflows/validate-template.yml");
-  if (!workflow.includes("windows-latest")) failures.push("validate-template.yml: generator smoke test needs a Windows runner");
-  if (!workflow.includes("Test-NewProjectGenerator.ps1")) failures.push("validate-template.yml: generator smoke test is not wired into CI");
+  const generatorSmokePath = "bootstrap/tests/Test-NewProjectGenerator.ps1";
+  if (!exists(generatorSmokePath)) {
+    failures.push(`${generatorSmokePath}: local generator smoke test is missing`);
+  } else {
+    const workflow = read(".github/workflows/validate-template.yml");
+    if (!workflow.includes("windows-latest")) failures.push("validate-template.yml: generator smoke test needs a Windows runner");
+    if (!workflow.includes("Test-NewProjectGenerator.ps1")) failures.push("validate-template.yml: generator smoke test is not wired into CI");
+    if (!workflow.includes("check-template-manifest.mjs")) failures.push("validate-template.yml: template manifest check is not wired into CI");
+  }
+
+  const posixCreator = "bootstrap/new-claude-project.sh";
+  if (!exists(posixCreator) || !read(posixCreator).includes("template-manifest.json")) failures.push(`${posixCreator}: cleanup does not read .agents/template-manifest.json`);
 }
 
 printWarnings(warnings);
