@@ -39,6 +39,9 @@
     "why": "native",
     "wow-loop": "native",
     "writing": "native",
-    "writing-plans": "native"
+    "writing-plans": "native",
+    "merge": "disabled",
+    "servers": "native",
+    "wrapup": "native"
   }
 }
