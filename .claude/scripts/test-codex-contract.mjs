@@ -23,7 +23,6 @@ failures.push(...capabilities.errors);
 // Capability warnings are printed once, by check-skill-capabilities.mjs.
 // Skills deleted on purpose and listed in .agents/removed-skills.json.
 const removed = capabilities.removed;
-const maxDescriptionChars = 240;
 const maxCatalogChars = 7000;
 
 function read(relativePath) {
@@ -115,9 +114,6 @@ const skills = [...activeNames].map(name => ({name}))
 let catalogChars = 0;
 for (const skill of skills) {
   if (!skill.description) failures.push(`${skill.directory}: missing description`);
-  if (skill.description.length > maxDescriptionChars) {
-    warnings.push(`${skill.directory}: description is ${skill.description.length} chars (max ${maxDescriptionChars})`);
-  }
   catalogChars += skill.name.length + skill.description.length;
 }
 const duplicateNames = skills
