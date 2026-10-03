@@ -1,6 +1,7 @@
 ---
 name: astra-fullreview
 description: "Full multi-agent Codex review on gpt-6-astra at medium reasoning. Same verified lifecycle as codex-fullreview. Use for /astra-fullreview or 'full Astra review with sub-reviewers'."
+disable-model-invocation: true
 ---
 
 # Astra full review
@@ -13,7 +14,7 @@ Read `.claude/skills/codex-fullreview/SKILL.md` and follow its complete executio
 | Effort | `medium`, regardless of diff size |
 | Run directory prefix | `.tmp/astra-fullreview-` |
 
-Skip the newest-Sol check in `codex-fullreview` Step 1; this entrypoint never swaps Astra for Sol. Honor an explicit user model/effort choice. Confirm supported local options before inference; a model identifier in this file is not proof of availability. `$ARGUMENTS` carries scope as in `codex-fullreview`. Usage is higher than `astra-review`; say so before launch.
+Skip the newest-Sol check in `codex-fullreview` Step 1; this entrypoint never swaps Astra for Sol. Honor an explicit user model/effort choice. Confirm supported local options before inference; a model identifier in this file is not proof of availability. `$ARGUMENTS` carries scope as in `codex-fullreview`.
 
 Example for a branch diff after creating a fresh `$RUN` directory (POSIX shell):
 

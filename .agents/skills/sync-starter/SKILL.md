@@ -23,7 +23,7 @@ git fetch starter
 Only these paths are sync candidates:
 
 ```
-git diff --stat HEAD starter/main -- AGENTS.md .agents/CODEX-SKILL-COMPATIBILITY.md .agents/skill-modes.json .agents/skill-capabilities.json .agents/skill-sources.json .agents/skills .claude/skills .claude/hooks .claude/scripts .claude/output-styles .claude/settings.json
+git diff --stat HEAD starter/main -- AGENTS.md .agents/CODEX-SKILL-COMPATIBILITY.md .agents/skill-modes.json .agents/skill-sources.json .agents/template-manifest.json .agents/skills .claude/skills .claude/hooks .claude/scripts .claude/output-styles .claude/settings.json
 ```
 
 Diverged by design; never bulk-pull these:
@@ -31,13 +31,15 @@ Diverged by design; never bulk-pull these:
 - `CLAUDE.md` is project-configured (FILL IN sections replaced). If the template's kernel changed, read the template version (`git show starter/main:CLAUDE.md`) and hand-merge the relevant rule into the project copy.
 - `.claude/reference/*` is project knowledge. The template only ships skeletons.
 
+Template-only; never pull these. Every path under `templateOnly` in the template's `.agents/template-manifest.json` (`git show starter/main:.agents/template-manifest.json`). They maintain or distribute the template itself (its README, changelog, bootstrap scripts, CI workflow, research docs), and new projects are created without them. Leave them out of every selection, even when they differ.
+
 ### Step 3: present and pick
 
 Group the diff for the user: new skills, changed skills, Codex boundary and compatibility, hooks/scripts/settings. Give one line each on what changed; read the actual diff, do not guess from filenames. Ask directly which to take, as a numbered list.
 
 ### Step 4: apply selectively
 
-Compare maintained native bodies and every referenced resource, together with `.agents/skill-modes.json`, `.agents/skill-capabilities.json` and `.agents/skill-sources.json`. Reconcile each selected ownership change with its corresponding files. Preserve project customizations and deliberate disables; merge customized native files and registry entries instead of checking out whole directories. Sync never writes Codex skills; every port is maintained by hand. Take a skill's upstream `.agents/skill-sources.json` hash only with its unchanged upstream Claude skill; for a customized Claude skill registered `native`, update its Codex port and run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`. A `disabled` skill has no port and no recorded hash. Inspect the registry first to distinguish ownership. Apply already-approved selections without another permission round.
+Compare maintained native bodies and every referenced resource, together with `.agents/skill-modes.json` and `.agents/skill-sources.json`. Reconcile each selected ownership change with its corresponding files. Preserve project customizations and deliberate disables; merge customized native files and registry entries instead of checking out whole directories. Sync never writes Codex skills; every port is maintained by hand. Take a skill's upstream `.agents/skill-sources.json` hash only with its unchanged upstream Claude skill; for a customized Claude skill registered `native`, update its Codex port and run `node .claude/scripts/sync-codex-skills.mjs --baseline <name>`. A `disabled` skill has no port and no recorded hash. Inspect the registry first to distinguish ownership. Apply already-approved selections without another permission round.
 
 ```
 git checkout starter/main -- <picked-paths>
@@ -52,10 +54,9 @@ After any skill, sync script, compatibility matrix, ownership, or `skillOverride
 ```
 node .claude/scripts/sync-codex-skills.mjs --write
 node .claude/scripts/test-codex-contract.mjs
-node .claude/scripts/check-skill-capabilities.mjs
 ```
 
-`--write` deletes leftover generated adapters and fails on unregistered skills or Claude skills that drifted from their port. For intentional registry changes, regenerate the capability catalog with `node .claude/scripts/check-skill-capabilities.mjs --write`. Stage `.agents/skill-sources.json` and any deleted adapter files along with the selected pulled paths.
+`--write` deletes leftover generated adapters and fails on unregistered skills or Claude skills that drifted from their port. Stage `.agents/skill-sources.json` and any deleted adapter files along with the selected pulled paths.
 
 ### Step 5: ship
 
@@ -81,6 +82,7 @@ When the user authorized propagation of a generic skill fix, new skill, or hook 
 
 - Do not `git checkout starter/main -- .claude` wholesale; it clobbers diverged-by-design files.
 - Do not overwrite `settings.json`; union the permission lists.
+- Do not pull a `templateOnly` path from the template's manifest into the project.
 - Do not push project-flavored content back to the template; genericize or leave it.
 - Do not treat a `CLAUDE.md` diff as pullable; kernel changes are always a hand-merge.
 - Do not ship a generated `.agents/skills/` adapter. Write a native port under `.agents/skills/<name>/` and register it `native`, or register the skill `disabled`.
