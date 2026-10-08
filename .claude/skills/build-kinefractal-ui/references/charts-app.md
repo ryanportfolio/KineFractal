@@ -28,6 +28,17 @@ The existing chart writes (`/labels/save`, `/watchlist/add`, `DELETE /api/chart-
 
 The account control (`#acct`, right of EXPORT) is hidden until the probe answers, then shows **SIGN IN** (`#signInBtn`) or the shortened email (`#acctBtn`) with a menu (account, email alerts, sign out via `POST /api/auth/sign-out`). `#signInDialog` posts to `/api/auth/sign-in/email` and reloads; the signup prompt (`#drawCta`) offers the same dialog. `siteEmail` holds the identity from the same probe; do not add a second `/api/me` call. Key handling for these lives in `onAccountKeydown`, registered before the chart key handler; it calls `stopImmediatePropagation()` while account UI is open so no key reaches the chart shortcuts. The `fearlab_hand_*` line cache has no account scope, so every account change clears it: chart sign-in and sign-out (`clearLineCache()`) and `/account` sign-in, sign-up and sign-out (`client/src/lib/chart-line-cache.ts`). Any new sign-in or sign-out path must do the same. Tests: `scripts/charts-account.test.mjs`.
 
+## Export dialog
+
+`#exportDialog` builds limit-buy levels from the published overlays. Group tabs (`#exportGroupTabs`) sit on top; the left column holds the ticker list (`#exportPicks`, symbol + full name + type), search, min/max % and strength; the right column (`#exportResult`) shows one section per ticker and rebuilds live on every change (`scheduleExportBuild`, a generation counter drops stale builds). There is no Build step; `#exportCsv` in the footer is the one primary action. The CSV columns, `CLUSTER_PCT` stacking and the `kf-export-strength` key are unchanged from before the redesign.
+
+- Full names come from the published combos (`superMap[sym].name`). The data has no asset type, so `tickerType()` reads it from the fund name (ETF/ETN/Fund, SPDR/iShares/ProShares, or a name ending in "Trust" = ETF; "Index" = index; else stock).
+- `#exportTip` is one fixed-position tooltip for every `[data-tip]` in the dialog, shown at once on hover and on keyboard focus.
+- Groups are `{id, name, symbols}` lists. Signed in: `GET/PUT /api/chart-groups` (`chart_preferences.ticker_groups`, `normalizeTickerGroups` in `server/fearlab-charts.ts`), with `csrfProtection` and `chartGroupsLimiter`; the page fetches `/api/csrf-token` and retries once on 419. Signed out or account storage failing: `kf-export-groups-v1` in localStorage. Checked tickers per tab persist in `kf-export-picks-v1`.
+- `#exportEditor` (create, rename, add/remove, two-click delete) replaces the columns while open; Escape closes it before the dialog (`onExportEscape`).
+
+Tests: `scripts/charts-export.test.mjs`, `server/chart-groups.test.ts`.
+
 ## Design system of this file
 
 Its own tokens, not `DESIGN.md`'s beam ramp:
