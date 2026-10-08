@@ -338,12 +338,20 @@
   #exportClose { justify-self:end; align-self:start; }
   /* group tabs */
   #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid); }
-  #exportGroupTabs .xp-tabwrap { display:inline-flex; }
   #exportGroupTabs .xp-tab { color:var(--mut); }
   #exportGroupTabs .xp-tab[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); background:rgba(38,198,218,.10); }
-  #exportGroupTabs .xp-tab .n { margin-left:8px; color:var(--mut); }
-  #exportGroupTabs .xp-edit { margin-left:-1px; padding:6px 9px; color:var(--mut); }
-  #exportGroupTabs .xp-edit:hover, #exportGroupTabs .xp-tab:hover { color:var(--fg); border-color:var(--sup); }
+  #exportGroupTabs .xp-tab:hover { color:var(--fg); border-color:var(--sup); }
+  /* a group tab and its edit button are one bordered unit, so neither border
+     covers the other and the whole unit lights up when that group is open */
+  #exportGroupTabs .xp-tabwrap { display:inline-flex; align-items:stretch; border:1px solid var(--grid); }
+  #exportGroupTabs .xp-tabwrap .xp-tab { border:0; background:none; }
+  #exportGroupTabs .xp-tabwrap .xp-edit { display:inline-flex; align-items:center; padding:0 10px; border:0;
+                                          border-left:1px solid var(--grid); background:none; color:var(--mut); }
+  #exportGroupTabs .xp-tabwrap:hover { border-color:var(--sup); }
+  #exportGroupTabs .xp-tabwrap .xp-edit:hover { color:var(--fg); background:rgba(38,198,218,.08); }
+  #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) { border-color:var(--sup); background:rgba(38,198,218,.10); }
+  #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) .xp-edit { border-left-color:rgba(38,198,218,.45); color:var(--sup); }
+  #exportGroupTabs .xp-edit svg { width:13px; height:13px; }
   #exportGroupTabs .xp-new { color:var(--sup); border-style:dashed; }
   #exportGroupsNote { flex-basis:100%; min-height:0; margin:0; color:var(--mut); font:12px monospace; }
   #exportGroupsNote:empty { display:none; }
@@ -435,18 +443,18 @@
   .xp-lmain { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; }
   .xp-px, .xp-pct { font:bold 22px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
   .xp-px { min-width:5.4ch; }
-  .xp-pct { min-width:5.6ch; }
+  .xp-pct { min-width:5.6ch; font-weight:normal; color:var(--fg); }
   .xp-sig { display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; }
   /* colour by strength, like the chart levels; a stacked limit is always lit green */
   .xp-limit.tier-strong { border-left-color:var(--cbuy); }
-  .xp-limit.tier-strong .xp-px, .xp-limit.tier-strong .xp-pct { color:var(--cbuy); }
+  .xp-limit.tier-strong .xp-px { color:var(--cbuy); }
   .xp-limit.tier-mid { border-left-color:rgba(230,230,230,.55); }
-  .xp-limit.tier-mid .xp-px, .xp-limit.tier-mid .xp-pct { color:var(--fg); }
+  .xp-limit.tier-mid .xp-px { color:var(--fg); }
   .xp-limit.tier-light { border-left-color:var(--grid); }
-  .xp-limit.tier-light .xp-px, .xp-limit.tier-light .xp-pct { color:var(--mut); }
+  .xp-limit.tier-light .xp-px { color:var(--mut); }
   /* after the tier rules on purpose: a stacked limit is the one to use, so it is lit green whatever its own tier */
   .xp-limit.stacked { border-left-color:var(--cbuy); }
-  .xp-limit.stacked .xp-px, .xp-limit.stacked .xp-pct { color:var(--cbuy); }
+  .xp-limit.stacked .xp-px { color:var(--cbuy); }
   .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font:11px monospace; }
   .xp-limit.tier-strong .export-badge { font-weight:bold; }
   /* the purple wash reads as "strong LEVEL" — keep it off the green zone badges */
@@ -3286,24 +3294,26 @@ function exportTabSymbols(tabId) {
 function renderExportTabs() {
   var wrap = document.getElementById('exportGroupTabs');
   wrap.innerHTML = '';
-  function tab(id, label, count) {
+  function tab(id, label) {
     var b = document.createElement('button');
     b.type = 'button';
     b.className = 'xp-tab';
     b.setAttribute('aria-pressed', _exportActive === id ? 'true' : 'false');
-    b.innerHTML = escHtml(label) + '<span class="n">' + count + '</span>';
+    b.textContent = label;
     b.onclick = function () { selectExportTab(id); };
     return b;
   }
-  wrap.appendChild(tab('all', 'All tickers', visibleTickerSymbols().length));
+  wrap.appendChild(tab('all', 'All tickers'));
   _exportGroups.forEach(function (g) {
     var box = document.createElement('span');
     box.className = 'xp-tabwrap';
-    box.appendChild(tab(g.id, g.name, exportTabSymbols(g.id).length));
+    box.appendChild(tab(g.id, g.name));
     var edit = document.createElement('button');
     edit.type = 'button';
     edit.className = 'xp-edit';
-    edit.textContent = '✎';
+    // drawn pencil: the ✎ character renders cramped and clipped in the dialog fonts
+    edit.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" '
+      + 'stroke-linejoin="round"><path d="M11 2.5l2.5 2.5L5 13.5H2.5V11z"/><path d="M9.5 4l2.5 2.5"/></svg>';
     edit.setAttribute('aria-label', 'Edit group ' + g.name);
     edit.setAttribute('data-tip', 'Edit · rename, change tickers or delete');
     edit.onclick = function () { openExportEditor(g.id, null); };
@@ -3512,17 +3522,13 @@ function renderExportTable(sections) {
   var html = '<div class="xp-grid">';
   sections.forEach(function (sec, idx) {
     var hue = Math.round((idx * 137.508) % 360);
-    var type = tickerType(sec.sym);
     var limits = exportLimits(sec.rows);
     var n = sec.rows.length;
     html += '<section class="xp-card" aria-label="' + escHtml(sec.sym) + ' limits">'
       + '<div class="xp-cardhead">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
-      + (type ? '<span class="xp-type ' + type + '">' + type + '</span>' : '')
-      + '<span class="xp-meta">' + (sec.close != null ? 'Last close <b>' + px2(sec.close) + '</b><br>' : '')
-      + limits.length + ' limit' + (limits.length === 1 ? '' : 's')
-      + (limits.length !== n ? ' · ' + n + ' levels' : '') + '</span>'
+      + (sec.close != null ? '<span class="xp-meta">Last close <b>' + px2(sec.close) + '</b></span>' : '')
       + '</div>';
     if (!n) {
       html += '<p class="xp-none">No levels in this range at this strength.</p>';
