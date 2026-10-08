@@ -47,7 +47,9 @@ test("combining nearby levels is stated on screen and adjustable", () => {
   assert.match(html, /var EXPORT_COMBINE_KEY = 'kf-export-combine-v1';/);
   assert.match(html, /if \(!_exportCombineOn\) return rows;/);
   assert.match(html, /<p id="exportLegend">/);
-  assert.match(html, /'<p class="xp-incl">Includes '/);
+  // the levels a stacked limit covers sit in its chip's tooltip, not on the page
+  assert.match(html, /'<button type="button" class="export-badge stack" data-tip="'/);
+  assert.match(html, /var lines = text\.split\('\\n'\);/);
 });
 
 test("the CSV columns and the stacked-level rule are unchanged", () => {
