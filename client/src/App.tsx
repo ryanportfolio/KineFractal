@@ -21,6 +21,7 @@ const LabReport = lazy(() => import("@/pages/lab-report"));
 const About = lazy(() => import("@/pages/about"));
 const Alerts = lazy(() => import("@/pages/alerts"));
 const Account = lazy(() => import("@/pages/account"));
+const ResetPassword = lazy(() => import("@/pages/reset-password"));
 const Disclaimer = lazy(() => import("@/pages/legal/disclaimer"));
 const Privacy = lazy(() => import("@/pages/legal/privacy"));
 const SectorRotation = lazy(() => import("@/pages/sector-rotation"));
@@ -39,6 +40,7 @@ function Router() {
         <Route path="/about" component={About} />
         <Route path="/alerts" component={Alerts} />
 <Route path="/account" component={Account} />
+        <Route path="/reset-password" component={ResetPassword} />
         <Route path="/legal/disclaimer" component={Disclaimer} />
         {/* the terms page is retired — the disclaimer carries the legal text now */}
         <Route path="/legal/terms"><Redirect to="/legal/disclaimer" replace /></Route>

@@ -1,4 +1,5 @@
-// P2 account page: sign in / sign up, email verification status, and the
+// P2 account page: sign in / sign up / request a password reset (?mode=forgot;
+// the emailed link lands on /reset-password), email verification status, and the
 // versioned ToS acceptance that gates alert enablement (platform/P2-DESIGN.md).
 // Watchlist + alert toggles land here in the follow-up PR.
 
@@ -23,15 +24,33 @@ type Me = {
   tosVersion?: string;
 };
 
+type AuthMode = "signin" | "signup" | "forgot";
+
+function readMode(): AuthMode {
+  const m = new URLSearchParams(window.location.search).get("mode");
+  return m === "signup" || m === "forgot" ? m : "signin";
+}
+
+// Where the emailed reset link lands; carries ?next= so the visitor can sign in
+// afterwards and still get back to where they started.
+function resetRedirect(): string {
+  const next = readNext();
+  return next ? `/reset-password?next=${encodeURIComponent(next)}` : "/reset-password";
+}
+
 function AuthForms() {
-  const [mode, setMode] = useState<"signin" | "signup">(() =>
-    new URLSearchParams(window.location.search).get("mode") === "signup" ? "signup" : "signin",
-  );
+  const [mode, setModeState] = useState<AuthMode>(readMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  const setMode = (m: AuthMode) => {
+    setModeState(m);
+    setError(null);
+    setNotice(null);
+  };
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,7 +58,11 @@ function AuthForms() {
     setError(null);
     setNotice(null);
     try {
-      if (mode === "signup") {
+      if (mode === "forgot") {
+        const r = await authClient.requestPasswordReset({ email, redirectTo: resetRedirect() });
+        if (r.error) throw new Error(r.error.message || "could not send reset link");
+        setNotice(`If an account exists for ${email}, a reset link is on its way. It expires in 1 hour.`);
+      } else if (mode === "signup") {
         const r = await signUp.email({ email, password, name: email.split("@")[0] });
         if (r.error) throw new Error(r.error.message || "sign up failed");
         clearChartLineCache();
@@ -79,27 +102,59 @@ function AuthForms() {
           Create account
         </button>
       </div>
+      {mode === "forgot" && (
+        <div className="mb-4">
+          <h2 className="text-sm font-mono uppercase tracking-widest">Reset password</h2>
+          <p className="mt-2 text-[11px] text-muted-foreground leading-relaxed">
+            Enter your account email. We'll send a link to choose a new password.
+          </p>
+        </div>
+      )}
       <form onSubmit={submit} className="space-y-4">
         <input className={input} type="email" required placeholder="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
-        <input
-          className={input}
-          type="password"
-          required
-          minLength={8}
-          placeholder={mode === "signup" ? "password (8+ characters)" : "password"}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-        />
-        {error && <div className="text-red-400 text-xs font-mono">{error}</div>}
-        {notice && <div className="text-primary text-xs font-mono">{notice}</div>}
+        {mode !== "forgot" && (
+          <input
+            className={input}
+            type="password"
+            required
+            minLength={8}
+            placeholder={mode === "signup" ? "password (8+ characters)" : "password"}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete={mode === "signup" ? "new-password" : "current-password"}
+          />
+        )}
+        {mode === "signin" && (
+          <div className="text-right -mt-2">
+            <button
+              type="button"
+              onClick={() => setMode("forgot")}
+              className="text-xs font-mono text-muted-foreground underline hover:text-primary py-1"
+            >
+              Forgot password?
+            </button>
+          </div>
+        )}
+        <div role="status" aria-live="polite">
+          {error && <div className="text-red-400 text-xs font-mono">{error}</div>}
+          {notice && <div className="text-primary text-xs font-mono">{notice}</div>}
+        </div>
         <button
           type="submit"
           disabled={busy}
           className="w-full bg-primary text-primary-foreground font-bold rounded py-2 text-sm uppercase tracking-widest disabled:opacity-50"
         >
-          {busy ? "…" : mode === "signup" ? "Create account" : "Sign in"}
+          {busy ? "…" : mode === "forgot" ? "Send reset link" : mode === "signup" ? "Create account" : "Sign in"}
         </button>
+        {mode === "forgot" && (
+          <button
+            type="button"
+            onClick={() => setMode("signin")}
+            className="w-full text-xs font-mono text-muted-foreground underline hover:text-primary py-1"
+          >
+            Back to sign in
+          </button>
+        )}
       </form>
       <p className="mt-4 text-[11px] text-muted-foreground leading-relaxed">
         Accounts are free and only exist to keep a watchlist and opt into email alerts.

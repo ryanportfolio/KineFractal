@@ -216,6 +216,8 @@
   #signInDialog .err { min-height:19px; margin:10px 0 0; color:var(--csell); font-size:13px; }
   #signInDialog .row { display:flex; align-items:center; gap:8px; margin-top:12px; }
   #signInDialog a.alt { margin-right:auto; color:var(--fg); font-size:13px; }
+  #signInDialog a.forgot { align-self:flex-end; margin-top:6px; padding:2px 0; color:var(--mut); font-size:12px; }
+  #signInDialog a.forgot:hover { color:#00ff88; }
   #signInDialog button { padding:7px 12px; font-size:13px; }
   #signInDialog button.go { color:#00ff88; border-color:#00ff88; font-weight:bold; }
   #signInDialog button.go:hover { background:rgba(0,255,136,.1); }
@@ -233,6 +235,7 @@
     #topActions #acctBtn { max-width:150px; }
     #acctMenu a, #acctMenu button { min-height:44px; }
     #signInDialog input, #signInDialog button { min-height:44px; }
+    #signInDialog a.forgot { min-height:44px; display:inline-flex; align-items:center; }
     #signInDialog { padding:10px; }
     #drawCta .row { flex-wrap:wrap; }
     #drawCta button.go, #drawCta a.alt, #drawCta button.later { min-height:44px; display:inline-flex;
@@ -533,6 +536,8 @@ var siteUser = null;
 var siteEmail = null;
 // "Create account" goes to /account, which sends the visitor back here afterwards.
 var SIGNUP_HREF = '/account?mode=signup&next=%2Fcharts%2F';
+// "Forgot password?" emails a reset link; signing in afterwards returns here too.
+var RESET_HREF = '/account?mode=forgot&next=%2Fcharts%2F';
 
 function inject(src, ok, err) {
   var s = document.createElement('script');
@@ -1795,6 +1800,7 @@ function buildSignInDialog() {
       '<input id="signInEmail" name="email" type="email" autocomplete="email" required>' +
       '<label for="signInPassword">Password</label>' +
       '<input id="signInPassword" name="password" type="password" autocomplete="current-password" required>' +
+      '<a class="forgot" href="' + RESET_HREF + '">Forgot password?</a>' +
       '<p id="signInError" class="err" role="status" aria-live="polite"></p>' +
       '<div class="row">' +
         '<a class="alt" href="' + SIGNUP_HREF + '">Create account</a>' +

@@ -14,7 +14,7 @@ const RESEND_KEY = process.env.RESEND_API_KEY || "";
 
 async function sendViaResend(to: string, subject: string, html: string, text: string): Promise<void> {
   if (!RESEND_KEY) {
-    console.warn("[auth] RESEND_API_KEY unset — verification email NOT sent to", to);
+    console.warn(`[auth] RESEND_API_KEY unset — "${subject}" email NOT sent to`, to);
     return;
   }
   const res = await fetch("https://api.resend.com/emails", {
@@ -43,6 +43,18 @@ function verificationEmail(url: string): { html: string; text: string } {
   return { html, text };
 }
 
+function resetPasswordEmail(url: string): { html: string; text: string } {
+  const text = `Reset your KineFractal password\n\nClick to choose a new password: ${url}\n\nThe link works once and expires in 1 hour. If you didn't ask for a reset, ignore this email; your password stays the same.`;
+  const html = `<div style="font-family:ui-monospace,Menlo,Consolas,monospace;background:#0a0e14;color:#e6edf3;padding:32px;border-radius:8px;max-width:520px">
+  <div style="color:#00ff88;font-size:13px;letter-spacing:2px;margin-bottom:16px">KINE FRACTAL</div>
+  <h2 style="margin:0 0 12px;font-size:18px;color:#e6edf3">Reset your password</h2>
+  <p style="font-size:14px;line-height:1.6;color:#9aa4b2">Someone asked to reset the password for this account. The link works once and expires in 1 hour.</p>
+  <p style="margin:24px 0"><a href="${url}" style="background:#00ff88;color:#0a0e14;text-decoration:none;padding:10px 20px;border-radius:4px;font-weight:bold;font-size:14px">Choose a new password</a></p>
+  <p style="font-size:12px;color:#6b7280">If you didn't ask for a reset, ignore this email. Your password stays the same.</p>
+</div>`;
+  return { html, text };
+}
+
 // db may be null in dev without DATABASE_URL — auth is then unavailable and the
 // /api/auth mount answers 503 (see app.ts).
 export const auth = db
@@ -60,6 +72,18 @@ export const auth = db
         enabled: true,
         requireEmailVerification: false, // gate is on ALERT enablement, not login
         minPasswordLength: 8,
+        resetPasswordTokenExpiresIn: 60 * 60, // 1 hour, single use
+        // A reset is often a response to a leaked password, and sessions last a
+        // year, so a reset signs the account out everywhere.
+        revokeSessionsOnPasswordReset: true,
+        sendResetPassword: async ({ user, url }) => {
+          // Not awaited: an unknown email returns at once, so waiting on Resend
+          // here would let response time reveal which emails have accounts.
+          const { html, text } = resetPasswordEmail(url);
+          sendViaResend(user.email, "Reset your KineFractal password", html, text).catch((e) =>
+            console.error("[auth] reset email failed:", e?.message ?? e),
+          );
+        },
       },
       session: {
         // Keep users signed in as long as practically possible: sessions live a
