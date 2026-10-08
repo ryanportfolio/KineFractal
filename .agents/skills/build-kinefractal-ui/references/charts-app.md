@@ -36,6 +36,7 @@ The account control (`#acct`, right of the Limit Buy Levels button `#exportBtn`)
 - `#exportTip` is one fixed-position tooltip for every `[data-tip]` in the dialog, shown at once on hover and on keyboard focus.
 - Groups are `{id, name, symbols}` lists. Signed in: `GET/PUT /api/chart-groups` (`chart_preferences.ticker_groups`, `normalizeTickerGroups` in `server/fearlab-charts.ts`), with `csrfProtection` and `chartGroupsLimiter`; the page fetches `/api/csrf-token` and retries once on 419. Signed out or account storage failing: `kf-export-groups-v1` in localStorage. Checked tickers per tab persist in `kf-export-picks-v1`.
 - `#exportEditor` (create, rename, add/remove, two-click delete) replaces the columns while open; Escape closes it before the dialog (`onExportEscape`).
+- Results are ticker cards (`.xp-card`), each limit a row with price and % below close side by side (`.xp-px`, `.xp-pct`). A stacked pack shows as one limit at its highest price with an "Includes …" line for the levels it covers (`exportLimits`). "Combine nearby levels" (`#exportCombineToggle`, `#exportCombinePct`, 0.5 to 5%, default 2) sets `CLUSTER_PCT` or switches stacking off; it is kept in this browser (`kf-export-combine-v1`) and is not yet shared with the alert emails, whose pair/triple rules run in the range worker. `#exportLegend` explains the colours and stacking. The CSV still lists every level.
 
 Tests: `scripts/charts-export.test.mjs`, `server/chart-groups.test.ts`.
 

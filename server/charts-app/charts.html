@@ -383,38 +383,59 @@
   #exportStrengthWrap button { margin-left:-1px; color:var(--mut); }
   #exportStrengthWrap button.active { border-color:var(--sup); color:var(--sup); background:rgba(38,198,218,.12); position:relative; }
   #exportStrengthHint { color:var(--mut); font:12px monospace; }
-  /* results: one section per ticker */
-  #exportResult .xp-sec { margin:0 0 16px; border:1px solid var(--grid); }
-  #exportResult .xp-sechead { display:flex; align-items:baseline; flex-wrap:wrap; gap:6px 12px; padding:9px 12px;
-                              border-bottom:1px solid var(--grid); background:rgba(255,255,255,.025); }
-  #exportResult .xp-sechead .xp-sym { font-size:17px; }
-  #exportResult .xp-sechead .xp-name { color:var(--fg); white-space:normal; }
-  #exportResult .xp-sechead .xp-meta { margin-left:auto; color:var(--mut); font:12px monospace; }
+  /* combine nearby levels (left column) */
+  #exportDialog .xp-combine { display:flex; flex-direction:column; gap:8px; padding-top:12px; border-top:1px solid var(--grid); }
+  #exportCombineToggle { position:relative; width:38px; height:20px; padding:0; margin-left:auto; border:1px solid var(--grid); background:var(--bg); }
+  #exportCombineToggle::after { content:""; position:absolute; top:3px; left:3px; width:12px; height:12px; background:var(--mut); }
+  #exportCombineToggle[aria-checked="true"] { border-color:var(--sup); background:rgba(38,198,218,.18); }
+  #exportCombineToggle[aria-checked="true"]::after { left:21px; background:var(--sup); }
+  #exportCombinePct { flex:1 1 auto; accent-color:var(--sup); }
+  #exportCombinePct:disabled { opacity:.4; }
+  #exportCombineVal { min-width:4ch; text-align:right; font:bold 14px Verdana,Geneva,sans-serif; }
+  #exportCombineText { margin:0; color:var(--mut); font:12px monospace; line-height:1.5; }
+  #exportCombineExample { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--grid); font:13px Verdana,Geneva,sans-serif; }
+  #exportCombineExample:empty { display:none; }
+  #exportCombineExample .pair { display:flex; flex-direction:column; color:var(--mut); }
+  #exportCombineExample .arrow { color:var(--mut); font-family:monospace; }
+  #exportCombineExample .to { color:var(--cbuy); font-weight:bold; }
+  /* legend: what the colours and "stacked" mean */
+  #exportLegend { margin:0 0 12px; color:var(--mut); font:12px monospace; line-height:1.6; }
+  #exportLegend b { font-weight:bold; }
+  #exportLegend .g { color:var(--cbuy); } #exportLegend .w { color:var(--fg); } #exportLegend .m { color:var(--mut); }
+  /* results: ticker cards, two or more across */
+  #exportResult .xp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(460px,100%), 1fr)); gap:12px; align-items:start; }
+  #exportResult .xp-card { border:1px solid var(--grid); background:rgba(255,255,255,.015); }
+  #exportResult .xp-cardhead { display:flex; align-items:flex-start; flex-wrap:wrap; gap:4px 10px; padding:9px 12px; border-bottom:1px solid var(--grid); }
+  #exportResult .xp-cardhead .xp-sym { font-size:19px; }
+  #exportResult .xp-cardhead .xp-name { flex:1 1 140px; color:var(--fg); white-space:normal; padding-top:3px; }
+  #exportResult .xp-cardhead .xp-type { margin-top:3px; }
+  #exportResult .xp-meta { margin-left:auto; text-align:right; color:var(--mut); font:12px monospace; line-height:1.5; }
+  #exportResult .xp-meta b { color:var(--fg); font:bold 13px Verdana,Geneva,sans-serif; }
   #exportResult .xp-none, #exportResult .xp-help { margin:0; padding:10px 12px; color:var(--mut); font:12px monospace; }
-  #exportResult .xp-secfoot { display:flex; align-items:center; gap:8px; padding:6px 12px; border-top:1px solid var(--grid); color:var(--mut); font:12px monospace; }
-  .export-table { width:100%; border-collapse:collapse; font:12.5px monospace; }
-  .export-table th, .export-table td { text-align:left; padding:6px 12px; border-bottom:1px solid var(--grid); white-space:nowrap; }
-  .export-table tbody tr:last-child td { border-bottom:0; }
-  .export-table th { color:var(--mut); font-size:11px; font-weight:normal; letter-spacing:.1em; text-transform:uppercase; }
-  .export-table th.num, .export-table td.dist { text-align:right; }
-  .export-table td.px { width:24%; }
-  .export-table .px, .export-table .dist { font:bold 16px Verdana,Geneva,sans-serif; }
-  .export-table .dist { font-weight:normal; }
-  /* buy price colours by strength, like the chart levels */
-  .export-table tr.tier-strong .px { color:var(--cbuy); }
-  .export-table tr.tier-mid .px { color:var(--fg); }
-  .export-table tr.tier-light .px { color:var(--mut); }
-  /* stacked levels: the highest price in a pack is the one to use (lit, green);
-     the rest of the pack recedes and says why. After the tier rules on purpose. */
-  .export-table tr.stack-pick { background:rgba(255,255,255,.07); box-shadow:inset 2px 0 0 #fff; }
-  .export-table tr.stack-pick .px { color:var(--cbuy); }
-  .export-table tr.stack-member td { opacity:.5; }
-  .export-table .xp-covered { margin-left:8px; color:var(--mut); font-size:11px; }
-  .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font-size:11px; }
-  tr.tier-strong .export-badge { font-weight:bold; }
+  #exportResult .xp-secfoot { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:6px 12px; border-top:1px solid var(--grid); color:var(--mut); font:12px monospace; }
+  /* one limit: price and % below close side by side, the loudest thing on screen */
+  .xp-limit { padding:7px 12px 7px 10px; border-left:3px solid transparent; }
+  .xp-limit + .xp-limit { border-top:1px solid var(--grid); }
+  .xp-lmain { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; }
+  .xp-px, .xp-pct { font:bold 22px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
+  .xp-px { min-width:5.4ch; }
+  .xp-pct { min-width:5.6ch; }
+  .xp-sig { display:inline-flex; flex-wrap:wrap; gap:6px; }
+  .xp-incl { margin:3px 0 0; color:var(--mut); font:12px monospace; }
+  .xp-incl b { color:var(--fg); font:bold 12px Verdana,Geneva,sans-serif; }
+  /* colour by strength, like the chart levels; a stacked limit is always lit green */
+  .xp-limit.tier-strong, .xp-limit.stacked { border-left-color:var(--cbuy); }
+  .xp-limit.tier-strong .xp-px, .xp-limit.tier-strong .xp-pct,
+  .xp-limit.stacked .xp-px, .xp-limit.stacked .xp-pct { color:var(--cbuy); }
+  .xp-limit.tier-mid { border-left-color:rgba(230,230,230,.55); }
+  .xp-limit.tier-mid .xp-px, .xp-limit.tier-mid .xp-pct { color:var(--fg); }
+  .xp-limit.tier-light { border-left-color:var(--grid); }
+  .xp-limit.tier-light .xp-px, .xp-limit.tier-light .xp-pct { color:var(--mut); }
+  .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font:11px monospace; }
+  .xp-limit.tier-strong .export-badge { font-weight:bold; }
   /* the purple wash reads as "strong LEVEL" — keep it off the green zone badges */
-  tr.tier-strong .export-badge:not(.gap):not(.ob):not(.confl):not(.pd):not(.stack) { background:rgba(157,107,255,.14); }
-  .export-badge.stack { margin-left:6px; border-color:#fff; color:#fff; background:rgba(255,255,255,.12); font-weight:bold; }
+  .xp-limit.tier-strong .export-badge:not(.gap):not(.ob):not(.confl):not(.pd):not(.stack) { background:rgba(157,107,255,.14); }
+  .export-badge.stack { border-color:#fff; color:#fff; background:rgba(255,255,255,.12); font-weight:bold; }
   .export-badge.gap { border-color:var(--gap); color:var(--gap); }
   .export-badge.ob { border-color:var(--cbuy); color:var(--cbuy); }
   .export-badge.confl { border-color:var(--cbuy); color:var(--cbuy); }
@@ -472,8 +493,7 @@
     #exportDialog button, #exportPicks .xp-pick, #exportEditor .xp-edrow { min-height:44px; }
     #exportDialog .xp-foot { flex-wrap:wrap; }
     #exportDialog .xp-foot .xp-primary { width:100%; }
-    .export-table th, .export-table td { padding:5px 8px; }
-    .export-table .px, .export-table .dist { font-size:14px; }
+    .xp-px, .xp-pct { font-size:18px; }
   }
   /* ticker symbols render in Verdana everywhere they are listed (user, 2026-08-08):
      toolbar buttons, combo dropdown, add box, reorder rows, remove confirm, export */
@@ -615,8 +635,21 @@
           </div>
           <span id="exportStrengthHint"></span>
         </div>
+        <div class="xp-combine" role="group" aria-labelledby="exportCombineTitle">
+          <div class="xp-row">
+            <span class="xp-count" id="exportCombineTitle">Combine nearby levels</span>
+            <button id="exportCombineToggle" type="button" role="switch" aria-checked="true" aria-labelledby="exportCombineTitle"></button>
+          </div>
+          <div class="xp-row">
+            <input id="exportCombinePct" type="range" min="0.5" max="5" step="0.5" value="2" aria-label="Combine levels within this percent of each other">
+            <output id="exportCombineVal" for="exportCombinePct">2%</output>
+          </div>
+          <p id="exportCombineText"></p>
+          <div id="exportCombineExample" aria-label="Example from your results"></div>
+        </div>
       </div>
       <div class="xp-main" id="exportMain" aria-live="off">
+        <p id="exportLegend"><b class="g">green</b> = strong signal or a stacked limit · <b class="w">white</b> = medium · <b class="m">grey</b> = weaker · <span id="exportLegendStack"></span></p>
         <div id="exportResult"></div>
       </div>
     </div>
@@ -2965,15 +2998,46 @@ function exportSignalHtml(row) {
 }
 // STACKED LEVELS — when several signals land on nearly the same price, one
 // limit order covers all of them, so the table calls out the HIGHEST price in
-// the pack (the first one a pullback touches) and dims the rest. Rows arrive
-// sorted nearest-to-price first, so a cluster is a run of consecutive rows on
-// one ticker whose prices sit within CLUSTER_PCT of the run's TOP price (a
-// fixed span, not neighbour-chaining — chaining would let a "cluster" drift
-// arbitrarily wide). Values tuned in a lab (user, 2026-08-08).
+// the pack (the first one a pullback touches) and lists the rest under it. Rows
+// arrive sorted nearest-to-price first, so a cluster is a run of consecutive
+// rows on one ticker whose prices sit within CLUSTER_PCT of the run's TOP price
+// (a fixed span, not neighbour-chaining — chaining would let a "cluster" drift
+// arbitrarily wide). The 2% default was tuned in a lab (user, 2026-08-08); the
+// visitor can now change it or switch combining off ("Combine nearby levels"),
+// kept in this browser under EXPORT_COMBINE_KEY.
 var CLUSTER_PCT = 2;    // levels this close to the top of the run stack together
 var CLUSTER_MIN = 2;    // rows needed before a run counts as a cluster
+var EXPORT_COMBINE_KEY = 'kf-export-combine-v1';
+var _exportCombineOn = true;
+function readExportCombine() {
+  try {
+    var j = JSON.parse(localStorage.getItem(EXPORT_COMBINE_KEY) || 'null');
+    if (j && typeof j.pct === 'number' && j.pct >= 0.5 && j.pct <= 5) CLUSTER_PCT = j.pct;
+    if (j && typeof j.on === 'boolean') _exportCombineOn = j.on;
+  } catch (e) {}
+}
+function saveExportCombine() {
+  try { localStorage.setItem(EXPORT_COMBINE_KEY, JSON.stringify({ on: _exportCombineOn, pct: CLUSTER_PCT })); } catch (e) {}
+}
+function fmtPct(v) { return (Math.round(v * 10) / 10).toString(); }
+function renderCombineUi() {
+  var on = _exportCombineOn, pct = fmtPct(CLUSTER_PCT);
+  var toggle = document.getElementById('exportCombineToggle');
+  toggle.setAttribute('aria-checked', on ? 'true' : 'false');
+  var slider = document.getElementById('exportCombinePct');
+  slider.value = String(CLUSTER_PCT);
+  slider.disabled = !on;
+  document.getElementById('exportCombineVal').textContent = on ? pct + '%' : 'off';
+  document.getElementById('exportCombineText').textContent = on
+    ? 'Levels within ' + pct + '% of each other become one limit at the highest price: one order there covers them all.'
+    : 'Off: every level is listed as its own limit.';
+  document.getElementById('exportLegendStack').innerHTML = on
+    ? '<b class="w">stacked</b> = levels within ' + pct + '% of each other, combined into one limit at the highest price'
+    : 'combining nearby levels is off';
+}
 function markExportClusters(rows) {
   rows.forEach(function (r) { r.cluster = 0; r.pick = false; r.stack = 0; });
+  if (!_exportCombineOn) return rows;
   var id = 0, i = 0;
   while (i < rows.length) {
     var j = i + 1;
@@ -3401,43 +3465,71 @@ function buildExportTable() {
     if (gen === _exportGen && n > 1) msg.textContent = 'loading ' + (i + 1) + ' of ' + n + ' …';
   });
 }
+// Plain-text name of a level's signal, for the "Includes …" line under a stacked limit.
+function exportSignalText(row) {
+  if (row.type === 'gap') return 'unfilled gap';
+  if (row.type === 'ob') return 'fresh OB';
+  if (row.type === 'confl') return 'confluence ×' + row.n;
+  if (row.type === 'pd') return 'discount';
+  return 'support ×' + row.touches + (row.tfs > 1 ? ' · ' + row.tfs + 'TF' : '');
+}
+// A ticker's rows as limits: each stacked pack becomes one limit (its highest
+// price) carrying the levels it covers; every other level is its own limit.
+function exportLimits(rows) {
+  var out = [];
+  rows.forEach(function (r) {
+    var last = out[out.length - 1];
+    if (r.cluster && !r.pick && last && last.row.cluster === r.cluster) last.members.push(r);
+    else out.push({ row: r, members: [] });
+  });
+  return out;
+}
+// prices on screen always show cents (212.30, not 212.3); the CSV keeps its raw values
+function px2(v) { return Number(v).toFixed(2); }
+function pctBelow(row) { return ((row.close - row.limit) / row.close) * 100; }
 function renderExportTable(sections) {
   var wrap = document.getElementById('exportResult');
   if (!sections.length) { wrap.innerHTML = ''; return; }
   // one pastel per ticker, golden-angle spaced so neighbours land on clearly different hues
-  var html = '';
+  var html = '<div class="xp-grid">';
   sections.forEach(function (sec, idx) {
     var hue = Math.round((idx * 137.508) % 360);
     var type = tickerType(sec.sym);
+    var limits = exportLimits(sec.rows);
     var n = sec.rows.length;
-    html += '<section class="xp-sec" aria-label="' + escHtml(sec.sym) + ' levels">'
-      + '<div class="xp-sechead">'
+    html += '<section class="xp-card" aria-label="' + escHtml(sec.sym) + ' limits">'
+      + '<div class="xp-cardhead">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
       + (type ? '<span class="xp-type ' + type + '">' + type + '</span>' : '')
-      + '<span class="xp-meta">' + (sec.close != null ? 'last close ' + sec.close + ' · ' : '')
-      + n + ' level' + (n === 1 ? '' : 's') + '</span>'
+      + '<span class="xp-meta">' + (sec.close != null ? 'Last close <b>' + px2(sec.close) + '</b><br>' : '')
+      + limits.length + ' limit' + (limits.length === 1 ? '' : 's')
+      + (limits.length !== n ? ' · ' + n + ' levels' : '') + '</span>'
       + '</div>';
     if (!n) {
       html += '<p class="xp-none">No levels in this range at this strength.</p>';
     } else {
-      html += '<table class="export-table"><thead><tr>'
-        + '<th>Limit price</th><th>Signal</th><th class="num">Below close</th>'
-        + '</tr></thead><tbody>';
-      sec.rows.forEach(function (row) {
-        var dist = ((row.close - row.limit) / row.close) * 100;
-        var cls = 'tier-' + exportTier(row) + (row.pick ? ' stack-pick' : row.cluster ? ' stack-member' : '');
-        var badge = row.pick
-          ? '<span class="export-badge stack" title="' + row.stack + ' signals within '
-            + CLUSTER_PCT + '% — one limit here covers them all">stacked ×' + row.stack + '</span>'
-          : row.cluster ? '<span class="xp-covered">covered by the stacked level above</span>' : '';
-        html += '<tr class="' + cls + '">'
-          + '<td class="px">' + row.limit + '</td>'
-          + '<td>' + exportSignalHtml(row) + badge + '</td>'
-          + '<td class="dist">' + dist.toFixed(1) + '%</td>'
-          + '</tr>';
+      limits.forEach(function (lim) {
+        var row = lim.row;
+        var stacked = lim.members.length > 0;
+        var cls = 'xp-limit tier-' + exportTier(row) + (stacked ? ' stacked' : '');
+        var chip = stacked
+          ? '<span class="export-badge stack" title="' + row.stack + ' signals within ' + CLUSTER_PCT
+            + '% of each other: one limit here covers them all">stacked ×' + row.stack + '</span>'
+          : '';
+        html += '<div class="' + cls + '">'
+          + '<div class="xp-lmain">'
+          + '<span class="xp-px">' + px2(row.limit) + '</span>'
+          + '<span class="xp-pct">−' + pctBelow(row).toFixed(1) + '%</span>'
+          + '<span class="xp-sig">' + exportSignalHtml(row) + chip + '</span>'
+          + '</div>';
+        if (stacked) {
+          html += '<p class="xp-incl">Includes ' + lim.members.map(function (m) {
+            return '<b>' + px2(m.limit) + '</b> −' + pctBelow(m).toFixed(1) + '% · ' + escHtml(exportSignalText(m));
+          }).join('; ') + '</p>';
+        }
+        html += '</div>';
       });
-      html += '</tbody></table>';
     }
     if (sec.weaker) {
       html += '<div class="xp-secfoot">' + sec.weaker + ' weaker level' + (sec.weaker === 1 ? '' : 's')
@@ -3446,18 +3538,42 @@ function renderExportTable(sections) {
     }
     html += '</section>';
   });
-  wrap.innerHTML = html;
+  wrap.innerHTML = html + '</div>';
+  renderCombineExample(sections);
+}
+// The worked example under the combine control uses the first stacked limit on
+// screen, so it always shows real numbers; nothing stacked = no example.
+function renderCombineExample(sections) {
+  var box = document.getElementById('exportCombineExample');
+  var found = null;
+  sections.some(function (sec) {
+    return exportLimits(sec.rows).some(function (lim) { if (lim.members.length) { found = { sym: sec.sym, lim: lim }; return true; } return false; });
+  });
+  if (!found || !_exportCombineOn) { box.innerHTML = ''; return; }
+  var all = [found.lim.row].concat(found.lim.members);
+  box.innerHTML = '<span class="pair">' + all.map(function (r) { return '<span>' + px2(r.limit) + '</span>'; }).join('') + '</span>'
+    + '<span class="arrow">→</span><span class="to">' + px2(found.lim.row.limit) + '</span>'
+    + '<span class="xp-count">' + escHtml(found.sym) + ', one limit</span>';
 }
 function updateExportFooter(rows, tickerCount) {
   var summary = document.getElementById('exportSummary');
   var scope = document.getElementById('exportScope');
   var syms = checkedExportSymbols();
+  var limits = 0, packs = 0, packed = 0, i = 0;
+  while (i < rows.length) {
+    var j = i + 1;
+    while (j < rows.length && rows[j].cluster && rows[j].cluster === rows[i].cluster) j++;
+    limits++;
+    if (j - i > 1) { packs++; packed += j - i; }
+    i = j;
+  }
   if (!syms.length) summary.textContent = 'No tickers selected';
-  else summary.textContent = rows.length + ' level' + (rows.length === 1 ? '' : 's') + ' across '
+  else summary.textContent = limits + ' limit' + (limits === 1 ? '' : 's') + ' across '
     + tickerCount + ' ticker' + (tickerCount === 1 ? '' : 's');
   var g = exportGroupById(_exportActive);
   var list = syms.length > 8 ? syms.slice(0, 8).join(', ') + ' +' + (syms.length - 8) + ' more' : syms.join(', ');
-  scope.textContent = syms.length ? (g ? g.name : 'All tickers') + ' · ' + list : '';
+  var detail = packs ? rows.length + ' levels · ' + packed + ' stacked into ' + packs + ' limits · ' : '';
+  scope.textContent = syms.length ? detail + (g ? g.name : 'All tickers') + ' · ' + list : '';
   _exportCsvReady = !!rows.length;
   document.getElementById('exportCsv').disabled = !rows.length;
 }
@@ -3653,6 +3769,8 @@ function openExportDialog() {
   document.getElementById('exportCsv').disabled = true;
   _exportRows = null;
   _exportPickMemory = readExportPickMemory();
+  readExportCombine();
+  renderCombineUi();
   closeExportEditor(false);
   dialog.classList.add('open');
   dialog.setAttribute('aria-hidden', 'false');
@@ -3714,6 +3832,13 @@ function wireExportDialog() {
     if (b) { setExportStrength(b.getAttribute('data-strength-set'), true); document.getElementById('strengthAny').focus(); }
   });
   document.getElementById('exportCsv').onclick = downloadExportCsv;
+  document.getElementById('exportCombineToggle').onclick = function () {
+    _exportCombineOn = !_exportCombineOn; saveExportCombine(); renderCombineUi(); scheduleExportBuild(0);
+  };
+  document.getElementById('exportCombinePct').addEventListener('input', function (e) {
+    var v = parseFloat(e.target.value);
+    if (isFinite(v) && v >= 0.5 && v <= 5) { CLUSTER_PCT = v; saveExportCombine(); renderCombineUi(); scheduleExportBuild(); }
+  });
   document.getElementById('exportSaveGroup').onclick = function () { openExportEditor(null, checkedExportSymbols()); };
   document.getElementById('exportGroupSave').onclick = saveExportEditor;
   document.getElementById('exportGroupCancel').onclick = function () { closeExportEditor(true); };

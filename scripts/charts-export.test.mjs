@@ -41,6 +41,15 @@ test("the group editor is labelled, Escape closes it before the dialog, delete t
   assert.match(html, /del\.textContent = 'Click again to delete';/);
 });
 
+test("combining nearby levels is stated on screen and adjustable", () => {
+  assert.match(html, /<button id="exportCombineToggle" type="button" role="switch" aria-checked="true" aria-labelledby="exportCombineTitle"><\/button>/);
+  assert.match(html, /<input id="exportCombinePct" type="range" min="0\.5" max="5" step="0\.5" value="2"/);
+  assert.match(html, /var EXPORT_COMBINE_KEY = 'kf-export-combine-v1';/);
+  assert.match(html, /if \(!_exportCombineOn\) return rows;/);
+  assert.match(html, /<p id="exportLegend">/);
+  assert.match(html, /'<p class="xp-incl">Includes '/);
+});
+
 test("the CSV columns and the stacked-level rule are unchanged", () => {
   assert.match(html, /'Ticker,Limit price,Signal,Touches,Timeframes,Gap zone,Below close %,Last close'/);
   assert.match(html, /var CLUSTER_PCT = 2;/);
