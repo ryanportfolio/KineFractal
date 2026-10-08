@@ -34,7 +34,7 @@
            border-radius:0; padding:3px 6px; font:inherit; }
   button { cursor:pointer; }
   button:hover { border-color:#00ff88; }
-  /* REORDER/EXPORT live on the TOP row (right of the brand) so the ticker
+  /* REORDER and Limit Buy Levels live on the TOP row (right of the brand) so the ticker
      strip below gets the full bar width */
   #topActions { margin-left:auto; display:flex; align-items:center; gap:18px; }
   #topActions button { font-weight:bold; letter-spacing:1.5px; padding:5px 14px; }
@@ -46,6 +46,10 @@
   .superbtn { font-weight:bold; letter-spacing:.5px; padding:3px 7px; font-size:15px; }   /* bar is 13px; tickers read 2px bigger */
   .superbtn.active { border-color:var(--sup); color:var(--sup); }
   #exportBtn { flex:0 0 auto; color:var(--sup); border-color:rgba(38,198,218,.48); }
+  /* the main action on this row: Space Grotesk stops at 700, so it reads heavier
+     through size, a solid border and a light fill instead (user, 2026-10-08) */
+  #topActions #exportBtn { font-size:14px; letter-spacing:.04em; border-color:var(--sup); background:rgba(38,198,218,.10); }
+  #topActions #exportBtn:hover, #topActions #exportBtn[aria-expanded="true"] { background:rgba(38,198,218,.22); }
   #exportBtn:hover, #exportBtn[aria-expanded="true"] { border-color:var(--sup); background:rgba(38,198,218,.08); }
   #tickerReorderBtn { flex:0 0 auto; color:var(--sup); border-color:rgba(38,198,218,.48);
                       font:11px monospace; letter-spacing:.12em; padding:4px 8px; }
@@ -179,7 +183,7 @@
   #drawCta button.go:hover { background:rgba(198,255,0,.08); }
   #drawCta a.alt { padding:7px 6px; color:var(--fg); font-size:13px; }
   #drawCta button.later { padding:7px 10px; font-size:13px; }
-  /* account control (site mode, right of EXPORT) + in-page sign-in dialog */
+  /* account control (site mode, right of Limit Buy Levels) + in-page sign-in dialog */
   #acct { position:relative; display:inline-flex; align-items:center; }
   #acct[hidden], #acct [hidden] { display:none !important; }
   #topActions #signInBtn { color:#00ff88; border-color:rgba(0,255,136,.55); }
@@ -496,7 +500,7 @@
 <body>
 <div id="bar">
   <span class="kf-brand" title="KineFractal">KINEFRACTAL</span>
-  <span id="topActions"><span id="topUtil"><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">EXPORT</button></span>
+  <span id="topActions"><span id="topUtil"><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
   <span id="tickerStrip"><span id="superBtns" title="super (MTF) charts"></span></span>
   <input id="addSym" placeholder="add ticker" maxlength="12" style="width:88px" title="add a chart-only watchlist ticker (live build)"><button id="addBtn">+ Add</button><span id="addMsg" class="addmsg"></span>
   <select id="combo" title="per-timeframe board combos"></select>
@@ -1841,7 +1845,7 @@ function showSignupCta(heading, body) {
 }
 
 // --- account control + in-page sign-in (SITE only) ---------------------------
-// Top-bar control right of EXPORT. Hidden while the /api/me probe is pending or
+// Top-bar control right of Limit Buy Levels. Hidden while the /api/me probe is pending or
 // failed (never flash a wrong state); "Sign in" when signed out; the account's
 // shortened email with a small menu (account, email alerts, sign out) when
 // signed in. Sign-in posts to Better Auth (same origin, its own origin check)
