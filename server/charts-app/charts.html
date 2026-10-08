@@ -2988,7 +2988,7 @@ function markExportClusters(rows) {
   return rows;
 }
 function downloadExportCsv() {
-  if (!_exportRows || !_exportRows.length) return;
+  if (!_exportCsvReady || !_exportRows || !_exportRows.length) return;
   var lines = ['Ticker,Limit price,Signal,Touches,Timeframes,Gap zone,Below close %,Last close'];
   _exportRows.forEach(function (row) {
     var dist = (((row.close - row.limit) / row.close) * 100).toFixed(1);
@@ -3097,6 +3097,10 @@ function setGroupsNote(text, isError) {
   el.textContent = _groupsNote.text;
   el.classList.toggle('error', _groupsNote.error);
 }
+// Per signed-in email: has this browser's group list already met the account's?
+function groupsSyncedKey() { return 'kf-export-groups-synced:' + (siteEmail || '').toLowerCase(); }
+function groupsSynced() { try { return localStorage.getItem(groupsSyncedKey()) === '1'; } catch (e) { return false; } }
+function markGroupsSynced() { try { localStorage.setItem(groupsSyncedKey(), '1'); } catch (e) {} }
 // Signed in: the account's list (a first sign-in carries this browser's groups
 // up once). Signed out, local mode, or the account call failing: this browser.
 function loadExportGroups(done) {
@@ -3113,13 +3117,16 @@ function loadExportGroups(done) {
       } else if (!j.stored) {            // account storage not ready yet
         _exportGroups = local;
         setGroupsNote('Groups are saved in this browser for now.');
-      } else if (!remote.length && local.length) {
-        _exportGroupsAccount = true;     // first sign-in: carry this browser's groups up once
+      } else if (!remote.length && local.length && !groupsSynced()) {
+        _exportGroupsAccount = true;     // first sign-in here: carry this browser's groups up once
         _exportGroups = local;
-        saveExportGroups();
+        saveExportGroups().then(function (ok) { if (ok) markGroupsSynced(); });
       } else {
+        // the account list is the truth from now on, even when empty (a group
+        // deleted in another browser must not come back from this one's copy)
         _exportGroupsAccount = true;
         _exportGroups = remote;
+        markGroupsSynced();
       }
       done();
     })
@@ -3145,9 +3152,17 @@ function putExportGroups(retried) {
       body: body,
     });
   }).then(function (r) {
-    if (r.status === 419 && !retried) return putExportGroups(true);   // token expired: one fresh retry
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
+    if (retried || (r.status !== 419 && r.status !== 403)) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }
+    // 419 = token expired; 403 "Invalid CSRF token" = another tab rotated it.
+    // Either way one retry with a fresh token, like the site's csrfFetch.
+    return r.clone().json().catch(function () { return {}; }).then(function (j) {
+      var csrf = r.status === 419 || j.code === 'CSRF_REFRESH_NEEDED' || /CSRF/.test(j.error || '');
+      if (csrf) return putExportGroups(true);
+      throw new Error('HTTP ' + r.status);
+    });
   });
 }
 // Always keeps a browser copy; signed in, the account copy is the one that
@@ -3156,7 +3171,7 @@ function saveExportGroups() {
   try { localStorage.setItem(EXPORT_GROUPS_KEY, JSON.stringify(_exportGroups)); } catch (e) {}
   if (!_exportGroupsAccount) return Promise.resolve(true);
   return putExportGroups(false)
-    .then(function () { setGroupsNote(''); return true; })
+    .then(function () { setGroupsNote(''); markGroupsSynced(); return true; })
     .catch(function () {
       setGroupsNote('Could not save groups to your account. They are kept in this browser; try again later.', true);
       return false;
@@ -3221,10 +3236,12 @@ function renderExportTabs() {
   note.classList.toggle('error', _groupsNote.error);
   wrap.appendChild(note);
 }
-function selectExportTab(id) {
+// keepPicks=false skips saving the outgoing list's checks: used right after a
+// group was saved or deleted, whose old checkbox list no longer applies.
+function selectExportTab(id, keepPicks) {
   if (id !== 'all' && !exportGroupById(id)) id = 'all';
   if (!document.getElementById('exportEditor').hidden) closeExportEditor(false);
-  rememberExportPicks();
+  if (keepPicks !== false) rememberExportPicks();
   _exportActive = id;
   try { localStorage.setItem(EXPORT_ACTIVE_KEY, id); } catch (e) {}
   Array.prototype.forEach.call(document.querySelectorAll('#exportGroupTabs .xp-tab'), function (b, i) {
@@ -3241,6 +3258,9 @@ var EXPORT_PICKS_KEY = 'kf-export-picks-v1';
 function rememberExportPicks() {
   if (!document.querySelectorAll('#exportPicks input').length) return;
   _exportPickMemory[_exportActive] = checkedExportSymbols();
+  persistExportPicks();
+}
+function persistExportPicks() {
   try { localStorage.setItem(EXPORT_PICKS_KEY, JSON.stringify(_exportPickMemory)); } catch (e) {}
 }
 function readExportPickMemory() {
@@ -3307,15 +3327,22 @@ function updateExportPickCount() {
 
 // --- live build -----------------------------------------------------------------
 var _exportTimer = null;
+var _exportCsvReady = false;   // true only while the shown table matches the current inputs
 function scheduleExportBuild(delay) {
   clearTimeout(_exportTimer);
+  // the table on screen is about to go stale: never let Download hand out the old rows
+  _exportCsvReady = false;
+  document.getElementById('exportCsv').disabled = true;
   _exportTimer = setTimeout(buildExportTable, delay == null ? 250 : delay);
 }
+// The range the inputs show, or an error to show instead. Never builds with
+// values the visitor can't see (a silent fallback would export other prices).
 function readExportRange() {
   var depthPct = parseFloat(document.getElementById('exportDepth').value);
-  if (!isFinite(depthPct) || depthPct <= 0 || depthPct > 99) depthPct = 25;
   var minPct = parseFloat(document.getElementById('exportMin').value);
-  if (!isFinite(minPct) || minPct < 0 || minPct >= depthPct) minPct = depthPct > 2 ? 2 : 0;
+  if (!isFinite(depthPct) || depthPct <= 0 || depthPct > 99) return { error: 'Set max between 1 and 99%.' };
+  if (!isFinite(minPct) || minPct < 0) return { error: 'Set min to 0% or more.' };
+  if (minPct >= depthPct) return { error: 'Set min below max.' };
   return { depth: depthPct, min: minPct };
 }
 function buildExportTable() {
@@ -3334,6 +3361,12 @@ function buildExportTable() {
     return;
   }
   var range = readExportRange();
+  if (range.error) {
+    msg.textContent = range.error;
+    msg.classList.add('error');
+    main.setAttribute('aria-busy', 'true');   // fade the old table: it no longer matches the inputs
+    return;
+  }
   if (!_exportRows) {   // first build since opening: say what is loading, not "none selected"
     document.getElementById('exportSummary').textContent = syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + ' selected';
     document.getElementById('exportResult').innerHTML = '<p class="xp-help">Loading levels for '
@@ -3421,6 +3454,7 @@ function updateExportFooter(rows, tickerCount) {
   var g = exportGroupById(_exportActive);
   var list = syms.length > 8 ? syms.slice(0, 8).join(', ') + ' +' + (syms.length - 8) + ' more' : syms.join(', ');
   scope.textContent = syms.length ? (g ? g.name : 'All tickers') + ' · ' + list : '';
+  _exportCsvReady = !!rows.length;
   document.getElementById('exportCsv').disabled = !rows.length;
 }
 var STRENGTH_HINTS = {
@@ -3566,14 +3600,16 @@ function saveExportEditor() {
     id = newExportGroupId();
     _exportGroups.push({ id: id, name: name, syms: _edSyms.slice() });
   }
-  delete _exportPickMemory[id];   // a saved group opens with all its tickers checked
+  rememberExportPicks();          // keep the outgoing tab's checks first ...
+  delete _exportPickMemory[id];   // ... then a saved group opens with all its tickers checked
+  persistExportPicks();
   var save = document.getElementById('exportGroupSave');
   save.disabled = true; save.textContent = 'Save group…';
   saveExportGroups().then(function () {
     save.disabled = false; save.textContent = 'Save group';
     closeExportEditor(false);
     renderExportTabs();
-    selectExportTab(id);
+    selectExportTab(id, false);
     var pressed = document.querySelector('#exportGroupTabs .xp-tab[aria-pressed="true"]');
     if (pressed) pressed.focus();
   });
@@ -3589,11 +3625,13 @@ function deleteExportGroup() {
   }
   var id = _edGroupId;
   _exportGroups = _exportGroups.filter(function (g) { return g.id !== id; });
+  rememberExportPicks();
   delete _exportPickMemory[id];
+  persistExportPicks();
   saveExportGroups().then(function () {
     closeExportEditor(false);
     renderExportTabs();
-    selectExportTab('all');
+    selectExportTab('all', false);
     document.querySelector('#exportGroupTabs .xp-tab').focus();
   });
 }

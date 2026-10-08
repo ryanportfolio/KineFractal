@@ -24,7 +24,14 @@ test("ticker groups save to the account with a CSRF token, else to this browser"
   assert.match(html, /var EXPORT_GROUPS_KEY = 'kf-export-groups-v1';/);
   assert.match(html, /fetch\('\/api\/chart-groups', \{ credentials: 'same-origin', cache: 'no-store' \}\)/);
   assert.match(html, /'X-CSRF-Token': token/);
-  assert.match(html, /if \(r\.status === 419 && !retried\) return putExportGroups\(true\);/);
+  assert.match(html, /if \(csrf\) return putExportGroups\(true\);/);
+  assert.match(html, /!remote\.length && local\.length && !groupsSynced\(\)/);
+});
+
+test("Download never hands out rows from before the latest change, and bad ranges are shown, not replaced", () => {
+  assert.match(html, /_exportCsvReady = false;\s*document\.getElementById\('exportCsv'\)\.disabled = true;/);
+  assert.match(html, /if \(!_exportCsvReady \|\| !_exportRows \|\| !_exportRows\.length\) return;/);
+  assert.match(html, /if \(minPct >= depthPct\) return \{ error: 'Set min below max\.' \};/);
 });
 
 test("the group editor is labelled, Escape closes it before the dialog, delete takes two clicks", () => {
