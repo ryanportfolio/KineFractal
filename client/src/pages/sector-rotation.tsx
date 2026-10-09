@@ -474,8 +474,9 @@ export default function SectorRotation() {
             {/* HEADER */}
             <div className="flex justify-between items-end border-b border-primary/30 pb-4">
               <div className="flex-1">
-                <h1 className="text-3xl font-bold text-primary mb-2 flex items-center gap-3">
-                  <Database className="w-8 h-8" />
+                {/* Same type as the BeamHeading page titles (alerts, lab); drawn at once, no wipe. */}
+                <h1 className="beam-heading mb-2 flex items-center gap-3" data-drawn="1">
+                  <Database className="w-8 h-8 shrink-0" />
                   <span className="hidden sm:inline">SECTOR_ROTATION_ANALYSIS</span>
                   <span className="sm:hidden">SECTOR_ROTATION</span>
                 </h1>
