@@ -158,6 +158,12 @@ async function ensureDefaultAlertPrefs(userId: string): Promise<void> {
   );
 }
 
+// Last applied watchlist save revision per user (PUT /api/watchlist). Kept in
+// process memory: the web service runs exactly one Railway replica. With more
+// replicas, or after a restart, this check stops ordering saves across
+// instances and needs a column in Postgres instead.
+const lastWatchlistRev = new Map<string, number>();
+
 // ---------------------------------------------------------------------------
 
 export function registerAlertsRoutes(app: Express): void {
@@ -210,6 +216,8 @@ export function registerAlertsRoutes(app: Express): void {
         return res.status(400).json({ error: "symbols must be a list" });
       }
       const desired = Array.from(new Set(raw.map((s) => String(s || "").toUpperCase().trim()).filter(Boolean)));
+      const rev = Number(req.body?.rev);
+      const hasRev = Number.isFinite(rev) && rev > 0;
       const universe = await publishedUniverse();
       const symbols = await db.transaction(async (tx) => {
         // Serialize replacements per user (two open tabs): without this, two
@@ -221,6 +229,12 @@ export function registerAlertsRoutes(app: Express): void {
           (await tx.select({ symbol: watchlistSymbols.symbol }).from(watchlistSymbols)
             .where(eq(watchlistSymbols.userId, u.id))).map((r) => r.symbol),
         );
+        // The lock orders arrival, not edit order: a save sent on page exit can
+        // overtake an earlier save still in flight. Drop anything older than
+        // the last applied revision and report what is stored instead.
+        if (hasRev && rev <= (lastWatchlistRev.get(u.id) ?? 0)) {
+          return { stale: [...current].sort() };
+        }
         // Symbols already saved may stay even if the published set dropped them;
         // anything newly added must be published.
         const invalid = desired.filter((s) => !current.has(s) && !universe.includes(s));
@@ -235,10 +249,14 @@ export function registerAlertsRoutes(app: Express): void {
             .values(desired.map((symbol) => ({ userId: u.id, symbol })))
             .onConflictDoNothing();
         }
+        if (hasRev) lastWatchlistRev.set(u.id, rev);
         return { saved: desired.sort() };
       });
       if ("invalid" in symbols) {
         return res.status(400).json({ error: `not in the published set: ${symbols.invalid!.join(", ")}` });
+      }
+      if ("stale" in symbols) {
+        return res.json({ ok: true, stale: true, symbols: symbols.stale });
       }
       res.json({ ok: true, symbols: symbols.saved });
     } catch (e: any) {

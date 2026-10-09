@@ -16,6 +16,21 @@ import {
   type AlertPrefsState,
 } from "@/lib/alert-control-model";
 
+// Every watchlist save carries an increasing revision so the server can drop a
+// save that arrives after a newer one. Wall-clock based so a later edit in any
+// tab outranks an earlier one; +1 keeps saves inside one millisecond ordered.
+let lastWatchRev = 0;
+
+function putWatchlist(symbols: string[]): Promise<Response> {
+  lastWatchRev = Math.max(lastWatchRev + 1, Date.now());
+  // keepalive lets a save already in flight finish if the tab closes or reloads
+  return csrfFetch("/api/watchlist", {
+    method: "PUT",
+    body: JSON.stringify({ symbols, rev: lastWatchRev }),
+    keepalive: true,
+  });
+}
+
 type Props = {
   canEnable: boolean;
   gateHint?: string | null;
@@ -242,10 +257,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     setWatchSaving(true);
     setWatchError(null);
     try {
-      const response = await csrfFetch("/api/watchlist", {
-        method: "PUT",
-        body: JSON.stringify({ symbols: next }),
-      });
+      const response = await putWatchlist(next);
       const body = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(
@@ -256,9 +268,15 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       }
       const saved: string[] = Array.isArray(body.symbols) ? body.symbols : next;
       setSavedSymbols(saved);
-      // later clicks may have landed while this request was in flight; keep them
-      setSymbols((current) => (current.join(",") === key ? saved : current));
-      setWatchStatus("watchlist saved");
+      // later clicks may have landed while this request was in flight; keep them.
+      // A stale reply means a newer save (another tab) won: show that list
+      // unless the user has edited since, in which case the edit saves next.
+      setSymbols((current) => {
+        if (current.join(",") !== key) return current;
+        sentWatchKey.current = saved.join(",");
+        return saved;
+      });
+      setWatchStatus(body.stale ? "a newer save from another tab was kept" : "watchlist saved");
     } catch (reason: any) {
       failedWatchKey.current = key;
       // show what the server actually holds instead of an unsaved selection
@@ -288,8 +306,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   }, [loading, persistWatchlist, symbols, watchDirty, watchKey, watchSaving]);
 
   // The debounce above drops its timer when the panel unmounts or the tab
-  // closes; send any list that never went out, once, with keepalive so the
-  // request survives the page going away.
+  // closes; send any list that never went out, once. It may overtake a save
+  // still in flight; its higher rev makes the server keep it either way.
   latestSymbols.current = symbols;
   useEffect(() => {
     const flush = () => {
@@ -298,11 +316,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       const key = next.join(",");
       if (sent === null || key === sent || key === failedWatchKey.current) return;
       sentWatchKey.current = key;
-      void csrfFetch("/api/watchlist", {
-        method: "PUT",
-        body: JSON.stringify({ symbols: next }),
-        keepalive: true,
-      }).catch(() => {});
+      void putWatchlist(next).catch(() => {});
     };
     window.addEventListener("pagehide", flush);
     return () => {
@@ -449,7 +463,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
                   onClick={() => toggleSymbol(symbol)}
                   className={`border px-3 py-2 font-mono text-xs transition-colors ${
                     on
-                      ? "border-beam-hot bg-[hsl(var(--beam-ghost))] text-beam-hot shadow-[inset_0_0_0_1px_hsl(var(--beam-hot)/0.35)]"
+                      ? "border-beam-hot bg-[hsl(var(--beam-ghost))] text-beam-hot shadow-[inset_0_0_0_1px_hsl(var(--beam-hot)/0.35)] forced-colors:outline forced-colors:outline-2 forced-colors:outline-offset-[-5px]"
                       : "border-[hsl(var(--beam-ghost))] text-beam-dim hover:border-beam-dim hover:text-beam-mid"
                   }`}
                 >
