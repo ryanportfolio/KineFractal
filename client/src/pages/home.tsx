@@ -3,10 +3,15 @@
 //   1 IGNITION   the beam ignites, weaves the brand Lissajous from today's
 //                real fear, then sweeps the SPY drawdown history
 //   2 VERDICT    three scope channels: strategy trace vs benchmark ghost
-//   3 STRATEGY   the SPY monthly record scanned in like television
-//   4 MECHANISM  standing-wave fear gauges + the real sizing curves
-//   5 REPLAY     SPY v4.6 stepped through a simulated 2020 episode
-//   6 RECORD     latest EOD decisions, then recent simulated activity
+//   3 STRATEGY   SPY monthly grid (faint-tint numbers), per-year strategy vs
+//                dashed buy & hold bars, edge in pp, selected-year readout
+//   4 MECHANISM  how it buys: shared-scale fear rails, one sizing curve at a
+//                time with fund tabs; how it sells: trim / exit / watch
+//                markets groups with schematic sketches
+//   5 REPLAY     SPY simulated 2020 episode, then the rulebook cycle wheel
+//                with a when / then / limits panel and a fund switch
+//   6 RECORD     latest EOD decision beside simulated activity: a timeline
+//                (tick height = % of account), single-line rows, the stamp
 //
 // A scope has one beam: the scheduler guarantees only one movement animates
 // at a time. No cards, no glass, no idle glow — darkness, hairlines, light.
