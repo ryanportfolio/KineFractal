@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, Check, ListChecks } from "lucide-react";
+import { BellRing, ListChecks } from "lucide-react";
 
 import {
   ALERT_KINDS,
@@ -15,6 +15,25 @@ import {
   setAlertEnabled,
   type AlertPrefsState,
 } from "@/lib/alert-control-model";
+
+// Each page load numbers its watchlist saves 1, 2, 3... under a random tab id,
+// so the server can drop a save from this tab that arrives after a later one
+// (the exit flush can overtake a save still in flight). No clocks involved.
+const watchTab =
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+let watchSeq = 0;
+
+function putWatchlist(symbols: string[]): Promise<Response> {
+  watchSeq += 1;
+  // keepalive lets a save already in flight finish if the tab closes or reloads
+  return csrfFetch("/api/watchlist", {
+    method: "PUT",
+    body: JSON.stringify({ symbols, tab: watchTab, seq: watchSeq }),
+    keepalive: true,
+  });
+}
 
 type Props = {
   canEnable: boolean;
@@ -56,7 +75,7 @@ function InfoTip({ label, text, large = false }: { label: string; text: string; 
         side="top"
         sideOffset={10}
         collisionPadding={12}
-        className={`max-w-80 rounded-none border border-[hsl(var(--beam-dim))] bg-background px-3 py-2 font-mono leading-relaxed text-beam-mid shadow-[0_0_18px_hsl(var(--beam-ghost)/0.55)] ${large ? "text-sm" : "text-[11px]"}`}
+        className={`max-w-[min(20rem,calc((100vw_-_24px)_/_var(--pz)))] rounded-none border border-[hsl(var(--beam-dim))] bg-background px-3 py-2 font-mono leading-relaxed text-beam-mid shadow-[0_0_18px_hsl(var(--beam-ghost)/0.55)] ${large ? "text-sm" : "text-[11px]"}`}
       >
         {text}
       </TooltipContent>
@@ -164,6 +183,18 @@ function NumberField({
 export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [universe, setUniverse] = useState<string[]>([]);
   const [symbols, setSymbols] = useState<string[]>([]);
+  const [savedSymbols, setSavedSymbols] = useState<string[]>([]);
+  const savedSymbolsRef = useRef<string[]>([]);
+  const [watchSaving, setWatchSaving] = useState(false);
+  const [watchStatus, setWatchStatus] = useState<string | null>(null);
+  const [watchError, setWatchError] = useState<string | null>(null);
+  const failedWatchKey = useRef<string | null>(null);
+  // key of the list last loaded from or sent to the server; null until loaded
+  const sentWatchKey = useRef<string | null>(null);
+  const latestSymbols = useRef<string[]>([]);
+  const watchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // bumps on every watchlist edit, so a slow reload can tell it is outdated
+  const watchEdits = useRef(0);
   const [prefs, setPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [savedPrefs, setSavedPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [loading, setLoading] = useState(true);
@@ -190,7 +221,11 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         ]);
         const normalized = normalizeAlertPrefsResponse(alertPrefs.prefs);
         setUniverse(watchlist.universe ?? []);
-        setSymbols(watchlist.symbols ?? []);
+        const savedList: string[] = [...(watchlist.symbols ?? [])].sort();
+        setSymbols(savedList);
+        setSavedSymbols(savedList);
+        sentWatchKey.current = savedList.join(",");
+        void csrfFetch.prime().catch(() => {});
         setPrefs(normalized);
         setSavedPrefs(normalized);
       })
@@ -205,31 +240,127 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
 
   const selected = useMemo(() => new Set(symbols), [symbols]);
   const dirty = JSON.stringify(prefs) !== JSON.stringify(savedPrefs);
+  const watchKey = symbols.join(",");
+  const watchDirty = watchKey !== savedSymbols.join(",");
+  // saved symbols can include tickers since dropped from the published set,
+  // so compare membership rather than counts
+  const allSelected = universe.every((symbol) => selected.has(symbol));
 
-  const toggleSymbol = async (symbol: string) => {
-    const wasSelected = selected.has(symbol);
-    setError(null);
-    setStatus(null);
-    setSymbols((current) =>
-      wasSelected ? current.filter((item) => item !== symbol) : [...current, symbol].sort(),
-    );
-    try {
-      const response = wasSelected
-        ? await csrfFetch(`/api/watchlist/${symbol}`, { method: "DELETE" })
-        : await csrfFetch("/api/watchlist", {
-            method: "POST",
-            body: JSON.stringify({ symbol }),
-          });
-      if (!response.ok) throw new Error((await response.json()).error || `HTTP ${response.status}`);
-    } catch (reason: any) {
-      setSymbols((current) =>
-        wasSelected
-          ? [...current, symbol].sort()
-          : current.filter((item) => item !== symbol),
-      );
-      setError(reason?.message || "failed to update watchlist");
-    }
+  // Chip clicks and select all / clear only edit local state; one PUT saves the
+  // settled list. Saving per click tripped the server rate limit mid-selection.
+  const editSymbols = (next: string[]) => {
+    watchEdits.current += 1;
+    setSymbols([...new Set(next)].sort());
+    setWatchError(null);
+    setWatchStatus(null);
+    failedWatchKey.current = null;
   };
+
+  const toggleSymbol = (symbol: string) => {
+    editSymbols(selected.has(symbol) ? symbols.filter((item) => item !== symbol) : [...symbols, symbol]);
+  };
+
+  const persistWatchlist = useCallback(async (next: string[], key: string) => {
+    // the exit flush may already have sent this list
+    if (key === sentWatchKey.current) return;
+    sentWatchKey.current = key;
+    setWatchSaving(true);
+    setWatchError(null);
+    try {
+      const response = await putWatchlist(next);
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          response.status === 429
+            ? `${body.error || "too many watchlist changes"} · selection restored to the last saved list`
+            : `${body.error || `HTTP ${response.status}`} · selection restored to the last saved list`,
+        );
+      }
+      const saved: string[] = Array.isArray(body.symbols) ? body.symbols : next;
+      setSavedSymbols(saved);
+      // the server now holds `saved`, unless a later list was sent meanwhile
+      if (sentWatchKey.current === key) sentWatchKey.current = saved.join(",");
+      // later clicks may have landed while this request was in flight; keep
+      // them. A stale reply (this tab's later save got there first) carries
+      // the stored list and is not an error.
+      setSymbols((current) => (current.join(",") === key ? saved : current));
+      setWatchStatus("watchlist saved");
+    } catch (reason: any) {
+      failedWatchKey.current = key;
+      // this list never reached the server, so it no longer counts as sent
+      // (a newer request's key stays); otherwise re-selecting it never saves
+      if (sentWatchKey.current === key) sentWatchKey.current = savedSymbolsRef.current.join(",");
+      // show what the server actually holds instead of an unsaved selection
+      setSymbols((current) => (current.join(",") === key ? savedSymbolsRef.current : current));
+      setWatchStatus(null);
+      setWatchError(reason?.message || "failed to save watchlist");
+    } finally {
+      setWatchSaving(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    savedSymbolsRef.current = savedSymbols;
+  }, [savedSymbols]);
+
+  useEffect(() => {
+    if (loading || watchSaving || !watchDirty) return;
+    if (failedWatchKey.current === watchKey) return;
+    watchTimer.current = setTimeout(() => {
+      watchTimer.current = null;
+      void persistWatchlist(symbols, watchKey);
+    }, 600);
+    return () => {
+      if (watchTimer.current) clearTimeout(watchTimer.current);
+      watchTimer.current = null;
+    };
+  }, [loading, persistWatchlist, symbols, watchDirty, watchKey, watchSaving]);
+
+  // On unmount or tab close, send any list that never went out, once, and
+  // cancel the pending debounce so a page restored from the back/forward cache
+  // does not send it again. It may overtake this tab's save still in flight;
+  // its higher seq makes the server keep it either way.
+  latestSymbols.current = symbols;
+  useEffect(() => {
+    const flush = () => {
+      if (watchTimer.current) clearTimeout(watchTimer.current);
+      watchTimer.current = null;
+      const sent = sentWatchKey.current;
+      const next = latestSymbols.current;
+      const key = next.join(",");
+      if (sent === null || key === sent || key === failedWatchKey.current) return;
+      sentWatchKey.current = key;
+      void putWatchlist(next).catch(() => {});
+    };
+    // A page restored from the back/forward cache shows what is stored now,
+    // which another tab may have changed while this one was hidden.
+    const reconcile = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      const editsAtStart = watchEdits.current;
+      fetch("/api/watchlist", { credentials: "include" })
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+        .then((watchlist) => {
+          const savedList: string[] = [...(watchlist.symbols ?? [])].sort();
+          // chips clicked while this reload was in flight win, and their save
+          // may already have landed: leave both lists to that save
+          if (watchEdits.current !== editsAtStart) return;
+          failedWatchKey.current = null;
+          sentWatchKey.current = savedList.join(",");
+          setSavedSymbols(savedList);
+          setSymbols(savedList);
+          setWatchError(null);
+          setWatchStatus(null);
+        })
+        .catch(() => setWatchError("could not reload the saved watchlist · refresh the page"));
+    };
+    window.addEventListener("pagehide", flush);
+    window.addEventListener("pageshow", reconcile);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      window.removeEventListener("pageshow", reconcile);
+      flush();
+    };
+  }, []);
 
   const updateWeekly = (patch: Partial<LevelsWeeklySettings>) => {
     setPrefs((current) => ({
@@ -332,11 +463,33 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             {symbols.length}/{universe.length} ACTIVE
           </span>
         </div>
-        <p className="mb-5 max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
-          Choose the symbols the nightly pipeline should inspect for your emails
-        </p>
+        <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-3">
+          <p className="max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
+            Choose the symbols the nightly pipeline should inspect for your emails
+          </p>
+          {universe.length > 0 && (
+            <div className="ml-auto flex gap-2 font-mono text-[11px] tracking-[0.12em]">
+              <button
+                type="button"
+                onClick={() => editSymbols([...symbols, ...universe])}
+                disabled={allSelected}
+                className="border border-[hsl(var(--beam-ghost))] px-3 py-1.5 text-beam-mid hover:border-beam-hot hover:text-beam-hot disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[hsl(var(--beam-ghost))] disabled:hover:text-beam-mid"
+              >
+                SELECT ALL
+              </button>
+              <button
+                type="button"
+                onClick={() => editSymbols([])}
+                disabled={symbols.length === 0}
+                className="border border-[hsl(var(--beam-ghost))] px-3 py-1.5 text-beam-mid hover:border-beam-hot hover:text-beam-hot disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[hsl(var(--beam-ghost))] disabled:hover:text-beam-mid"
+              >
+                CLEAR
+              </button>
+            </div>
+          )}
+        </div>
         {universe.length ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Watchlist symbols">
             {universe.map((symbol) => {
               const on = selected.has(symbol);
               return (
@@ -347,11 +500,10 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
                   onClick={() => toggleSymbol(symbol)}
                   className={`border px-3 py-2 font-mono text-xs transition-colors ${
                     on
-                      ? "border-beam-hot bg-[hsl(var(--beam-ghost))] text-beam-hot"
+                      ? "border-beam-hot bg-[hsl(var(--beam-ghost))] text-beam-hot shadow-[inset_0_0_0_1px_hsl(var(--beam-hot)/0.35)] forced-colors:outline forced-colors:outline-2 forced-colors:outline-offset-[-5px]"
                       : "border-[hsl(var(--beam-ghost))] text-beam-dim hover:border-beam-dim hover:text-beam-mid"
                   }`}
                 >
-                  {on && <Check className="mr-1 inline h-3 w-3" aria-hidden="true" />}
                   {symbol}
                 </button>
               );
@@ -360,6 +512,17 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         ) : (
           <p className="font-mono text-xs text-beam-dim">published symbol list unavailable · try again later</p>
         )}
+        <div aria-live="polite" className="mt-4 min-h-5 font-mono text-xs">
+          {watchError ? (
+            <span className="text-red-400">{watchError}</span>
+          ) : watchSaving ? (
+            <span className="text-beam-dim">saving watchlist…</span>
+          ) : watchDirty ? (
+            <span className="text-beam-dim">changes pending…</span>
+          ) : watchStatus ? (
+            <span className="text-beam-mid">{watchStatus}</span>
+          ) : null}
+        </div>
       </section>
 
       <section aria-labelledby="channels-heading" className="border-t border-[hsl(var(--beam-ghost))] pt-6">

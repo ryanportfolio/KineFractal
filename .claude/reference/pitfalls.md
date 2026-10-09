@@ -28,6 +28,8 @@ At widths of 1440px and up, `index.css` sets `zoom: 1.2` (1.4 from 1800px) on `:
 
 Two related traps: `canvas.clientWidth` reports unzoomed CSS px, so a WebGL canvas sized from it renders below screen resolution unless the backing store also multiplies by `--pz`; and `getBoundingClientRect()` returns zoomed px while `offsetHeight` does not, so scroll-progress math must not mix the two. Existing full-screen utilities get unlayered overrides in `index.css` (`.h-\[100svh\]` and friends); new ones need either an override there or an inline `calc(... / var(--pz))`.
 
+Radix tooltips (Floating UI) hit the same zoom: the popper writes on-screen px as a CSS translate, the root zoom multiplies it again, and at 1440px and up the box landed right of and below its trigger, cut off at the viewport edge (Alerts panel `?` help, 2026-10-09). `index.css` now unzooms `[data-radix-popper-content-wrapper]` and rezooms its child; keep that rule if a new Radix popover, menu or select is added.
+
 ### 2026-09-28: A Playwright locator call skews frame-time measurements
 
 Any `page.locator(...)` call (even `.count()`) injects Playwright's helper script into the page, and from then on requestAnimationFrame intervals in headed Chrome can sit at 30-40 ms instead of the panel's 10 ms. It hit the untouched home page as well as the About film, so it is the harness, not the site. A frame-time check that called `locator().count()` before measuring failed at 30 ms; the same sweep without it measured 10 ms.

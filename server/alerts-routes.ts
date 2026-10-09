@@ -7,7 +7,7 @@
 
 import crypto from "crypto";
 import type { Express, Request, Response } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "./db";
 import { alertPrefs, emailSuppression, watchlistSymbols } from "@shared/schema";
 import {
@@ -158,6 +158,21 @@ async function ensureDefaultAlertPrefs(userId: string): Promise<void> {
   );
 }
 
+// Last applied watchlist save per browser tab (PUT /api/watchlist), keyed
+// `${userId}:${tab}`. A tab numbers its saves 1, 2, 3...; a save numbered at
+// or below the last applied one from the same tab arrived out of order and is
+// dropped. Saves from different tabs apply in arrival order. Kept in process
+// memory: the web service runs exactly one Railway replica. With more replicas
+// this needs Postgres; after a restart a tab's next save simply applies.
+const lastWatchlistSeq = new Map<string, { seq: number; seen: number }>();
+const WATCHLIST_SEQ_IDLE_MS = 60 * 60 * 1000;
+
+function pruneWatchlistSeq(now: number): void {
+  for (const [key, entry] of Array.from(lastWatchlistSeq.entries())) {
+    if (now - entry.seen > WATCHLIST_SEQ_IDLE_MS) lastWatchlistSeq.delete(key);
+  }
+}
+
 // ---------------------------------------------------------------------------
 
 export function registerAlertsRoutes(app: Express): void {
@@ -195,6 +210,72 @@ export function registerAlertsRoutes(app: Express): void {
     } catch (e: any) {
       console.error("[watchlist] POST failed:", e?.message ?? e);
       res.status(500).json({ error: "failed to add symbol" });
+    }
+  });
+
+  // Replace the whole watchlist in one request. The Alerts panel batches chip
+  // toggles and select-all / clear into this call, so a burst of edits costs
+  // one rate-limited request instead of one per symbol.
+  app.put("/api/watchlist", requireUser, async (req: Request, res: Response) => {
+    try {
+      if (!db) return res.status(503).json({ error: "database unavailable" });
+      const u = (req as any).kfUser as SessionUser;
+      const raw = req.body?.symbols;
+      if (!Array.isArray(raw) || raw.length > 500) {
+        return res.status(400).json({ error: "symbols must be a list" });
+      }
+      const desired = Array.from(new Set(raw.map((s) => String(s || "").toUpperCase().trim()).filter(Boolean)));
+      const tab = typeof req.body?.tab === "string" && /^[A-Za-z0-9-]{1,64}$/.test(req.body.tab) ? req.body.tab : null;
+      const seq = Number(req.body?.seq);
+      const seqKey = tab && Number.isSafeInteger(seq) && seq > 0 ? `${u.id}:${tab}` : null;
+      const universe = await publishedUniverse();
+      const symbols = await db.transaction(async (tx) => {
+        // Serialize replacements per user (two open tabs): without this, two
+        // READ COMMITTED transactions can both delete before either inserts
+        // and leave the union. Locks the key, not rows, so it also holds when
+        // the user has no saved symbols yet; released at commit or rollback.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`watchlist:${u.id}`}, 0))`);
+        const current = new Set(
+          (await tx.select({ symbol: watchlistSymbols.symbol }).from(watchlistSymbols)
+            .where(eq(watchlistSymbols.userId, u.id))).map((r) => r.symbol),
+        );
+        // The lock orders arrival, not edit order: a save a tab sends on page
+        // exit can overtake its own earlier save still in flight. Drop the
+        // older one and report what is stored instead.
+        if (seqKey && seq <= (lastWatchlistSeq.get(seqKey)?.seq ?? 0)) {
+          return { stale: [...current].sort() };
+        }
+        // Symbols already saved may stay even if the published set dropped them;
+        // anything newly added must be published.
+        const invalid = desired.filter((s) => !current.has(s) && !universe.includes(s));
+        if (invalid.length) return { invalid };
+        await tx.delete(watchlistSymbols).where(
+          desired.length
+            ? and(eq(watchlistSymbols.userId, u.id), notInArray(watchlistSymbols.symbol, desired))
+            : eq(watchlistSymbols.userId, u.id),
+        );
+        if (desired.length) {
+          await tx.insert(watchlistSymbols)
+            .values(desired.map((symbol) => ({ userId: u.id, symbol })))
+            .onConflictDoNothing();
+        }
+        if (seqKey) {
+          const now = Date.now();
+          pruneWatchlistSeq(now);
+          lastWatchlistSeq.set(seqKey, { seq, seen: now });
+        }
+        return { saved: desired.sort() };
+      });
+      if ("invalid" in symbols) {
+        return res.status(400).json({ error: `not in the published set: ${symbols.invalid!.join(", ")}` });
+      }
+      if ("stale" in symbols) {
+        return res.json({ ok: true, stale: true, symbols: symbols.stale });
+      }
+      res.json({ ok: true, symbols: symbols.saved });
+    } catch (e: any) {
+      console.error("[watchlist] PUT failed:", e?.message ?? e);
+      res.status(500).json({ error: "failed to save watchlist" });
     }
   });
 
