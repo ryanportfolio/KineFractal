@@ -57,6 +57,15 @@ test("each card leads with the nearest strong price, in plain words, with a why 
   assert.match(html, /Chart signals are clues, not guarantees; prices can keep falling\./);
 });
 
+test("results switch between cards and one table, reasons stay in tooltips", () => {
+  assert.match(html, /var EXPORT_VIEW_KEY = 'kf-export-view-v1';/);
+  assert.match(html, /<span id="exportViewSwitch" class="xp-seg" role="group" aria-labelledby="exportViewLabel">/);
+  assert.match(html, /wrap\.innerHTML = _exportView === 'table' \? exportTableHtml\(sections\) : exportCardsHtml\(sections\);/);
+  assert.match(html, /'<tr class="xp-trow tier-' \+ t \+ '" tabindex="0"' \+ limitAttrs\(sec\.sym, lim, k\) \+ '>'/);
+  assert.match(html, /return t \+ '\\nClick for the chart and details';/);
+  assert.doesNotMatch(html, /class="xp-link xp-why"/);
+});
+
 test("the CSV columns and the stacked-level rule are unchanged", () => {
   assert.match(html, /'Ticker,Limit price,Signal,Touches,Timeframes,Gap zone,Below close %,Last close'/);
   assert.match(html, /var CLUSTER_PCT = 2;/);
