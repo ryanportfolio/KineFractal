@@ -25,7 +25,8 @@ test("ticker groups save to the account with a CSRF token, else to this browser"
   assert.match(html, /fetch\('\/api\/chart-groups', \{ credentials: 'same-origin', cache: 'no-store' \}\)/);
   assert.match(html, /'X-CSRF-Token': token/);
   assert.match(html, /if \(csrf\) return putExportGroups\(true\);/);
-  assert.match(html, /!remote\.length && carry\.length && !groupsSynced\(\)/);
+  assert.match(html, /!remote\.length && guest\.length && siteEmail && !groupsSynced\(\)/);
+  assert.match(html, /_exportGroupsLocked = signedIn;/);
 });
 
 test("Download never hands out rows from before the latest change, and bad ranges are shown, not replaced", () => {

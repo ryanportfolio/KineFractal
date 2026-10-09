@@ -57,6 +57,13 @@
       "when": 1786147200000,
       "tag": "0007_hidden_tickers",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791417600000,
+      "tag": "0008_ticker_groups",
+      "breakpoints": true
     }
   ]
 }
