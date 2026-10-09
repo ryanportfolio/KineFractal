@@ -421,40 +421,69 @@
   #exportCombineExample .arrow { color:var(--mut); font-family:monospace; }
   #exportCombineExample .to { color:var(--cbuy); font-weight:bold; }
   /* legend: what the colours and "stacked" mean */
-  #exportLegend { margin:0 0 12px; color:var(--mut); font:12px monospace; line-height:1.6; }
-  #exportLegend .sw { display:inline-block; width:10px; height:10px; margin:0 5px 0 10px; vertical-align:-1px; }
-  #exportLegend .sw:first-child { margin-left:0; }
-  #exportLegend .sw.g { background:var(--cbuy); } #exportLegend .sw.w { background:var(--fg); } #exportLegend .sw.m { background:var(--mut); }
-  #exportLegend .export-badge { margin-left:12px; }
   /* results: ticker cards, two or more across */
-  #exportResult .xp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(460px,100%), 1fr)); gap:12px; align-items:start; }
+  #exportResult .xp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px,100%), 1fr)); gap:12px; align-items:start; }
   #exportResult .xp-card { border:1px solid var(--grid); background:rgba(255,255,255,.015); }
-  #exportResult .xp-cardhead { display:flex; align-items:flex-start; flex-wrap:wrap; gap:4px 10px; padding:9px 12px; border-bottom:1px solid var(--grid); }
+  #exportResult .xp-cardhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; padding:9px 14px; border-bottom:1px solid var(--grid); }
   #exportResult .xp-cardhead .xp-sym { font-size:19px; }
-  #exportResult .xp-cardhead .xp-name { flex:1 1 140px; color:var(--fg); white-space:normal; padding-top:3px; }
-  #exportResult .xp-cardhead .xp-type { margin-top:3px; }
-  #exportResult .xp-meta { margin-left:auto; text-align:right; color:var(--mut); font:12px monospace; line-height:1.5; }
+  #exportResult .xp-cardhead .xp-name { flex:1 1 140px; color:var(--fg); white-space:normal; }
+  #exportResult .xp-meta { margin-left:auto; color:var(--mut); font:12px monospace; }
   #exportResult .xp-meta b { color:var(--fg); font:bold 13px Verdana,Geneva,sans-serif; }
-  #exportResult .xp-none, #exportResult .xp-help { margin:0; padding:10px 12px; color:var(--mut); font:12px monospace; }
-  #exportResult .xp-secfoot { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:6px 12px; border-top:1px solid var(--grid); color:var(--mut); font:12px monospace; }
-  /* one limit: price and % below close side by side, the loudest thing on screen */
-  .xp-limit { padding:7px 12px 7px 10px; border-left:3px solid transparent; }
-  .xp-limit + .xp-limit { border-top:1px solid var(--grid); }
-  .xp-lmain { display:flex; align-items:center; flex-wrap:wrap; gap:4px 14px; }
-  .xp-px, .xp-pct { font:bold 22px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
-  .xp-px { min-width:5.4ch; }
-  .xp-pct { min-width:5.6ch; font-weight:normal; color:var(--fg); }
-  .xp-sig { display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; }
-  /* colour by strength, like the chart levels; a stacked limit is always lit green */
-  .xp-limit.tier-strong { border-left-color:var(--cbuy); }
-  .xp-limit.tier-strong .xp-px { color:var(--cbuy); }
-  .xp-limit.tier-mid { border-left-color:rgba(230,230,230,.55); }
-  .xp-limit.tier-mid .xp-px { color:var(--fg); }
-  .xp-limit.tier-light { border-left-color:var(--grid); }
-  .xp-limit.tier-light .xp-px { color:var(--mut); }
-  /* after the tier rules on purpose: a stacked limit is the one to use, so it is lit green whatever its own tier */
-  .xp-limit.stacked { border-left-color:var(--cbuy); }
-  .xp-limit.stacked .xp-px { color:var(--cbuy); }
+  #exportResult .xp-none, #exportResult .xp-help { margin:0; padding:10px 14px; color:var(--mut); font:12px monospace; }
+  #exportResult .xp-secfoot { display:flex; align-items:center; gap:8px; padding:6px 14px; border-top:1px solid var(--grid); color:var(--mut); font:12px monospace; }
+  /* the lead price: nearest strong price, biggest thing in the card */
+  .xp-hero { padding:12px 14px 12px; }
+  .xp-herolabel { color:var(--mut); font:12px monospace; letter-spacing:.04em; }
+  .xp-heromain { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 14px; margin:2px 0 6px; }
+  .xp-heropx { font:bold 36px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
+  .xp-heropct { font:18px Verdana,Geneva,sans-serif; color:var(--fg); }
+  .xp-lmeta { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; color:var(--fg); font:13px Verdana,Geneva,sans-serif; }
+  .xp-strength { display:inline-flex; align-items:center; gap:6px; }
+  .xp-meter { display:inline-flex; align-items:flex-end; gap:2px; height:13px; }
+  .xp-meter i { display:block; width:4px; background:var(--grid); }
+  .xp-meter i:nth-child(1) { height:5px; } .xp-meter i:nth-child(2) { height:9px; } .xp-meter i:nth-child(3) { height:13px; }
+  .xp-meter.strong i.on { background:var(--cbuy); } .xp-meter.mid i.on { background:var(--fg); } .xp-meter.light i.on { background:var(--mut); }
+  .xp-sword { font:bold 12px monospace; }
+  .tier-strong .xp-sword { color:var(--cbuy); } .tier-mid .xp-sword { color:var(--fg); } .tier-light .xp-sword { color:var(--mut); }
+  .xp-reason { color:var(--fg); }
+  .xp-comb { color:var(--mut); font:12px monospace; }
+  .xp-why { font-size:12px; }
+  /* price colour by strength (the % stays neutral) */
+  .tier-strong .xp-heropx, .tier-strong .xp-rpx, .xp-whypx.tier-strong { color:var(--cbuy); }
+  .tier-mid .xp-heropx, .tier-mid .xp-rpx, .xp-whypx.tier-mid { color:var(--fg); }
+  .tier-light .xp-heropx, .tier-light .xp-rpx, .xp-whypx.tier-light { color:var(--mut); }
+  /* the other prices, folded */
+  #exportDialog .xp-more { display:block; width:100%; padding:8px 14px; border:0; border-top:1px solid var(--grid);
+                           background:none; color:var(--sup); text-align:left; font:12px monospace; }
+  #exportDialog .xp-more::after { content:" ›"; }
+  #exportDialog .xp-more[aria-expanded="true"]::after { content:" ‹"; }
+  #exportDialog .xp-more:hover { background:rgba(38,198,218,.06); }
+  .xp-rrow { display:grid; grid-template-columns:auto auto 1fr; align-items:center; gap:4px 14px; padding:8px 14px; border-top:1px solid var(--grid); }
+  .xp-rpx { font:bold 19px Verdana,Geneva,sans-serif; min-width:5.2ch; }
+  .xp-rpct { font:14px Verdana,Geneva,sans-serif; color:var(--fg); min-width:9ch; }
+  .xp-rrow .xp-lmeta { font-size:12px; }
+  /* why panel: third column beside the cards */
+  #exportDialog .xp-body.why-open { grid-template-columns:minmax(300px,380px) 1fr minmax(320px,380px); }
+  #exportWhy { min-height:0; overflow:auto; padding:14px 16px 20px; border-left:1px solid var(--grid); background:var(--panel); }
+  #exportWhy .xp-whytop { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  #exportWhy h3 { margin:0; }
+  .xp-whyhead { display:flex; align-items:baseline; gap:10px; }
+  .xp-whyhead .xp-sym { font-size:20px; }
+  .xp-whypx { margin-top:8px; font:bold 40px Verdana,Geneva,sans-serif; }
+  .xp-whypct { color:var(--fg); font:14px Verdana,Geneva,sans-serif; margin-bottom:12px; }
+  .xp-whychart { display:block; width:100%; height:auto; margin:6px 0 12px; border:1px solid var(--grid); }
+  .xp-whychart .px { fill:none; stroke:var(--fg); stroke-width:1.3; }
+  .xp-whychart .lvl { stroke:var(--cbuy); stroke-width:1.5; }
+  .xp-whychart .mem { stroke:var(--mut); stroke-width:1; stroke-dasharray:4 3; }
+  .xp-whychart .now { fill:var(--fg); }
+  .xp-whychart text { font:11px monospace; fill:var(--mut); }
+  .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
+  .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:13px Verdana,Geneva,sans-serif; line-height:1.55; }
+  .xp-whylist li { margin-bottom:6px; }
+  .xp-whynote { margin:0; color:var(--mut); font:12px monospace; line-height:1.5; }
+  @media (max-width:900px) {
+    #exportWhy { position:fixed; inset:0; z-index:79; border-left:0; }
+  }
   .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font:11px monospace; }
   .xp-limit.tier-strong .export-badge { font-weight:bold; }
   /* the purple wash reads as "strong LEVEL" — keep it off the green zone badges */
@@ -682,9 +711,12 @@
         </div>
       </div>
       <div class="xp-main" id="exportMain" aria-live="off">
-        <p id="exportLegend"><span class="sw g"></span>strong or stacked <span class="sw w"></span>medium <span class="sw m"></span>weaker <span id="exportLegendStack"></span></p>
         <div id="exportResult"></div>
       </div>
+      <aside id="exportWhy" aria-labelledby="exportWhyTitle" hidden>
+        <div class="xp-whytop"><h3 id="exportWhyTitle">Why this price?</h3><button id="exportWhyClose" type="button">Close</button></div>
+        <div id="exportWhyBody" aria-live="polite"></div>
+      </aside>
     </div>
     <div id="exportEditor" role="region" aria-labelledby="exportEditorTitle" hidden>
       <h3 id="exportEditorTitle">New group</h3>
@@ -3056,9 +3088,6 @@ function renderCombineUi() {
   document.getElementById('exportCombineText').textContent = on
     ? 'Within ' + pct + '% of each other → one limit at the highest price.'
     : 'Off: every level is its own limit.';
-  document.getElementById('exportLegendStack').innerHTML = on
-    ? '<span class="export-badge stack">stacked</span> hover for the levels it covers'
-    : '';
 }
 function markExportClusters(rows) {
   rows.forEach(function (r) { r.cluster = 0; r.pick = false; r.stack = 0; });
@@ -3480,7 +3509,7 @@ function buildExportTable() {
       var extra = _exportStrength === 'any' ? 0
         : exportCandidates(item.sym, item.candles, item.ov, range.depth, range.min, 'any').length - mine.length;
       var close = item.candles.length ? r2(item.candles[item.candles.length - 1].close) : null;
-      sections.push({ sym: item.sym, rows: mine, weaker: Math.max(0, extra), close: close });
+      sections.push({ sym: item.sym, rows: mine, weaker: Math.max(0, extra), close: close, candles: item.candles });
       rows = rows.concat(mine);
     });
     markExportClusters(rows);
@@ -3515,58 +3544,198 @@ function exportLimits(rows) {
 // prices on screen always show cents (212.30, not 212.3); the CSV keeps its raw values
 function px2(v) { return Number(v).toFixed(2); }
 function pctBelow(row) { return ((row.close - row.limit) / row.close) * 100; }
+// --- plain-language results ---------------------------------------------------------
+// Each ticker card leads with its nearest strong price; the rest fold behind
+// "Show N more prices". Every price says in plain words why it is there, shows
+// its strength as a word and a 3-bar meter, and "why?" opens a side panel with
+// a price chart of the last six months and the reasons in full.
+var STRENGTH_WORD = { strong: 'Strong', mid: 'Medium', light: 'Weaker' };
+var STRENGTH_BARS = { strong: 3, mid: 2, light: 1 };
+var _exportSecs = {};          // sym -> section of the last build (rows, candles, close), for the why panel
+var _exportExpanded = {};      // sym -> true while that card shows all its prices
+// A combined (stacked) limit is rated Strong: several signals agree on one price,
+// and it was always lit green (user, 2026-08-08). Otherwise the level's own tier.
+function limitStrength(lim) { return lim.members.length ? 'strong' : exportTier(lim.row); }
+// Why a level is there, in everyday words.
+function reasonText(row) {
+  if (row.type === 'gap') return 'A price gap from earlier has not been filled yet';
+  if (row.type === 'ob') return 'Buyers stepped in strongly here before';
+  if (row.type === 'confl') return row.n + ' trendlines meet here';
+  if (row.type === 'pd') return 'Bottom of the recent price range';
+  return 'Held as a floor ' + row.touches + ' times';
+}
+// Why it earns its strength rating, in everyday words.
+function strengthReason(lim) {
+  var r = lim.row;
+  if (lim.members.length) return (lim.members.length + 1) + ' signals sit within ' + fmtPct(CLUSTER_PCT) + '% of each other';
+  if (r.type === 'pd') return 'the bottom of the recent range is a price many buyers watch';
+  if (r.type === 'confl') return (r.n >= 3 ? r.n + ' separate trendlines agree' : 'two trendlines agree');
+  if (r.type === 'gap' || r.type === 'ob') return 'zones like this are often revisited, but not always';
+  if ((r.tfs || 1) >= 3) return 'it shows on the 2-hour, 4-hour and daily charts';
+  if ((r.tfs || 1) === 2) return 'it shows on two of the three chart timeframes';
+  if ((r.touches || 0) >= 10) return 'price bounced here ' + r.touches + ' times';
+  return 'only a few touches on one timeframe';
+}
+function meterHtml(tier) {
+  var n = STRENGTH_BARS[tier] || 1, h = '';
+  for (var i = 1; i <= 3; i++) h += '<i class="' + (i <= n ? 'on' : '') + '"></i>';
+  return '<span class="xp-meter ' + tier + '" aria-hidden="true">' + h + '</span><span class="xp-sword">' + STRENGTH_WORD[tier] + '</span>';
+}
+function limitMetaHtml(sym, lim, idx) {
+  var tier = limitStrength(lim);
+  return '<span class="xp-strength">' + meterHtml(tier) + '</span>'
+    + '<span class="xp-reason">' + escHtml(reasonText(lim.row)) + '</span>'
+    + (lim.members.length ? '<span class="xp-comb">+' + lim.members.length + ' nearby price' + (lim.members.length === 1 ? '' : 's') + ' combined</span>' : '')
+    + '<button type="button" class="xp-link xp-why" data-why="' + escHtml(sym) + '|' + idx + '" aria-label="Why '
+    + px2(lim.row.limit) + ' for ' + escHtml(sym) + '?">why?</button>';
+}
+function pctBelowText(row) { return pctBelow(row).toFixed(1) + '% below'; }
 function renderExportTable(sections) {
   var wrap = document.getElementById('exportResult');
+  _exportSecs = {};
   if (!sections.length) { wrap.innerHTML = ''; return; }
-  // one pastel per ticker, golden-angle spaced so neighbours land on clearly different hues
   var html = '<div class="xp-grid">';
   sections.forEach(function (sec, idx) {
+    _exportSecs[sec.sym] = sec;
     var hue = Math.round((idx * 137.508) % 360);
     var limits = exportLimits(sec.rows);
-    var n = sec.rows.length;
-    html += '<section class="xp-card" aria-label="' + escHtml(sec.sym) + ' limits">'
+    html += '<section class="xp-card" aria-label="' + escHtml(sec.sym) + ' buy prices">'
       + '<div class="xp-cardhead">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
-      + (sec.close != null ? '<span class="xp-meta">Last close <b>' + px2(sec.close) + '</b></span>' : '')
+      + (sec.close != null ? '<span class="xp-meta">Today’s close <b>' + px2(sec.close) + '</b></span>' : '')
       + '</div>';
-    if (!n) {
-      html += '<p class="xp-none">No levels in this range at this strength.</p>';
+    if (!limits.length) {
+      html += '<p class="xp-none">No buy prices in this range at this strength.</p>';
     } else {
-      limits.forEach(function (lim) {
-        var row = lim.row;
-        var stacked = lim.members.length > 0;
-        var cls = 'xp-limit tier-' + exportTier(row) + (stacked ? ' stacked' : '');
-        // the levels a stacked limit covers live in the chip's tooltip, one per line
-        var chip = stacked
-          ? '<button type="button" class="export-badge stack" data-tip="' + escHtml(
-              'Stacked ×' + row.stack + ' · one limit at ' + px2(row.limit) + ' covers:\n'
-              + lim.members.map(function (m) {
-                  return px2(m.limit) + '  −' + pctBelow(m).toFixed(1) + '%  ' + exportSignalText(m);
-                }).join('\n')) + '">stacked ×' + row.stack + '</button>'
-          : '';
-        html += '<div class="' + cls + '">'
-          + '<div class="xp-lmain">'
-          + '<span class="xp-px">' + px2(row.limit) + '</span>'
-          + '<span class="xp-pct">−' + pctBelow(row).toFixed(1) + '%</span>'
-          + '<span class="xp-sig">' + exportSignalHtml(row) + chip + '</span>'
-          + '</div>';
+      // the nearest Strong price leads; with none, the nearest price of any strength
+      var lead = 0;
+      for (var i = 0; i < limits.length; i++) if (limitStrength(limits[i]) === 'strong') { lead = i; break; }
+      var top = limits[lead], tier = limitStrength(top);
+      html += '<div class="xp-hero tier-' + tier + '">'
+        + '<div class="xp-herolabel">' + (tier === 'strong' ? 'Nearest strong price' : 'Nearest price') + '</div>'
+        + '<div class="xp-heromain"><span class="xp-heropx">' + px2(top.row.limit) + '</span>'
+        + '<span class="xp-heropct">' + pctBelowText(top.row) + '</span></div>'
+        + '<div class="xp-lmeta">' + limitMetaHtml(sec.sym, top, lead) + '</div>'
+        + '</div>';
+      var rest = limits.map(function (l, k) { return { lim: l, k: k }; }).filter(function (x) { return x.k !== lead; });
+      if (rest.length) {
+        var open = !!_exportExpanded[sec.sym];
+        html += '<button type="button" class="xp-more" data-more="' + escHtml(sec.sym) + '" aria-expanded="' + open + '">'
+          + (open ? 'Hide other prices' : 'Show ' + rest.length + ' more price' + (rest.length === 1 ? '' : 's')) + '</button>'
+          + '<div class="xp-rest"' + (open ? '' : ' hidden') + '>';
+        rest.forEach(function (x) {
+          var t = limitStrength(x.lim);
+          html += '<div class="xp-rrow tier-' + t + '">'
+            + '<span class="xp-rpx">' + px2(x.lim.row.limit) + '</span>'
+            + '<span class="xp-rpct">' + pctBelowText(x.lim.row) + '</span>'
+            + '<div class="xp-lmeta">' + limitMetaHtml(sec.sym, x.lim, x.k) + '</div>'
+            + '</div>';
+        });
         html += '</div>';
-      });
+      }
     }
     if (sec.weaker) {
-      html += '<div class="xp-secfoot">' + sec.weaker + ' weaker hidden'
-        + ' <button type="button" class="xp-link" data-strength-set="any" data-tip="'
-        + escHtml(sec.weaker + ' weaker level' + (sec.weaker === 1 ? ' is' : 's are') + ' hidden by the ' + _exportStrength
-          + ' strength filter · switches strength to any') + '">show</button></div>';
+      html += '<div class="xp-secfoot">' + sec.weaker + ' weaker price' + (sec.weaker === 1 ? '' : 's') + ' hidden'
+        + ' <button type="button" class="xp-link" data-strength-set="any">show</button></div>';
     }
     html += '</section>';
   });
   wrap.innerHTML = html + '</div>';
   renderCombineExample(sections);
+  if (_whyOpen) refreshWhyPanel();
 }
-// The worked example under the combine control uses the first stacked limit on
-// screen, so it always shows real numbers; nothing stacked = no example.
+
+// --- why panel -----------------------------------------------------------------------
+var _whyOpen = null;           // { sym, idx } while the panel is open
+var _whyReturnFocus = null;
+// Daily closes for the last six months, from the 2-hour candles the page loaded:
+// the last candle of each calendar day.
+function dailyCloses(candles) {
+  if (!candles || !candles.length) return [];
+  var end = candles[candles.length - 1].time, start = end - 183 * 86400, out = [], lastDay = null;
+  for (var i = 0; i < candles.length; i++) {
+    var c = candles[i];
+    if (c.time < start) continue;
+    var day = Math.floor(c.time / 86400);
+    if (day === lastDay) out[out.length - 1] = { t: c.time, v: c.close };
+    else { out.push({ t: c.time, v: c.close }); lastDay = day; }
+  }
+  return out;
+}
+function whyChartSvg(sec, lim) {
+  var pts = dailyCloses(sec.candles);
+  if (pts.length < 2) return '';
+  var W = 340, H = 180, padL = 4, padR = 56, padT = 10, padB = 22;
+  var levels = [lim.row].concat(lim.members).map(function (r) { return r.limit; });
+  var lo = Math.min.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
+  var hi = Math.max.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
+  var span = hi - lo || 1; lo -= span * 0.05; hi += span * 0.05;
+  var t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  function x(t) { return padL + (t - t0) / (t1 - t0) * (W - padL - padR); }
+  function y(v) { return padT + (hi - v) / (hi - lo) * (H - padT - padB); }
+  var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' ');
+  var svg = '<svg class="xp-whychart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="'
+    + escHtml(sec.sym) + ' daily closes for the last six months, with the buy price ' + px2(lim.row.limit) + ' drawn across">';
+  // month ticks
+  var seen = {};
+  pts.forEach(function (p) {
+    var d = new Date(p.t * 1000), key = d.getUTCFullYear() + '-' + d.getUTCMonth();
+    if (seen[key] || d.getUTCDate() > 7) return;
+    seen[key] = 1;
+    svg += '<text x="' + x(p.t).toFixed(1) + '" y="' + (H - 6) + '" class="ax">' + d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }) + '</text>';
+  });
+  lim.members.forEach(function (m) {
+    svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(m.limit).toFixed(1) + '" y2="' + y(m.limit).toFixed(1) + '" class="mem"/>';
+  });
+  var yl = y(lim.row.limit).toFixed(1), last = pts[pts.length - 1];
+  svg += '<path d="' + line + '" class="px"/>'
+    + '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yl + '" y2="' + yl + '" class="lvl"/>'
+    + '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3" class="now"/>'
+    + '<text x="' + (W - padR + 6) + '" y="' + (y(last.v) + 4).toFixed(1) + '" class="lbl now">' + px2(last.v) + '</text>'
+    + '<text x="' + (W - padR + 6) + '" y="' + (Number(yl) + 4).toFixed(1) + '" class="lbl lvl">' + px2(lim.row.limit) + '</text>'
+    + '</svg>';
+  return svg;
+}
+function refreshWhyPanel() {
+  var panel = document.getElementById('exportWhy');
+  var sec = _whyOpen && _exportSecs[_whyOpen.sym];
+  var lim = sec && exportLimits(sec.rows)[_whyOpen.idx];
+  if (!lim) { closeWhyPanel(false); return; }
+  var tier = limitStrength(lim);
+  var bullets = [reasonText(lim.row) + ', at ' + px2(lim.row.limit) + '.'];
+  lim.members.forEach(function (m) {
+    bullets.push('Just below, at ' + px2(m.limit) + ' (' + pctBelowText(m) + '): ' + reasonText(m).charAt(0).toLowerCase() + reasonText(m).slice(1) + '.');
+  });
+  if (lim.members.length) {
+    var count = lim.members.length + 1;
+    bullets.push('One order at ' + px2(lim.row.limit) + ' covers ' + (count === 2 ? 'both' : 'all ' + count) + ', because a drop reaches it first.');
+  }
+  bullets.push('Strength: ' + STRENGTH_WORD[tier] + ', because ' + strengthReason(lim) + '.');
+  document.getElementById('exportWhyBody').innerHTML =
+      '<div class="xp-whyhead"><span class="xp-sym">' + escHtml(sec.sym) + '</span><span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span></div>'
+    + '<div class="xp-whypx tier-' + tier + '">' + px2(lim.row.limit) + '</div>'
+    + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' today’s close of ' + px2(sec.close) + '</div>'
+    + whyChartSvg(sec, lim)
+    + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>'
+    + '<p class="xp-whynote">Chart signals are clues, not guarantees; prices can keep falling. You place any order in your own broker.</p>';
+  panel.hidden = false;
+  document.getElementById('exportBody').classList.add('why-open');
+}
+function openWhyPanel(sym, idx, opener) {
+  _whyOpen = { sym: sym, idx: idx };
+  _whyReturnFocus = opener || document.activeElement;
+  hideExportTip();
+  refreshWhyPanel();
+  document.getElementById('exportWhyClose').focus();
+}
+function closeWhyPanel(restoreFocus) {
+  _whyOpen = null;
+  document.getElementById('exportWhy').hidden = true;
+  document.getElementById('exportBody').classList.remove('why-open');
+  if (restoreFocus && _whyReturnFocus && document.body.contains(_whyReturnFocus)) _whyReturnFocus.focus();
+  _whyReturnFocus = null;
+}
 function renderCombineExample(sections) {
   var box = document.getElementById('exportCombineExample');
   var found = null;
@@ -3776,6 +3945,7 @@ function openExportDialog() {
   document.getElementById('exportCsv').disabled = true;
   _exportRows = null;
   _exportPickMemory = readExportPickMemory();
+  closeWhyPanel(false);
   readExportCombine();
   renderCombineUi();
   closeExportEditor(false);
@@ -3795,6 +3965,7 @@ function openExportDialog() {
 function closeExportDialog() {
   var dialog = document.getElementById('exportDialog');
   rememberExportPicks();
+  closeWhyPanel(false);
   clearTimeout(_exportTimer);
   _exportGen++;
   hideExportTip();
@@ -3806,7 +3977,8 @@ function closeExportDialog() {
 }
 // Escape closes the group editor first, then the dialog.
 function onExportEscape() {
-  if (!document.getElementById('exportEditor').hidden) closeExportEditor(true);
+  if (_whyOpen) closeWhyPanel(true);
+  else if (!document.getElementById('exportEditor').hidden) closeExportEditor(true);
   else closeExportDialog();
 }
 function trapExportFocus(event) {
@@ -3836,9 +4008,26 @@ function wireExportDialog() {
   });
   document.getElementById('exportResult').addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-strength-set]');
-    if (b) { setExportStrength(b.getAttribute('data-strength-set'), true); document.getElementById('strengthAny').focus(); }
+    if (b) { setExportStrength(b.getAttribute('data-strength-set'), true); document.getElementById('strengthAny').focus(); return; }
+    var more = e.target.closest && e.target.closest('[data-more]');
+    if (more) {
+      var sym = more.getAttribute('data-more');
+      _exportExpanded[sym] = !_exportExpanded[sym];
+      var rest = more.nextElementSibling;
+      if (rest) rest.hidden = !_exportExpanded[sym];
+      more.setAttribute('aria-expanded', _exportExpanded[sym] ? 'true' : 'false');
+      var n = rest ? rest.children.length : 0;
+      more.textContent = _exportExpanded[sym] ? 'Hide other prices' : 'Show ' + n + ' more price' + (n === 1 ? '' : 's');
+      return;
+    }
+    var why = e.target.closest && e.target.closest('[data-why]');
+    if (why) {
+      var parts = why.getAttribute('data-why').split('|');
+      openWhyPanel(parts[0], Number(parts[1]), why);
+    }
   });
   document.getElementById('exportCsv').onclick = downloadExportCsv;
+  document.getElementById('exportWhyClose').onclick = function () { closeWhyPanel(true); };
   document.getElementById('exportCombineToggle').onclick = function () {
     _exportCombineOn = !_exportCombineOn; saveExportCombine(); renderCombineUi(); scheduleExportBuild(0);
   };

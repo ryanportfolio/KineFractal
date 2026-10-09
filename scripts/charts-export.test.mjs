@@ -46,10 +46,15 @@ test("combining nearby levels is stated on screen and adjustable", () => {
   assert.match(html, /<input id="exportCombinePct" type="range" min="0\.5" max="5" step="0\.5" value="2"/);
   assert.match(html, /var EXPORT_COMBINE_KEY = 'kf-export-combine-v1';/);
   assert.match(html, /if \(!_exportCombineOn\) return rows;/);
-  assert.match(html, /<p id="exportLegend">/);
-  // the levels a stacked limit covers sit in its chip's tooltip, not on the page
-  assert.match(html, /'<button type="button" class="export-badge stack" data-tip="'/);
-  assert.match(html, /var lines = text\.split\('\\n'\);/);
+});
+
+test("each card leads with the nearest strong price, in plain words, with a why panel", () => {
+  assert.match(html, /\(tier === 'strong' \? 'Nearest strong price' : 'Nearest price'\)/);
+  assert.match(html, /var STRENGTH_WORD = \{ strong: 'Strong', mid: 'Medium', light: 'Weaker' \};/);
+  assert.match(html, /if \(row\.type === 'gap'\) return 'A price gap from earlier has not been filled yet';/);
+  assert.match(html, /<aside id="exportWhy" aria-labelledby="exportWhyTitle" hidden>/);
+  assert.match(html, /if \(_whyOpen\) closeWhyPanel\(true\);/);
+  assert.match(html, /Chart signals are clues, not guarantees; prices can keep falling\./);
 });
 
 test("the CSV columns and the stacked-level rule are unchanged", () => {
