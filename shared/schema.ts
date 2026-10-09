@@ -163,6 +163,8 @@ export const chartPreferences = pgTable("chart_preferences", {
   tickerOrder: jsonb("ticker_order").notNull().default(sql`'[]'::jsonb`),
   // Curated (built-in) tickers this account has removed from its button row.
   hiddenTickers: jsonb("hidden_tickers").notNull().default(sql`'[]'::jsonb`),
+  // Named ticker groups for the chart Export dialog: [{ id, name, symbols }].
+  tickerGroups: jsonb("ticker_groups").notNull().default(sql`'[]'::jsonb`),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 

@@ -67,3 +67,8 @@ test("site chrome (home link, site menu, trimmed toolbar) is applied at page loa
   const mode = html.slice(html.indexOf("function applySiteMode()"), html.indexOf("function applySiteChrome()"));
   assert.doesNotMatch(mode, /siteNav|SITE_HIDE_LAYERS/);
 });
+
+test("the sign-in dialog links to password reset and returns to the chart afterwards", () => {
+  assert.match(html, /var RESET_HREF = '\/account\?mode=forgot&next=%2Fcharts%2F';/);
+  assert.match(html, /<a class="forgot" href="' \+ RESET_HREF \+ '">Forgot password\?<\/a>/);
+});

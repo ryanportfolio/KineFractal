@@ -45,6 +45,15 @@ export const alertPrefsLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Export ticker groups: one load per dialog open, one save per group edit.
+export const chartGroupsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many group changes, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // /labels (charts.html hand-lines sync): outside /api so the general limiter
 // skips it, and drawing fires one small POST per edit — generous but bounded.
 export const linesLimiter = rateLimit({
@@ -236,6 +245,10 @@ export function setupSecurity(app: Express) {
   // charts.html ticker removal + ordering. Same shared-artifact/SameSite
   // posture; every mutation is account-scoped and rate-limited.
   app.use('/api/chart-symbols', strictLimiter);
+
+  // charts.html Export ticker groups: a new route, so it takes the site's
+  // CSRF token (the page fetches /api/csrf-token before each save).
+  app.use('/api/chart-groups', chartGroupsLimiter, csrfProtection);
   
   console.log('[Security] Security middleware initialized with enhanced protections');
 }

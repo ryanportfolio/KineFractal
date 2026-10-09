@@ -395,6 +395,47 @@ function normalizeTickerOrder(value: unknown): string[] {
   return order;
 }
 
+// Export-dialog ticker groups: [{ id, name, symbols }], one list per account.
+const MAX_TICKER_GROUPS = 30;
+const MAX_GROUP_NAME = 40;
+const MAX_GROUP_SYMBOLS = 100;
+const GROUP_ID_RE = /^[a-z0-9]{1,24}$/;
+
+export type TickerGroup = { id: string; name: string; symbols: string[] };
+
+/** Drop malformed groups, trim names, dedupe ids and names, cap every list. */
+// inputSanitizer runs on every request body and HTML-encodes text ("S&P 500"
+// arrives as "S&amp;P 500"). Group names are plain text, escaped by the page
+// wherever it draws them, so they are decoded back before saving.
+export function decodeGroupName(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || typeof (raw as any).name !== "string") return raw;
+  const name = (raw as any).name
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
+  return { ...(raw as any), name };
+}
+export function normalizeTickerGroups(value: unknown): TickerGroup[] {
+  if (!Array.isArray(value)) return [];
+  const ids = new Set<string>();
+  const names = new Set<string>();
+  const groups: TickerGroup[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object") continue;
+    const id = typeof (raw as any).id === "string" ? (raw as any).id.trim().toLowerCase() : "";
+    const name = typeof (raw as any).name === "string"
+      ? (raw as any).name.replace(/\s+/g, " ").trim().slice(0, MAX_GROUP_NAME)
+      : "";
+    if (!GROUP_ID_RE.test(id) || ids.has(id) || !name || names.has(name.toLowerCase())) continue;
+    const symbols = normalizeTickerOrder((raw as any).symbols).slice(0, MAX_GROUP_SYMBOLS);
+    if (!symbols.length) continue;
+    ids.add(id);
+    names.add(name.toLowerCase());
+    groups.push({ id, name, symbols });
+    if (groups.length >= MAX_TICKER_GROUPS) break;
+  }
+  return groups;
+}
+
 /** Mutate this account's hidden-ticker list (curated buttons the user removed),
  *  stored on the chart_preferences row. Tolerates the hidden_tickers column not
  *  existing yet (web deploy landing before the additive migration): logs and
@@ -635,6 +676,53 @@ function registerChartSymbolRoutes(app: Express): void {
     } catch (e: any) {
       console.error("[FearLab charts] ticker order save failed:", e?.message ?? e);
       res.status(500).json({ ok: false, error: "failed to save ticker order" });
+    }
+  });
+
+  // GET /api/chart-groups — this account's Export ticker groups. Signed out
+  // (or no database) answers account:false and the page keeps groups in the
+  // browser. stored:false means the ticker_groups column is not there yet.
+  app.get("/api/chart-groups", async (req: Request, res: Response) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      const u = db ? await sessionUser(req) : null;
+      if (!db || !u) return res.json({ groups: [], account: false, stored: false });
+      const rows = await db
+        .select({ tickerGroups: chartPreferences.tickerGroups })
+        .from(chartPreferences)
+        .where(eq(chartPreferences.userId, u.id))
+        .limit(1)
+        // Additive-migration lag tolerance, same as /api/chart-symbols.
+        .catch(() => null);
+      if (rows === null) return res.json({ groups: [], account: true, stored: false });
+      res.json({ groups: normalizeTickerGroups(rows[0]?.tickerGroups), account: true, stored: true });
+    } catch (e: any) {
+      console.error("[FearLab charts] chart-groups get failed:", e?.message ?? e);
+      res.status(500).json({ error: "failed to load ticker groups" });
+    }
+  });
+
+  // PUT /api/chart-groups — replace this account's group list.
+  app.put("/api/chart-groups", async (req: Request, res: Response) => {
+    try {
+      if (!db) return res.status(503).json({ ok: false, error: "database unavailable" });
+      const u = await sessionUser(req);
+      if (!u) return res.status(401).json({ ok: false, error: "sign in required" });
+      if (!Array.isArray((req.body as any)?.groups)) {
+        return res.status(400).json({ ok: false, error: "groups must be an array" });
+      }
+      const groups = normalizeTickerGroups((req.body as any).groups.map(decodeGroupName));
+      await db
+        .insert(chartPreferences)
+        .values({ userId: u.id, tickerGroups: groups })
+        .onConflictDoUpdate({
+          target: chartPreferences.userId,
+          set: { tickerGroups: groups, updatedAt: new Date() },
+        });
+      res.json({ ok: true, groups });
+    } catch (e: any) {
+      console.error("[FearLab charts] chart-groups save failed:", e?.message ?? e);
+      res.status(500).json({ ok: false, error: "failed to save ticker groups" });
     }
   });
 

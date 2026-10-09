@@ -66,7 +66,7 @@ Caveman covers chat replies only. Anything written to a file or for another read
 - Chart and signal DATA comes from the engine's Railway services (`worker`, `chart-builder`, `chart-refresh`), built from range's `prod` branch. Nothing merged here changes them.
 - `server/charts-app/charts.html` is this site's own `/charts/` page: edit it here. The engine repo (range) has a separate local chart viewer; it is not this file's source and is never synced in either direction.
 - The FearLab snapshot is a copy of engine output. Never hand-edit it; refresh with `npm run sync:snapshot`.
-- `npm install` / `npm ci` are fine; ask before adding an app-runtime dependency. Migrations (`npm run db:push`) are handed to the user as a copy/paste step, never run against the shared database blind.
+- `npm install` / `npm ci` are fine; ask before adding an app-runtime dependency. Run additive migrations yourself through the Railway CLI once their SQL file is in `migrations/`: new tables, new nullable columns, new indexes. Ask first for anything that drops, renames, retypes or rewrites existing data. Review what `npm run db:push` would change before applying it; it can propose dropping tables the engine worker owns.
 
 ## Project reference library
 
