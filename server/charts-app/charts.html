@@ -337,7 +337,8 @@
   #exportDialog .xp-lede { margin:0; color:var(--mut); font:12px monospace; }
   #exportClose { justify-self:end; align-self:start; }
   /* group tabs */
-  #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid); }
+  #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid);
+                     flex-shrink:0; max-height:118px; overflow-y:auto; }
   #exportGroupTabs .xp-tab { color:var(--mut); }
   #exportGroupTabs .xp-tab[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); background:rgba(38,198,218,.10); }
   #exportGroupTabs .xp-tab:hover { color:var(--fg); border-color:var(--sup); }
@@ -361,6 +362,22 @@
   #exportDialog .xp-side { display:flex; flex-direction:column; gap:14px; min-height:0; overflow:auto;
                            padding:14px 16px; border-right:1px solid var(--grid); }
   #exportDialog .xp-main { min-height:0; overflow:auto; padding:14px 20px 20px; }
+  /* sidebar text runs large; the combine sentence scales with the column so it never wraps */
+  #exportDialog .xp-side { container-type:inline-size; }
+  #exportDialog .xp-side h3 { font-size:17px; }
+  #exportDialog .xp-side .xp-count { font-size:14px; }
+  #exportDialog .xp-side .xp-link { font-size:15px; }
+  #exportDialog .xp-side #exportSearch { padding:7px 9px; font-size:15px; }
+  #exportDialog .xp-side .xp-field { font-size:14px; }
+  #exportDialog .xp-side .xp-field input { width:50px; font-size:16px; }
+  #exportDialog .xp-side #exportStrengthWrap button { padding:5px 14px; font-size:15px; }
+  /* loading: the build animation used when a ticker is added to the chart */
+  #exportLoading { display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 0 24px; text-align:center; }
+  #exportLoading[hidden] { display:none; }
+  #exportLoading canvas { display:block; width:min(480px,100%); height:220px; background:#000; border:1px solid var(--grid); }
+  #exportLoading canvas[hidden] { display:none; }
+  #exportDialog #exportLoading h3 { margin:12px 0 2px; font-size:16px; letter-spacing:.06em; color:var(--fg); }
+  #exportLoading .st { margin:0; min-height:1.3em; color:var(--sup); font:14px monospace; }
   #exportDialog .xp-main[aria-busy="true"] .xp-sec { opacity:.45; }
   #exportDialog h3 { margin:0; font-size:15px; letter-spacing:.03em; }
   #exportDialog .xp-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
@@ -373,10 +390,13 @@
     background:var(--bg); color:var(--fg); border:1px solid var(--grid); padding:6px 8px; font:13px monospace; border-radius:0; }
   #exportDialog input:focus { outline:none; border-color:var(--sup); }
   #exportSearch { width:100%; box-sizing:border-box; }
-  /* ticker list: symbol, full name, type */
+  /* ticker list: symbol, full name */
   #exportPicks { display:flex; flex-direction:column; flex:1 1 auto; min-height:160px; overflow:auto; border:1px solid var(--grid); }
-  #exportPicks .xp-pick { display:grid; grid-template-columns:18px 58px 1fr auto; align-items:center; gap:8px;
-                          padding:6px 10px; border-bottom:1px solid var(--grid); cursor:pointer; }
+  #exportPicks .xp-pick { display:grid; grid-template-columns:18px 66px minmax(0,1fr); align-items:center; gap:8px;
+                          padding:7px 10px; border-bottom:1px solid var(--grid); cursor:pointer; }
+  #exportPicks .xp-pick input { width:15px; height:15px; }
+  #exportDialog #exportPicks .xp-sym { font-size:15px; }
+  #exportDialog #exportPicks .xp-name { font-size:14px; }
   #exportPicks .xp-pick:last-child { border-bottom:0; }
   #exportPicks .xp-pick:hover, #exportPicks .xp-pick:focus-within { background:rgba(38,198,218,.08); }
   #exportPicks .xp-pick input { margin:0; accent-color:var(--sup); }
@@ -413,9 +433,10 @@
   #exportCombineToggle[aria-checked="true"]::after { left:21px; background:var(--sup); }
   #exportCombinePct { flex:1 1 auto; accent-color:var(--sup); }
   #exportCombinePct:disabled { opacity:.4; }
-  #exportCombineVal { min-width:4ch; text-align:right; font:bold 14px Verdana,Geneva,sans-serif; }
-  #exportCombineText { margin:0; color:var(--mut); font:12px monospace; line-height:1.5; }
-  #exportCombineExample { display:flex; align-items:center; gap:10px; padding:8px 10px; border:1px solid var(--grid); font:13px Verdana,Geneva,sans-serif; }
+  #exportCombineVal { min-width:4ch; text-align:right; font:bold 16px Verdana,Geneva,sans-serif; }
+  #exportCombineText { margin:0; color:var(--mut); font-family:"Space Grotesk","Segoe UI",Verdana,sans-serif;
+                       font-size:min(16px, calc(100cqi / 22)); line-height:1.5; white-space:nowrap; }   /* 22 = longest sentence width in ems, plus margin */
+  #exportCombineExample { display:flex; align-items:center; gap:10px; padding:9px 12px; border:1px solid var(--grid); font:15px Verdana,Geneva,sans-serif; }
   #exportCombineExample:empty { display:none; }
   #exportCombineExample .pair { display:flex; flex-direction:column; color:var(--mut); }
   #exportCombineExample .arrow { color:var(--mut); font-family:monospace; }
@@ -745,6 +766,11 @@
             <button type="button" data-view="cards" aria-pressed="true">Cards</button>
             <button type="button" data-view="table" aria-pressed="false">Table</button>
           </span>
+        </div>
+        <div id="exportLoading" role="status" hidden>
+          <canvas></canvas>
+          <h3>Finding limit-buy levels</h3>
+          <p class="st"></p>
         </div>
         <div id="exportResult"></div>
       </div>
@@ -3121,7 +3147,7 @@ function renderCombineUi() {
   slider.disabled = !on;
   document.getElementById('exportCombineVal').textContent = on ? pct + '%' : 'off';
   document.getElementById('exportCombineText').textContent = on
-    ? 'Within ' + pct + '% of each other → one limit at the highest price.'
+    ? 'Within ' + pct + '% → one limit at the highest price.'
     : 'Off: every level is its own limit.';
 }
 function markExportClusters(rows) {
@@ -3279,7 +3305,13 @@ function loadExportGroups(done) {
       } else if (!remote.length && local.length && !groupsSynced()) {
         _exportGroupsAccount = true;     // first sign-in here: carry this browser's groups up once
         _exportGroups = local;
-        saveExportGroups().then(function (ok) { if (ok) markGroupsSynced(); });
+        saveExportGroups().then(function (ok) {
+          if (!ok) return;
+          markGroupsSynced();
+          // they belong to this account now; cleared so a second account signing
+          // in on this browser does not receive them too
+          try { localStorage.removeItem(EXPORT_GROUPS_KEY); } catch (e) {}
+        });
       } else {
         // the account list is the truth from now on, even when empty (a group
         // deleted in another browser must not come back from this one's copy)
@@ -3324,15 +3356,17 @@ function putExportGroups(retried) {
     });
   });
 }
-// Always keeps a browser copy; signed in, the account copy is the one that
-// counts and a failed save says so.
+// Signed out: this browser's copy. Signed in: the account's copy only, so one
+// account's groups never sit where the next account to sign in here reads them.
 function saveExportGroups() {
-  try { localStorage.setItem(EXPORT_GROUPS_KEY, JSON.stringify(_exportGroups)); } catch (e) {}
-  if (!_exportGroupsAccount) return Promise.resolve(true);
+  if (!_exportGroupsAccount) {
+    try { localStorage.setItem(EXPORT_GROUPS_KEY, JSON.stringify(_exportGroups)); } catch (e) {}
+    return Promise.resolve(true);
+  }
   return putExportGroups(false)
     .then(function () { setGroupsNote(''); markGroupsSynced(); return true; })
     .catch(function () {
-      setGroupsNote('Could not save groups to your account. They are kept in this browser; try again later.', true);
+      setGroupsNote('Could not save groups to your account. Try again in a minute.', true);
       return false;
     });
 }
@@ -3452,12 +3486,10 @@ function renderExportPicks() {
     var box = document.createElement('input');
     box.type = 'checkbox'; box.value = sym;
     box.checked = remembered ? remembered.indexOf(sym) >= 0 : true;
-    var type = tickerType(sym);
     label.appendChild(box);
     label.insertAdjacentHTML('beforeend',
       '<span class="xp-sym">' + escHtml(sym) + '</span>'
-      + '<span class="xp-name">' + escHtml(tickerName(sym)) + '</span>'
-      + (type ? '<span class="xp-type ' + type + '">' + type + '</span>' : '<span></span>'));
+      + '<span class="xp-name">' + escHtml(tickerName(sym)) + '</span>');
     wrap.appendChild(label);
   });
   document.getElementById('exportSearch').value = '';
@@ -3491,6 +3523,7 @@ var _exportTimer = null;
 var _exportCsvReady = false;   // true only while the shown table matches the current inputs
 function scheduleExportBuild(delay) {
   clearTimeout(_exportTimer);
+  _exportGen++;   // a build still loading belongs to the old inputs: drop its result
   // the table on screen is about to go stale: never let Download hand out the old rows
   _exportCsvReady = false;
   document.getElementById('exportCsv').disabled = true;
@@ -3514,6 +3547,10 @@ function buildExportTable() {
   msg.classList.remove('error');
   if (!syms.length) {
     _exportRows = null;
+    _exportLastSections = [];
+    _exportSecs = {};
+    closeWhyPanel(false);
+    hideExportLoading();
     msg.textContent = '';
     main.removeAttribute('aria-busy');
     document.getElementById('exportResult').innerHTML =
@@ -3523,20 +3560,27 @@ function buildExportTable() {
   }
   var range = readExportRange();
   if (range.error) {
+    _exportCsvReady = false;
+    document.getElementById('exportCsv').disabled = true;
+    hideExportLoading();
     msg.textContent = range.error;
     msg.classList.add('error');
     main.setAttribute('aria-busy', 'true');   // fade the old table: it no longer matches the inputs
     return;
   }
-  if (!_exportRows) {   // first build since opening: say what is loading, not "none selected"
-    document.getElementById('exportResult').innerHTML = '<p class="xp-help">Loading levels for '
-      + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + '…</p>';
-  }
-  var slow = setTimeout(function () { if (gen === _exportGen) main.setAttribute('aria-busy', 'true'); }, 150);
+  // first build since opening: the loading animation right away; later builds
+  // only when loading takes long enough to notice (cached tickers are instant)
+  if (!_exportRows) showExportLoading(syms[0], 1, syms.length);
+  var slow = setTimeout(function () {
+    if (gen !== _exportGen) return;
+    main.setAttribute('aria-busy', 'true');
+    showExportLoading(syms[0], 1, syms.length);
+  }, 150);
   collectExportData(syms, function (loaded) {
     clearTimeout(slow);
     if (gen !== _exportGen) return;   // a newer change already started another build
     main.removeAttribute('aria-busy');
+    hideExportLoading();
     var rows = [], failed = [], sections = [];
     loaded.forEach(function (item) {
       if (item.failed) { failed.push(item.sym); return; }
@@ -3544,7 +3588,8 @@ function buildExportTable() {
       var extra = _exportStrength === 'any' ? 0
         : exportCandidates(item.sym, item.candles, item.ov, range.depth, range.min, 'any').length - mine.length;
       var close = item.candles.length ? r2(item.candles[item.candles.length - 1].close) : null;
-      sections.push({ sym: item.sym, rows: mine, weaker: Math.max(0, extra), close: close, candles: item.candles });
+      var closeTime = item.candles.length ? item.candles[item.candles.length - 1].time : null;
+      sections.push({ sym: item.sym, rows: mine, weaker: Math.max(0, extra), close: close, closeTime: closeTime, candles: item.candles });
       rows = rows.concat(mine);
     });
     markExportClusters(rows);
@@ -3554,8 +3599,31 @@ function buildExportTable() {
     renderExportTable(sections);
     updateExportFooter(rows, sections.length);
   }, function (i, n) {
-    if (gen === _exportGen && n > 1) msg.textContent = 'loading ' + (i + 1) + ' of ' + n + ' …';
+    if (gen === _exportGen) updateExportLoading(syms[i], i + 1, n);
   });
+}
+var _exportBeam = null;
+function showExportLoading(sym, i, n) {
+  var box = document.getElementById('exportLoading');
+  if (!box.hidden) return updateExportLoading(sym, i, n);
+  box.hidden = false;
+  document.getElementById('exportResult').hidden = true;
+  updateExportLoading(sym, i, n);
+  if (!_exportBeam) _exportBeam = createBuildBeam(box.querySelector('canvas'));
+  box.querySelector('canvas').hidden = !_exportBeam;   // no WebGL2: the words alone
+  if (_exportBeam) _exportBeam.start();
+}
+function updateExportLoading(sym, i, n) {
+  var box = document.getElementById('exportLoading');
+  if (box.hidden) return;
+  box.querySelector('.st').textContent = sym ? 'Loading ' + sym + (n > 1 ? ' · ' + i + ' of ' + n : '') : '';
+}
+function hideExportLoading() {
+  var box = document.getElementById('exportLoading');
+  if (!box || box.hidden) return;
+  box.hidden = true;
+  document.getElementById('exportResult').hidden = false;
+  if (_exportBeam) { _exportBeam.destroy(); _exportBeam = null; }
 }
 // Plain-text name of a level's signal, for the "Includes …" line under a stacked limit.
 function exportSignalText(row) {
@@ -3630,6 +3698,9 @@ function limitAttrs(sym, lim, idx) {
     + STRENGTH_WORD[limitStrength(lim)] + '. ' + escHtml(reasonText(lim.row)) + '. Show the chart and details"';
 }
 function pctBelowText(row) { return pctBelow(row).toFixed(1) + '% below'; }
+// "Oct 8 close": the session the latest candle belongs to (US Eastern), which is
+// not today on weekends, holidays or before the day's data is published
+function closeLabel(sec) { return sec.closeTime != null ? _etFmt(sec.closeTime, { month: 'short', day: 'numeric' }) + ' close' : 'Latest close'; }
 // Two ways to read the same results, picked with the Cards | Table switch and
 // kept in this browser: cards lead with each ticker's nearest strong price,
 // the table lists every price for every ticker in one place.
@@ -3643,7 +3714,7 @@ function setExportView(v) {
   _exportView = v === 'table' ? 'table' : 'cards';
   try { localStorage.setItem(EXPORT_VIEW_KEY, _exportView); } catch (e) {}
   renderViewSwitch();
-  renderExportTable(_exportLastSections);
+  if (_exportLastSections.length) renderExportTable(_exportLastSections);   // else keep the "pick tickers" prompt
 }
 function renderViewSwitch() {
   Array.prototype.forEach.call(document.querySelectorAll('#exportViewSwitch button'), function (b) {
@@ -3665,7 +3736,7 @@ function nearestStrongIndex(limits) {
   return 0;
 }
 function exportTableHtml(sections) {
-  var html = '<table class="xp-table"><thead><tr><th scope="col">Price</th><th scope="col">% below today</th>'
+  var html = '<table class="xp-table"><thead><tr><th scope="col">Price</th><th scope="col">% below close</th>'
     + '<th scope="col">Strength</th></tr></thead>';
   sections.forEach(function (sec, idx) {
     var hue = Math.round((idx * 137.508) % 360);
@@ -3673,7 +3744,7 @@ function exportTableHtml(sections) {
     html += '<tbody><tr class="xp-tgroup"><th colspan="3" scope="rowgroup">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
-      + (sec.close != null ? '<span class="xp-meta">Closed at <b>' + px2(sec.close) + '</b></span>' : '')
+      + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
       + '</th></tr>';
     if (!limits.length) html += '<tr><td colspan="3" class="xp-none">No buy prices in this range at this strength.</td></tr>';
     limits.forEach(function (lim, k) {
@@ -3700,7 +3771,7 @@ function exportCardsHtml(sections) {
       + '<div class="xp-cardhead">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
-      + (sec.close != null ? '<span class="xp-meta">Today’s close <b>' + px2(sec.close) + '</b></span>' : '')
+      + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
       + '</div>';
     if (!limits.length) {
       html += '<p class="xp-none">No buy prices in this range at this strength.</p>';
@@ -3809,7 +3880,7 @@ function refreshWhyPanel() {
   document.getElementById('exportWhyBody').innerHTML =
       '<div class="xp-whyhead"><span class="xp-sym">' + escHtml(sec.sym) + '</span><span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span></div>'
     + '<div class="xp-whypx tier-' + tier + '">' + px2(lim.row.limit) + '</div>'
-    + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' today’s close of ' + px2(sec.close) + '</div>'
+    + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' the ' + closeLabel(sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(sec.close) + '</div>'
     + whyChartSvg(sec, lim)
     + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>'
     + '<p class="xp-whynote">Chart signals are clues, not guarantees; prices can keep falling. You place any order in your own broker.</p>';
@@ -3822,6 +3893,7 @@ function openWhyPanel(sym, idx, opener) {
   _whyReturnFocus = opener || document.activeElement;
   hideExportTip();
   refreshWhyPanel();
+  setWhyInert();
   document.getElementById('exportWhyClose').focus();
 }
 function markWhySelection() {
@@ -3833,6 +3905,7 @@ function markWhySelection() {
 function closeWhyPanel(restoreFocus) {
   _whyOpen = null;
   markWhySelection();
+  setWhyInert();
   document.getElementById('exportWhy').hidden = true;
   document.getElementById('exportBody').classList.remove('why-open');
   if (restoreFocus && _whyReturnFocus && document.body.contains(_whyReturnFocus)) _whyReturnFocus.focus();
@@ -3990,6 +4063,7 @@ function saveExportEditor() {
   var clash = _exportGroups.filter(function (g) { return g.id !== _edGroupId && g.name.toLowerCase() === name.toLowerCase(); })[0];
   if (clash) { setEditorMsg('You already have a group named ' + clash.name + '.', true); return; }
   if (!_edGroupId && _exportGroups.length >= 30) { setEditorMsg('You can keep up to 30 groups.', true); return; }
+  var before = _exportGroups.map(function (g) { return { id: g.id, name: g.name, syms: g.syms.slice() }; });
   var id = _edGroupId;
   if (id) {
     var g = exportGroupById(id);
@@ -4003,8 +4077,13 @@ function saveExportEditor() {
   persistExportPicks();
   var save = document.getElementById('exportGroupSave');
   save.disabled = true; save.textContent = 'Save group…';
-  saveExportGroups().then(function () {
+  saveExportGroups().then(function (ok) {
     save.disabled = false; save.textContent = 'Save group';
+    if (!ok) {   // the edits stay in the editor, so Save can be tried again
+      _exportGroups = before;
+      setEditorMsg('Could not save to your account. Your changes are still here; try Save again.', true);
+      return;
+    }
     closeExportEditor(false);
     renderExportTabs();
     selectExportTab(id, false);
@@ -4021,12 +4100,19 @@ function deleteExportGroup() {
     setEditorMsg('This removes the group, not the tickers.');
     return;
   }
-  var id = _edGroupId;
+  var id = _edGroupId, before = _exportGroups;
   _exportGroups = _exportGroups.filter(function (g) { return g.id !== id; });
   rememberExportPicks();
   delete _exportPickMemory[id];
   persistExportPicks();
-  saveExportGroups().then(function () {
+  saveExportGroups().then(function (ok) {
+    if (!ok) {
+      _exportGroups = before;
+      _edDeleteArmed = false;
+      del.textContent = 'Delete group';
+      setEditorMsg('Could not delete it from your account. Try again in a minute.', true);
+      return;
+    }
     closeExportEditor(false);
     renderExportTabs();
     selectExportTab('all', false);
@@ -4072,6 +4158,7 @@ function closeExportDialog() {
   closeWhyPanel(false);
   clearTimeout(_exportTimer);
   _exportGen++;
+  hideExportLoading();
   hideExportTip();
   dialog.classList.remove('open');
   dialog.setAttribute('aria-hidden', 'true');
@@ -4085,8 +4172,18 @@ function onExportEscape() {
   else if (!document.getElementById('exportEditor').hidden) closeExportEditor(true);
   else closeExportDialog();
 }
+// Under 900px the why panel covers the whole dialog, so it is the only part
+// the keyboard and screen readers can reach while it is open.
+function whyCoversDialog() { return !!_whyOpen && window.matchMedia('(max-width:900px)').matches; }
+function setWhyInert() {
+  var cover = whyCoversDialog();
+  ['.xp-head', '#exportGroupTabs', '.xp-side', '#exportMain'].forEach(function (sel) {
+    var el = document.querySelector('#exportDialog ' + sel);
+    if (el) el.inert = cover;
+  });
+}
 function trapExportFocus(event) {
-  var dialog = document.getElementById('exportDialog');
+  var dialog = whyCoversDialog() ? document.getElementById('exportWhy') : document.getElementById('exportDialog');
   var focusable = Array.prototype.slice.call(dialog.querySelectorAll('button:not(:disabled), input:not(:disabled), [tabindex="0"]'))
     .filter(function (el) { return el.getClientRects().length > 0; });  // skip hidden panels and filtered rows
   if (!focusable.length) return;
@@ -4132,6 +4229,7 @@ function wireExportDialog() {
   });
   document.getElementById('exportCsv').onclick = downloadExportCsv;
   document.getElementById('exportWhyClose').onclick = function () { closeWhyPanel(true); };
+  window.addEventListener('resize', function () { if (_whyOpen) setWhyInert(); });
   Array.prototype.forEach.call(document.querySelectorAll('#exportViewSwitch button'), function (b) {
     b.onclick = function () { setExportView(b.getAttribute('data-view')); };
   });
