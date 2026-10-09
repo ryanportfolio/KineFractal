@@ -20,6 +20,8 @@ const month = (ts: number) => {
 const SMALL_ORDER_PCT = 0.1;
 /** fill rows: date, side, reason, account %, ETF quote or lot return (px, so the 11px header and 13px rows align) */
 const ROW_COLS = "grid-cols-[88px_40px_minmax(0,1fr)_76px_120px]";
+/** latest-decision rows: fund, decision, ETF quote; the header uses the same columns. Narrower below sm so a 320px screen fits "BUY+SELL" and a seven-digit quote */
+const DECISION_COLS = "grid-cols-[3rem_minmax(0,1fr)_auto] gap-2 sm:grid-cols-[4.5rem_minmax(0,1fr)_auto] sm:gap-3";
 
 type SignalIntent = { side?: string; signal_type?: string; engine?: string; order_type?: string };
 
@@ -57,7 +59,7 @@ function LatestDecision({ drawn }: { drawn: boolean }) {
           <p className="mt-3 font-mono text-[13px] leading-[20px] text-beam-dim">
             Closed-session signal facts, one per fund. Decisions, not broker fills. ETF quotes are market prices, not account values.
           </p>
-          <div className="mt-6 grid grid-cols-[4.5rem_1fr_auto] gap-3 border-b border-beam-ghost/70 pb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-beam-dim" aria-hidden="true">
+          <div className={`mt-6 grid ${DECISION_COLS} border-b border-beam-ghost/70 pb-2 font-mono text-[11px] uppercase tracking-[0.12em] text-beam-dim`} aria-hidden="true">
             <span>Fund</span><span>Decision</span><span className="text-right">ETF quote</span>
           </div>
           <ul>
@@ -67,9 +69,12 @@ function LatestDecision({ drawn }: { drawn: boolean }) {
                 className="anno border-b border-beam-ghost/40 py-3"
                 style={{ "--anno-delay": `${index * 70}ms` } as React.CSSProperties}
               >
-                <div className="grid grid-cols-[4.5rem_1fr_auto] items-baseline gap-3 font-mono text-lg leading-[30px] tabular-nums">
+                <div className={`grid ${DECISION_COLS} items-baseline font-mono text-[15px] leading-[24px] tabular-nums sm:text-lg sm:leading-[30px]`}>
                   <span className="font-semibold text-beam-mid">{cell.symbol}</span>
-                  <span className={decision.side.includes("SELL") ? "text-accent" : "text-beam-mid"}>{decision.side}</span>
+                  <span className={`min-w-0 ${decision.side.includes("SELL") ? "text-accent" : "text-beam-mid"}`}>
+                    {/* a combined decision may wrap after each "+" when the column is narrow */}
+                    {decision.side.split("+").map((part, i) => <span key={i}>{i > 0 && <>+<wbr /></>}{part}</span>)}
+                  </span>
                   <span className="text-right text-beam-mid">
                     {quote(cell.price)}<span className="sr-only"> ETF quote</span>
                   </span>

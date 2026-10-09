@@ -99,7 +99,7 @@ function detail(step: string, sym: Sym, f: FundFear | undefined): Detail {
         question: "How deep is today's dip?",
         when: "At every trading-day close.",
         then:
-          "Measure how far the close sits below the highest close of the last 22 trading days, then rank that dip against the previous 100 days. The rank is the day's fear percentile, from 0 to 100; higher means more fear.",
+          "Measure how far the day's low sits below the highest close of the last 22 trading days, then rank that dip against the previous 100 days. The rank is the day's fear percentile, from 0 to 100; higher means more fear.",
         limits: `Every other rule keys off this one number. ${sym} compares it with its own buy line.`,
         keys: [
           { value: "22", unit: "trading days", label: "highest-close window" },
@@ -190,11 +190,11 @@ function detail(step: string, sym: Sym, f: FundFear | undefined): Detail {
         when: "A lot retraces 2%.",
         then: "IWM sells the whole lot.",
         limits:
-          "IWM watches two markets: junk-bond credit and the dollar. The 500-day band trim and the five watch markets are SPY settings.",
+          "IWM watches five markets of its own: junk-bond credit, the dollar, a breadth omen, narrow leadership (equal-weight breadth) and transports. SPY's 500-day band trim and SPY's five watch markets are SPY settings.",
         keys: [
           { value: "2%", unit: "retrace", label: "triggers the sell" },
           { value: "100%", unit: "of the lot", label: "sold at once" },
-          { value: "2", unit: "watch markets", label: "credit, the dollar" },
+          { value: "5", unit: "watch markets", label: "credit, dollar, breadth omen, leadership, transports" },
         ],
       };
 

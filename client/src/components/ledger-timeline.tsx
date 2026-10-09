@@ -1,14 +1,18 @@
 // LedgerTimeline: the recent simulated SPY fills on a date axis. One tick per
 // fill; buys rise from the zero line, sells drop below it, and tick height is
 // the simulated order size as a percent of the simulated account (axis fixed
-// at 100% of account). Ticks draw in once when the section holds the beam and
-// settle instantly when it is held.
+// at 100% of account, no minimum height). A fill whose tick would be under
+// MIN_TICK px also gets a same-size ring on the zero line, so it stays visible
+// without its mark reading as an order size. Ticks draw in once when the
+// section holds the beam and settle instantly when it is held.
 import { useEffect, useRef, useState } from "react";
 import type { RecentRow } from "@/data/lab-data";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const DAY = 86_400;
 const LABELLED = 3;
+/** ticks shorter than this (px) also get a presence ring on the zero line */
+const MIN_TICK = 2;
 
 const utcMonthStart = (ts: number, add = 0) => {
   const d = new Date(ts * 1000);
@@ -64,8 +68,12 @@ export function LedgerTimeline({ rows, drawn, instant }: { rows: RecentRow[]; dr
   );
   const shown = instant || grown;
   const buys = fills.filter((row) => row.side === "buy").length;
+  const tickPx = (row: RecentRow) => (Math.min(100, row.account_pct ?? 0) / 100) * half;
+  // order size (% of account) below which a tick is under MIN_TICK px at this chart height
+  const ringBelow = ((MIN_TICK / half) * 100).toFixed(1);
+  const rings = fills.filter((row) => tickPx(row) < MIN_TICK).length;
   const summary = fills.length
-    ? `Timeline of ${fills.length} simulated SPY fills, ${new Date(fills[0].ts * 1000).toISOString().slice(0, 10)} to ${new Date(fills[fills.length - 1].ts * 1000).toISOString().slice(0, 10)}: ${buys} buys drawn upward, ${fills.length - buys} sells drawn downward. Tick height is the order size as a percent of the simulated account. Each fill is listed in the table below.`
+    ? `Timeline of ${fills.length} simulated SPY fills, ${new Date(fills[0].ts * 1000).toISOString().slice(0, 10)} to ${new Date(fills[fills.length - 1].ts * 1000).toISOString().slice(0, 10)}: ${buys} buys drawn upward, ${fills.length - buys} sells drawn downward. Tick height is the order size as a percent of the simulated account.${rings ? ` ${rings} fills under ${ringBelow}% of the account are too short to see and are also marked with a ring on the zero line.` : ""} Each fill is listed in the table below.`
     : "No simulated fills to plot.";
 
   return (
@@ -74,6 +82,7 @@ export function LedgerTimeline({ rows, drawn, instant }: { rows: RecentRow[]; dr
         <span className="text-beam-mid">Buy ↑</span>
         <span className="text-accent">Sell ↓</span>
         <span>Tick height = order size, % of account</span>
+        {rings > 0 && <span>○ = fill under {ringBelow}% of account</span>}
       </div>
       <div ref={boxRef} className="mt-2 w-full">
         {width > 0 && (
@@ -99,13 +108,20 @@ export function LedgerTimeline({ rows, drawn, instant }: { rows: RecentRow[]; dr
             ))}
             {fills.map((row, i) => {
               const sell = row.side === "sell";
-              const h = Math.max(2, (Math.min(100, row.account_pct ?? 0) / 100) * half);
+              const h = tickPx(row);
               const cx = x(row.ts);
               const colour = sell ? "hsl(var(--accent))" : "hsl(var(--beam-hot))";
               const delay = `${i * 70}ms`;
               return (
                 <g key={`${row.ts}-${i}`}>
+                  {h < MIN_TICK && (
+                    <circle
+                      data-presence="" cx={cx} cy={mid} r={2.5} fill="hsl(var(--background))" stroke={colour} strokeWidth={1.2}
+                      style={{ opacity: shown ? 1 : 0, transition: instant ? "none" : `opacity 0.3s ease-out ${delay}` }}
+                    />
+                  )}
                   <rect
+                    data-account-pct={row.account_pct ?? 0}
                     x={cx - 1} y={sell ? mid : mid - h} width={2} height={h} fill={colour}
                     style={{
                       transformBox: "fill-box",
