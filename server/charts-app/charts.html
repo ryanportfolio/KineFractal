@@ -3812,7 +3812,7 @@ function exportCardsHtml(sections) {
 }
 
 // --- why panel -----------------------------------------------------------------------
-var _whyOpen = null;           // { sym, idx } while the panel is open
+var _whyOpen = null;           // { sym, idx, px } while the panel is open; px finds the price again after a rebuild
 var _whyReturnFocus = null;
 // Daily closes for the last six months, from the 2-hour candles the page loaded:
 // the last candle of each calendar day.
@@ -3865,7 +3865,10 @@ function whyChartSvg(sec, lim) {
 function refreshWhyPanel() {
   var panel = document.getElementById('exportWhy');
   var sec = _whyOpen && _exportSecs[_whyOpen.sym];
-  var lim = sec && exportLimits(sec.rows)[_whyOpen.idx];
+  // a rebuild (combine or filters changed) can renumber the prices: find this
+  // one again by its price, or close when it is no longer in the results
+  var limits = sec ? exportLimits(sec.rows) : [], lim = null;
+  for (var k = 0; k < limits.length; k++) if (limits[k].row.limit === _whyOpen.px) { lim = limits[k]; _whyOpen.idx = k; break; }
   if (!lim) { closeWhyPanel(false); return; }
   var tier = limitStrength(lim);
   var bullets = [reasonText(lim.row) + ', at ' + px2(lim.row.limit) + '.'];
@@ -3889,7 +3892,8 @@ function refreshWhyPanel() {
   markWhySelection();
 }
 function openWhyPanel(sym, idx, opener) {
-  _whyOpen = { sym: sym, idx: idx };
+  var sec = _exportSecs[sym], lim = sec && exportLimits(sec.rows)[idx];
+  _whyOpen = { sym: sym, idx: idx, px: lim ? lim.row.limit : null };
   _whyReturnFocus = opener || document.activeElement;
   hideExportTip();
   refreshWhyPanel();
@@ -4060,6 +4064,7 @@ function saveExportEditor() {
   var name = document.getElementById('exportGroupName').value.replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!name) { setEditorMsg('Give the group a name.', true); document.getElementById('exportGroupName').focus(); return; }
   if (!_edSyms.length) { setEditorMsg('Add at least one ticker.', true); return; }
+  if (_edSyms.length > 100) { setEditorMsg('A group can hold up to 100 tickers. Remove ' + (_edSyms.length - 100) + ' to save.', true); return; }
   var clash = _exportGroups.filter(function (g) { return g.id !== _edGroupId && g.name.toLowerCase() === name.toLowerCase(); })[0];
   if (clash) { setEditorMsg('You already have a group named ' + clash.name + '.', true); return; }
   if (!_edGroupId && _exportGroups.length >= 30) { setEditorMsg('You can keep up to 30 groups.', true); return; }
@@ -4121,8 +4126,10 @@ function deleteExportGroup() {
 }
 
 // --- open / close / keyboard --------------------------------------------------------
+var _exportOpenGen = 0;   // bumped on every open and close
 function openExportDialog() {
   var dialog = document.getElementById('exportDialog');
+  var openGen = ++_exportOpenGen;
   _exportReturnFocus = document.activeElement;
   var savedStrength = null;
   try { savedStrength = localStorage.getItem('kf-export-strength'); } catch (e) {}
@@ -4144,6 +4151,7 @@ function openExportDialog() {
   document.getElementById('exportBtn').setAttribute('aria-expanded', 'true');
   document.getElementById('exportClose').focus();
   loadExportGroups(function () {
+    if (openGen !== _exportOpenGen) return;   // closed or reopened while the groups loaded
     var saved = null;
     try { saved = localStorage.getItem(EXPORT_ACTIVE_KEY); } catch (e) {}
     _exportActive = saved && exportGroupById(saved) ? saved : 'all';
@@ -4156,6 +4164,7 @@ function closeExportDialog() {
   var dialog = document.getElementById('exportDialog');
   rememberExportPicks();
   closeWhyPanel(false);
+  _exportOpenGen++;
   clearTimeout(_exportTimer);
   _exportGen++;
   hideExportLoading();
