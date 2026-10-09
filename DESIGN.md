@@ -77,24 +77,38 @@ Do not substitute continuous full-window returns, drawdowns or trade counts here
 
 ### 3. SPY v4.6 Strategy
 
-The SPY v4.6 monthly return grid shows strategy percentages. Its final columns
-compare each independent strategy year with buy-and-hold. State the independent
-annual basis, identify partial periods and keep account dollars out.
+The SPY v4.6 monthly return grid shows strategy percentages. Each monthly number
+sits on a faint tint (beam for gain, amber for loss); the number carries the
+reading, the tint only hints at sign and size. Its final columns compare each
+independent strategy year with buy-and-hold: a solid strategy bar over a dashed
+buy-and-hold bar on one shared scale, then strategy %, buy-and-hold % and the
+edge in percentage points (pp). Each year is a button; the selected year fills a
+readout with its edge in pp and strategy vs buy-and-hold %, stated as one
+calendar year, not an average. State the independent annual basis, identify
+partial periods and keep account dollars out.
 
 ### 4. How it buys / How it sells
 
-Each fund gets its own fear rail. Show `fear now`, `buy line`, `minimum` and
-`maximum` in percentile or percent-of-account terms. State whether the buy
-line is crossed or how many percentile points remain. Explain that crossing the
-line is only the first check: cooldown, protection, regime and available cash can
-still block a buy.
+Each fund gets its own fear rail, all on one shared 0-100 percentile scale. The
+buy line is labeled above the rail and fear today below it, so the two labels
+never share a row. Show `fear now`, `buy line`, `minimum` and `maximum` in
+percentile or percent-of-account terms. State whether the buy line is crossed or
+how many percentile points remain. Explain that crossing the line is only the
+first check: cooldown, protection, regime and available cash can still block a
+buy.
 
-Do not overlay three unexplained sizing curves. Do not expose channel codes or an
-internal one-word readiness state as user-facing copy.
+Below the rails, one sizing curve at a time, picked with SPY / QQQ / IWM tabs:
+order size as % of account against fear percentile, from that fund's live sizing
+policy, with the buy line and today's point marked. Label it a sizing rule, not
+an executed order. Do not overlay three sizing curves. Do not expose channel
+codes or an internal one-word readiness state as user-facing copy.
 
-Sell logic follows in a separate block. Describe simulated strength trims,
-lot-harvest, recycle and SPY protection in plain language. Exact engines and
-thresholds differ by fund.
+Sell logic follows in a separate block, in three groups: trim (sell slices into
+strength), exit (step aside when the protection line breaks) and watch markets
+(sell signals read from other markets). Each rule carries a schematic sketch of
+the shape its trigger looks for; sketches carry no numbers or data and are
+labeled schematic. Describe simulated strength trims, lot-harvest, recycle and
+SPY protection in plain language. Exact engines and thresholds differ by fund.
 
 ### 5. SPY, step by step
 
@@ -103,16 +117,27 @@ it as simulated and state the next-open fill assumption. The explanation may wal
 through fear buys, trims, recycle and protection, but must not imply QQQ and IWM
 share SPY's exact rules.
 
+Below the replay, the five rules run as a cycle wheel: gauge, buy, trim, exit,
+recycle, then back to the buy. Each station is a button; the selected one opens
+a when / then / limits panel with its key numbers, plus a SPY / QQQ / IWM switch.
+Buy line and order-size range are live; other numbers are deployed preset facts.
+With QQQ or IWM selected, SPY-only rules are labeled as SPY settings, never shown
+as that fund's own. There is no separate temperaments block.
+
 ### 6. The record
 
-The record has two visibly separate evidence blocks:
+The record has two visibly separate panels:
 
-1. **Latest EOD decision** — closed-session signal facts for deployed cells.
-   Quoted ETF prices may appear and must be identified as market quotes, not
-   account values. A queued intent is still not an executed broker order.
-2. **Recent simulated activity** — the latest SPY v4.6 full-history backtest
-   events. Buy and sell size appears as percent of simulated account; sell rows may
-   show sold-lot return. No account-dependent dollar P&L or notional appears.
+1. **Latest EOD decision**: closed-session signal facts for deployed cells, one
+   row per fund. Quoted ETF prices may appear and must be identified as market
+   quotes, not account values. A queued intent is still not an executed broker
+   order.
+2. **Recent simulated activity**: the latest SPY v4.6 full-history backtest
+   events. A timeline puts one tick per fill on a date axis, buys up and sells
+   down; tick height is order size as % of the simulated account. Single-line
+   rows follow. Buy and sell size appears as percent of simulated account; sell
+   rows may show sold-lot return. No account-dependent dollar P&L or notional
+   appears.
 
 The evidence stamp is explicit:
 

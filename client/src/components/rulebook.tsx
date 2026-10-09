@@ -6,17 +6,18 @@
 // deployed preset changes). The strip is the scene: SPY 2020 closes, the fear
 // percentile underneath, and each simulated fill ticked where it happened.
 //
-// Copy register: fragments joined with · and →, no em dashes, no jargon term
-// before its plain-words meaning. Rule numbers = deployed preset facts
-// (presets.json fav-spy-v4.6-1d etc.); live buy-line/curve numbers in cards
-// 01-02 bind to the same live fear state section 05 renders.
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
+// Below the replay, the five rules run as a loop (rulebook-cycle.tsx): a wheel
+// of stations, a when / then / limits panel per step and a SPY / QQQ / IWM
+// switch. Rule numbers = deployed preset facts (presets.json fav-spy-v4.6-1d
+// etc.); live buy-line and order-size numbers bind to the same live fear state
+// the HOW IT BUYS rails render.
+import { useEffect, useMemo, useState } from "react";
 import { BeamHeading } from "@/components/beam-heading";
 import { DecodeText } from "@/components/decode-text";
 import { useBeam } from "@/hooks/use-beam";
-import { useFearState, type FundFear } from "@/hooks/use-fear-state";
+import { useFearState } from "@/hooks/use-fear-state";
+import { RulebookCycle, type FundsBySym } from "@/components/rulebook-cycle";
 import { DEPLOY } from "@/data/fearlab-board";
-import { ord } from "@/data/lab-data";
 
 // Version label comes from the episode file's own preset, not the deploy: the
 // replay is a static artifact and may lag a deploy relabel until re-emitted.
@@ -25,43 +26,6 @@ const presetVariant = (preset: string) => preset.match(/-(v[\d.]+)-/)?.[1] ?? nu
 type EpDay = { d: string; c: number; fear: number | null };
 type EpFill = { d: string; side: "buy" | "sell"; eng?: string; tag?: string; usd: number; pctEq: number | null; lots?: number };
 type Episode = { sym: string; window: string; preset: string; days: EpDay[]; fills: EpFill[] };
-
-const AmbientWave = lazy(() => import("@/components/ambient-wave"));
-
-function LazyAmbientWave() {
-  const hostRef = useRef<HTMLDivElement | null>(null);
-  const [near, setNear] = useState(false);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-    if (!("IntersectionObserver" in window)) {
-      setNear(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (!entry.isIntersecting) return;
-        setNear(true);
-        observer.disconnect();
-      },
-      { rootMargin: "600px 0px" },
-    );
-    observer.observe(host);
-    return () => observer.disconnect();
-  }, []);
-
-  return (
-    <div ref={hostRef} className="h-[180px] w-full max-w-[270px]" aria-hidden="true">
-      {near && (
-        <Suspense fallback={null}>
-          <AmbientWave />
-        </Suspense>
-      )}
-    </div>
-  );
-}
 
 // the strip's callouts: date -> short plain label (all verifiable in the file)
 const CALLOUTS: Record<string, { text: string; side: "buy" | "sell" }> = {
@@ -200,82 +164,6 @@ function EpisodeStrip({ ep, drawn, instant }: { ep: Episode; drawn: boolean; ins
   );
 }
 
-// ---- the five rules (SPY flagship numbers; per-fund contrast below) ----------
-// Buy lines and max sizes come from the same live fear blocks the HOW IT BUYS
-// gauges read (useFearState), so a preset change cannot strand this copy.
-type FundsBySym = Partial<Record<"SPY" | "QQQ" | "IWM", FundFear>>;
-
-function buyRule({ SPY, QQQ, IWM }: FundsBySym): string {
-  const spy = SPY ? `SPY buys once fear reaches the ${ord(SPY.floorPct)} percentile` : "SPY buys once fear crosses its buy line";
-  const others = QQQ && IWM ? ` (QQQ waits for the ${ord(QQQ.floorPct)}, IWM the ${ord(IWM.floorPct)})` : "";
-  return `${spy}${others} · sizing starts at 3% of the account and climbs toward everything available as fear deepens · big buys wait 16 trading days between shots · small buys may also fire: 0.5% the day a dip first passes 1.75%, 1 to 10% when a reversal prints at a tested support`;
-}
-
-function ruleCards(funds: FundsBySym): { n: string; name: string; body: string }[] {
-  return [
-    {
-      n: "01",
-      name: "THE GAUGE",
-      body: "every close asks one question → how far did today dip below the highest close of the last 22 trading days · that dip, ranked against the previous 100 days, becomes the day's fear score · every other rule keys off it",
-    },
-    {
-      n: "02",
-      name: "THE BUY",
-      body: buyRule(funds),
-    },
-    {
-      n: "03",
-      name: "THE TRIM",
-      body: "sells only what is profitable, never at a loss · price stretched a full band above its own 500-day smoothed path → sell up to 80% of the account, most profitable lots first · five other markets stand watch while price climbs: equal-weight breadth, semiconductors, transports, inflation bonds, IPO appetite → any of them rotting trims 40 to 100%",
-    },
-    {
-      n: "04",
-      name: "THE EXIT",
-      body: "close 0.75% below the 160-day average → everything sold at the next open, the one rule allowed to take a loss · while out, only 90th-percentile fear buys · close 0.5% back above the line → the whole pool re-enters at once",
-    },
-    {
-      n: "05",
-      name: "THE RECYCLE",
-      body: "raised cash pools and waits for tested support or 90th-percentile fear · cooldown blocks can delay it: 12 days between re-entries and 5 days after the watch markets force a sell",
-    },
-  ];
-}
-
-// per-fund contrast: where the three deployments genuinely differ. Buy line
-// and max size are live (same fear block as the gauges); the rest are preset
-// facts the report JSON does not carry (IWM: reservePct 5, reserveFloorPct 85).
-function contrast({ SPY, QQQ, IWM }: FundsBySym) {
-  return [
-    {
-      sym: "SPY",
-      tone: "the eager one",
-      lines: [
-        SPY ? `buys from the ${ord(SPY.floorPct)} percentile, up to ${SPY.maxPct}% of the account per buy` : "buys early in a dip, nearly all-in per buy",
-        "five market watches + support snipers",
-        "protection line on: the 160-day average is the exit",
-      ],
-    },
-    {
-      sym: "QQQ",
-      tone: "the patient one",
-      lines: [
-        QQQ ? `waits for the ${ord(QQQ.floorPct)} percentile · only extreme fear sizes up, ${QQQ.maxPct}% max` : "waits for deep fear · only extreme fear sizes up",
-        "rides winners: sells 12% of a lot on a 5% retrace from its peak",
-        "watches semiconductors + market internals · no protection line",
-      ],
-    },
-    {
-      sym: "IWM",
-      tone: "the cautious one",
-      lines: [
-        `${IWM ? `${ord(IWM.floorPct)}-percentile buy line · ${IWM.maxPct}% max per buy` : "small buys that grow with fear"} · 5% cash reserve until fear hits the 85th`,
-        "sells a whole lot after a 2% retrace",
-        "watches junk-bond credit + the dollar · no protection line",
-      ],
-    },
-  ];
-}
-
 // Replay files whose preset differs from the deploy only by name: the engine's
 // presets.json carries identical SPY settings for these pairs (verified
 // 2026-10-09 against range@prod, fav-spy-v4.6-1d vs fav-spy-v4.7-1d).
@@ -351,40 +239,12 @@ export function Rulebook() {
           <div className="etched py-6 text-beam-dim mb-4">episode feed offline</div>
         )}
 
-        <p className="etched mb-6 max-w-[76ch] leading-relaxed text-beam-dim">
-          Five moves shape SPY. QQQ and IWM use different thresholds and exits.
+        <p className="font-mono text-[14px] md:text-[15px] mt-14 mb-8 max-w-[72ch] leading-relaxed text-beam-mid">
+          Five rules run as one loop, checked at every close. Pick a step to read its rule. The fund switch shows where QQQ and IWM
+          differ from SPY.
         </p>
 
-        {/* the five rules */}
-        <div className={`grid gap-px bg-[hsl(var(--beam-ghost))] border border-[hsl(var(--beam-ghost))] md:grid-cols-2 lg:grid-cols-3 mb-12 ${drawn ? "anno-in" : ""}`}>
-          {ruleCards(funds).map((r) => (
-            <div key={r.n} className="bg-background p-5 anno">
-              <div className="etched text-beam-dim mb-1">{r.n}</div>
-              <h3 className="font-mono font-semibold tracking-[0.14em] text-beam-hot mb-3">{r.name}</h3>
-              <p className="font-mono text-[14px] md:text-[15.5px] leading-relaxed text-beam-mid">{r.body}</p>
-            </div>
-          ))}
-          {/* sixth cell: the retired standing-wave language, now purely atmospheric */}
-          <div className="bg-background p-5 hidden lg:flex items-center justify-center" aria-hidden="true">
-            <LazyAmbientWave />
-          </div>
-        </div>
-
-        {/* per-fund contrast */}
-        <div className="etched text-beam-dim mb-3">same rulebook, three temperaments</div>
-        <div className={`grid gap-px bg-[hsl(var(--beam-ghost))] border border-[hsl(var(--beam-ghost))] md:grid-cols-3 ${drawn ? "anno-in" : ""}`}>
-          {contrast(funds).map((c) => (
-            <div key={c.sym} className="bg-background p-5 anno">
-              <div className="font-mono font-semibold text-beam-hot text-lg mb-1.5">{c.sym}</div>
-              <div className="etched mb-4">
-                <span className="hl-mark">{c.tone}</span>
-              </div>
-              {c.lines.map((l, i) => (
-                <p key={i} className="font-mono text-[14px] md:text-[15.5px] leading-relaxed text-beam-mid mb-2.5">{l}</p>
-              ))}
-            </div>
-          ))}
-        </div>
+        <RulebookCycle funds={funds} drawn={drawn} instant={instant} />
       </div>
     </section>
   );
