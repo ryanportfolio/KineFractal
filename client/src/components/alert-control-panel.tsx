@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BellRing, Check, ListChecks } from "lucide-react";
+import { BellRing, ListChecks } from "lucide-react";
 
 import {
   ALERT_KINDS,
@@ -56,7 +56,7 @@ function InfoTip({ label, text, large = false }: { label: string; text: string; 
         side="top"
         sideOffset={10}
         collisionPadding={12}
-        className={`max-w-80 rounded-none border border-[hsl(var(--beam-dim))] bg-background px-3 py-2 font-mono leading-relaxed text-beam-mid shadow-[0_0_18px_hsl(var(--beam-ghost)/0.55)] ${large ? "text-sm" : "text-[11px]"}`}
+        className={`max-w-[min(20rem,calc((100vw_-_24px)_/_var(--pz)))] rounded-none border border-[hsl(var(--beam-dim))] bg-background px-3 py-2 font-mono leading-relaxed text-beam-mid shadow-[0_0_18px_hsl(var(--beam-ghost)/0.55)] ${large ? "text-sm" : "text-[11px]"}`}
       >
         {text}
       </TooltipContent>
@@ -164,6 +164,12 @@ function NumberField({
 export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [universe, setUniverse] = useState<string[]>([]);
   const [symbols, setSymbols] = useState<string[]>([]);
+  const [savedSymbols, setSavedSymbols] = useState<string[]>([]);
+  const savedSymbolsRef = useRef<string[]>([]);
+  const [watchSaving, setWatchSaving] = useState(false);
+  const [watchStatus, setWatchStatus] = useState<string | null>(null);
+  const [watchError, setWatchError] = useState<string | null>(null);
+  const failedWatchKey = useRef<string | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [savedPrefs, setSavedPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [loading, setLoading] = useState(true);
@@ -190,7 +196,9 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         ]);
         const normalized = normalizeAlertPrefsResponse(alertPrefs.prefs);
         setUniverse(watchlist.universe ?? []);
-        setSymbols(watchlist.symbols ?? []);
+        const savedList: string[] = [...(watchlist.symbols ?? [])].sort();
+        setSymbols(savedList);
+        setSavedSymbols(savedList);
         setPrefs(normalized);
         setSavedPrefs(normalized);
       })
@@ -205,31 +213,66 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
 
   const selected = useMemo(() => new Set(symbols), [symbols]);
   const dirty = JSON.stringify(prefs) !== JSON.stringify(savedPrefs);
+  const watchKey = symbols.join(",");
+  const watchDirty = watchKey !== savedSymbols.join(",");
 
-  const toggleSymbol = async (symbol: string) => {
-    const wasSelected = selected.has(symbol);
-    setError(null);
-    setStatus(null);
-    setSymbols((current) =>
-      wasSelected ? current.filter((item) => item !== symbol) : [...current, symbol].sort(),
-    );
-    try {
-      const response = wasSelected
-        ? await csrfFetch(`/api/watchlist/${symbol}`, { method: "DELETE" })
-        : await csrfFetch("/api/watchlist", {
-            method: "POST",
-            body: JSON.stringify({ symbol }),
-          });
-      if (!response.ok) throw new Error((await response.json()).error || `HTTP ${response.status}`);
-    } catch (reason: any) {
-      setSymbols((current) =>
-        wasSelected
-          ? [...current, symbol].sort()
-          : current.filter((item) => item !== symbol),
-      );
-      setError(reason?.message || "failed to update watchlist");
-    }
+  // Chip clicks and select all / clear only edit local state; one PUT saves the
+  // settled list. Saving per click tripped the server rate limit mid-selection.
+  const editSymbols = (next: string[]) => {
+    setSymbols([...new Set(next)].sort());
+    setWatchError(null);
+    setWatchStatus(null);
+    failedWatchKey.current = null;
   };
+
+  const toggleSymbol = (symbol: string) => {
+    editSymbols(selected.has(symbol) ? symbols.filter((item) => item !== symbol) : [...symbols, symbol]);
+  };
+
+  const persistWatchlist = useCallback(async (next: string[], key: string) => {
+    setWatchSaving(true);
+    setWatchError(null);
+    try {
+      const response = await csrfFetch("/api/watchlist", {
+        method: "PUT",
+        body: JSON.stringify({ symbols: next }),
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(
+          response.status === 429
+            ? `${body.error || "too many watchlist changes"} · selection restored to the last saved list`
+            : `${body.error || `HTTP ${response.status}`} · selection restored to the last saved list`,
+        );
+      }
+      const saved: string[] = Array.isArray(body.symbols) ? body.symbols : next;
+      setSavedSymbols(saved);
+      // later clicks may have landed while this request was in flight; keep them
+      setSymbols((current) => (current.join(",") === key ? saved : current));
+      setWatchStatus("watchlist saved");
+    } catch (reason: any) {
+      failedWatchKey.current = key;
+      // show what the server actually holds instead of an unsaved selection
+      setSymbols((current) => (current.join(",") === key ? savedSymbolsRef.current : current));
+      setWatchStatus(null);
+      setWatchError(reason?.message || "failed to save watchlist");
+    } finally {
+      setWatchSaving(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    savedSymbolsRef.current = savedSymbols;
+  }, [savedSymbols]);
+
+  useEffect(() => {
+    if (loading || watchSaving || !watchDirty) return;
+    if (failedWatchKey.current === watchKey) return;
+    const timer = setTimeout(() => {
+      void persistWatchlist(symbols, watchKey);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [loading, persistWatchlist, symbols, watchDirty, watchKey, watchSaving]);
 
   const updateWeekly = (patch: Partial<LevelsWeeklySettings>) => {
     setPrefs((current) => ({
@@ -332,11 +375,33 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             {symbols.length}/{universe.length} ACTIVE
           </span>
         </div>
-        <p className="mb-5 max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
-          Choose the symbols the nightly pipeline should inspect for your emails
-        </p>
+        <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-3">
+          <p className="max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
+            Choose the symbols the nightly pipeline should inspect for your emails
+          </p>
+          {universe.length > 0 && (
+            <div className="ml-auto flex gap-2 font-mono text-[11px] tracking-[0.12em]">
+              <button
+                type="button"
+                onClick={() => editSymbols(universe)}
+                disabled={symbols.length === universe.length}
+                className="border border-[hsl(var(--beam-ghost))] px-3 py-1.5 text-beam-mid hover:border-beam-hot hover:text-beam-hot disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[hsl(var(--beam-ghost))] disabled:hover:text-beam-mid"
+              >
+                SELECT ALL
+              </button>
+              <button
+                type="button"
+                onClick={() => editSymbols([])}
+                disabled={symbols.length === 0}
+                className="border border-[hsl(var(--beam-ghost))] px-3 py-1.5 text-beam-mid hover:border-beam-hot hover:text-beam-hot disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[hsl(var(--beam-ghost))] disabled:hover:text-beam-mid"
+              >
+                CLEAR
+              </button>
+            </div>
+          )}
+        </div>
         {universe.length ? (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Watchlist symbols">
             {universe.map((symbol) => {
               const on = selected.has(symbol);
               return (
@@ -347,11 +412,10 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
                   onClick={() => toggleSymbol(symbol)}
                   className={`border px-3 py-2 font-mono text-xs transition-colors ${
                     on
-                      ? "border-beam-hot bg-[hsl(var(--beam-ghost))] text-beam-hot"
+                      ? "border-beam-hot bg-[hsl(var(--beam-ghost))] text-beam-hot shadow-[inset_0_0_0_1px_hsl(var(--beam-hot)/0.35)]"
                       : "border-[hsl(var(--beam-ghost))] text-beam-dim hover:border-beam-dim hover:text-beam-mid"
                   }`}
                 >
-                  {on && <Check className="mr-1 inline h-3 w-3" aria-hidden="true" />}
                   {symbol}
                 </button>
               );
@@ -360,6 +424,17 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         ) : (
           <p className="font-mono text-xs text-beam-dim">published symbol list unavailable · try again later</p>
         )}
+        <div aria-live="polite" className="mt-4 min-h-5 font-mono text-xs">
+          {watchError ? (
+            <span className="text-red-400">{watchError}</span>
+          ) : watchSaving ? (
+            <span className="text-beam-dim">saving watchlist…</span>
+          ) : watchDirty ? (
+            <span className="text-beam-dim">changes pending…</span>
+          ) : watchStatus ? (
+            <span className="text-beam-mid">{watchStatus}</span>
+          ) : null}
+        </div>
       </section>
 
       <section aria-labelledby="channels-heading" className="border-t border-[hsl(var(--beam-ghost))] pt-6">

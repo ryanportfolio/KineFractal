@@ -45,6 +45,18 @@ export const alertPrefsLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Alerts watchlist: was on strictLimiter, whose single counter (20 per 15 min)
+// is shared with /api/tos, chart builds and chart-symbol edits, so the page
+// load plus one save per chip click hit 429 near the 15th symbol. Its own
+// counter at 3x that allowance; the panel batches edits into one PUT.
+export const watchlistLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many watchlist changes, please wait a few minutes and try again' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Export ticker groups: one load per dialog open, one save per group edit.
 export const chartGroupsLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -226,7 +238,7 @@ export function setupSecurity(app: Express) {
   // (/api/auth/* is mounted BEFORE this middleware stack in app.ts — Better
   // Auth carries its own CSRF/origin protection and rate limiting.)
   app.use('/api/tos', strictLimiter, csrfProtection);
-  app.use('/api/watchlist', strictLimiter, csrfProtection);
+  app.use('/api/watchlist', watchlistLimiter, csrfProtection);
   app.use('/api/alerts/prefs', alertPrefsLimiter, csrfProtection);
 
   // charts.html hand-lines sync. NO csrfProtection: the page sends no token

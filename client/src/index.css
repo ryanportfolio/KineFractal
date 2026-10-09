@@ -1151,6 +1151,14 @@ html {
 .pt-\[30vh\] { padding-top: calc(30vh / var(--pz)); }
 .mt-\[3vh\] { margin-top: calc(3vh / var(--pz)); }
 
+/* Radix popovers (tooltips) are placed by Floating UI, which reads anchor rects
+   in on-screen px and writes the offset back as CSS px; the root zoom then
+   multiplies that offset again, pushing the box right and down by --pz (off the
+   viewport at 1440px and wider). The wrapper undoes the zoom so the offset lands
+   1:1 on screen; the content puts it back so the box keeps the site's scale. */
+[data-radix-popper-content-wrapper] { zoom: calc(1 / var(--pz)); }
+[data-radix-popper-content-wrapper] > * { zoom: var(--pz); }
+
 /* ---- ASCII HEADINGS ---------------------------------------------------------
    Section headlines as figlet banners (components/ascii-heading). Beam-hot
    phosphor + soft glow; wiped in left-to-right when granted, like a line

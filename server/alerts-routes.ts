@@ -7,7 +7,7 @@
 
 import crypto from "crypto";
 import type { Express, Request, Response } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, eq, notInArray } from "drizzle-orm";
 import { db } from "./db";
 import { alertPrefs, emailSuppression, watchlistSymbols } from "@shared/schema";
 import {
@@ -195,6 +195,50 @@ export function registerAlertsRoutes(app: Express): void {
     } catch (e: any) {
       console.error("[watchlist] POST failed:", e?.message ?? e);
       res.status(500).json({ error: "failed to add symbol" });
+    }
+  });
+
+  // Replace the whole watchlist in one request. The Alerts panel batches chip
+  // toggles and select-all / clear into this call, so a burst of edits costs
+  // one rate-limited request instead of one per symbol.
+  app.put("/api/watchlist", requireUser, async (req: Request, res: Response) => {
+    try {
+      if (!db) return res.status(503).json({ error: "database unavailable" });
+      const u = (req as any).kfUser as SessionUser;
+      const raw = req.body?.symbols;
+      if (!Array.isArray(raw) || raw.length > 500) {
+        return res.status(400).json({ error: "symbols must be a list" });
+      }
+      const desired = Array.from(new Set(raw.map((s) => String(s || "").toUpperCase().trim()).filter(Boolean)));
+      const universe = await publishedUniverse();
+      const symbols = await db.transaction(async (tx) => {
+        const current = new Set(
+          (await tx.select({ symbol: watchlistSymbols.symbol }).from(watchlistSymbols)
+            .where(eq(watchlistSymbols.userId, u.id))).map((r) => r.symbol),
+        );
+        // Symbols already saved may stay even if the published set dropped them;
+        // anything newly added must be published.
+        const invalid = desired.filter((s) => !current.has(s) && !universe.includes(s));
+        if (invalid.length) return { invalid };
+        await tx.delete(watchlistSymbols).where(
+          desired.length
+            ? and(eq(watchlistSymbols.userId, u.id), notInArray(watchlistSymbols.symbol, desired))
+            : eq(watchlistSymbols.userId, u.id),
+        );
+        if (desired.length) {
+          await tx.insert(watchlistSymbols)
+            .values(desired.map((symbol) => ({ userId: u.id, symbol })))
+            .onConflictDoNothing();
+        }
+        return { saved: desired.sort() };
+      });
+      if ("invalid" in symbols) {
+        return res.status(400).json({ error: `not in the published set: ${symbols.invalid!.join(", ")}` });
+      }
+      res.json({ ok: true, symbols: symbols.saved });
+    } catch (e: any) {
+      console.error("[watchlist] PUT failed:", e?.message ?? e);
+      res.status(500).json({ error: "failed to save watchlist" });
     }
   });
 
