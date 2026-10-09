@@ -404,6 +404,16 @@ const GROUP_ID_RE = /^[a-z0-9]{1,24}$/;
 export type TickerGroup = { id: string; name: string; symbols: string[] };
 
 /** Drop malformed groups, trim names, dedupe ids and names, cap every list. */
+// inputSanitizer runs on every request body and HTML-encodes text ("S&P 500"
+// arrives as "S&amp;P 500"). Group names are plain text, escaped by the page
+// wherever it draws them, so they are decoded back before saving.
+export function decodeGroupName(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || typeof (raw as any).name !== "string") return raw;
+  const name = (raw as any).name
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
+    .replace(/&#39;|&#x27;/g, "'").replace(/&amp;/g, "&");
+  return { ...(raw as any), name };
+}
 export function normalizeTickerGroups(value: unknown): TickerGroup[] {
   if (!Array.isArray(value)) return [];
   const ids = new Set<string>();
@@ -701,7 +711,7 @@ function registerChartSymbolRoutes(app: Express): void {
       if (!Array.isArray((req.body as any)?.groups)) {
         return res.status(400).json({ ok: false, error: "groups must be an array" });
       }
-      const groups = normalizeTickerGroups((req.body as any).groups);
+      const groups = normalizeTickerGroups((req.body as any).groups.map(decodeGroupName));
       await db
         .insert(chartPreferences)
         .values({ userId: u.id, tickerGroups: groups })

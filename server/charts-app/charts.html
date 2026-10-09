@@ -3254,7 +3254,7 @@ var _exportActive = 'all';  // 'all' or a group id
 var _exportPickMemory = {}; // tab id -> checked symbols, for this page view
 function normalizeExportGroups(list) {
   if (!Array.isArray(list)) return [];
-  var out = [], ids = {}, names = {};
+  var out = [], ids = Object.create(null), names = Object.create(null);
   list.forEach(function (g) {
     if (!g || typeof g !== 'object' || out.length >= 30) return;
     var id = String(g.id || '').toLowerCase();
@@ -3296,13 +3296,16 @@ function markGroupsSynced() { if (!siteEmail) return; try { localStorage.setItem
 // A response that arrives after the dialog closed or reopened changes nothing.
 var _exportGroupsLocked = false;
 function loadExportGroups(openGen, done) {
-  var signedIn = !!(SITE && _chartAccess && _chartAccess.account);
+  // Whether there is an account comes from the group route itself; only a
+  // visitor already known to be signed out skips it. A slow or failed
+  // ticker-access check therefore never routes account groups to this browser.
+  var maybeAccount = SITE && siteUser !== false;
   var guest = readLocalExportGroups();
   _exportGroupsAccount = false;
-  _exportGroupsLocked = signedIn;
-  _exportGroups = signedIn ? [] : guest;
+  _exportGroupsLocked = maybeAccount;
+  _exportGroups = maybeAccount ? [] : guest;
   setGroupsNote('');
-  if (!signedIn) return done();
+  if (!maybeAccount) return done();
   fetch('/api/chart-groups', { credentials: 'same-origin', cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
     .then(function (j) {
@@ -3351,8 +3354,9 @@ function chartCsrfToken(fresh) {
     .then(function (r) { return r.json(); })
     .then(function (j) { _csrfToken = j.csrfToken; return _csrfToken; });
 }
-function putExportGroups(retried) {
-  var body = JSON.stringify({ groups: _exportGroups.map(function (g) { return { id: g.id, name: g.name, symbols: g.syms }; }) });
+// body is built once by the caller, so a retry can never send a list that
+// changed in the meantime (a reopen empties it while groups reload)
+function putExportGroups(body, retried) {
   return chartCsrfToken(retried).then(function (token) {
     return fetch('/api/chart-groups', {
       method: 'PUT', credentials: 'same-origin',
@@ -3368,7 +3372,7 @@ function putExportGroups(retried) {
     // Either way one retry with a fresh token, like the site's csrfFetch.
     return r.clone().json().catch(function () { return {}; }).then(function (j) {
       var csrf = r.status === 419 || j.code === 'CSRF_REFRESH_NEEDED' || /CSRF/.test(j.error || '');
-      if (csrf) return putExportGroups(true);
+      if (csrf) return putExportGroups(body, true);
       throw new Error('HTTP ' + r.status);
     });
   });
@@ -3379,7 +3383,8 @@ function saveExportGroups() {
     try { localStorage.setItem(EXPORT_GROUPS_KEY, JSON.stringify(_exportGroups)); } catch (e) {}
     return Promise.resolve(true);
   }
-  return putExportGroups(false)
+  var body = JSON.stringify({ groups: _exportGroups.map(function (g) { return { id: g.id, name: g.name, symbols: g.syms }; }) });
+  return putExportGroups(body, false)
     .then(function () { setGroupsNote(''); markGroupsSynced(); return true; })
     .catch(function () {
       setGroupsNote('Could not save groups to your account. Try again in a minute.', true);
