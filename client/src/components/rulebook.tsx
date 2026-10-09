@@ -299,7 +299,8 @@ export function Rulebook() {
   const instant = phase === "held";
   const funds: FundsBySym = Object.fromEntries(fear.funds.map((f) => [f.sym, f]));
   const epVariant = ep ? presetVariant(ep.preset) : null;
-  const deployVariant = DEPLOY.find((d) => d.sym === "SPY")?.variant ?? null;
+  // same report the thresholds come from; bundled DEPLOY only while it loads or offline
+  const deployVariant = funds.SPY?.variant ?? DEPLOY.find((d) => d.sym === "SPY")?.variant ?? null;
   const replayNote = epVariant && deployVariant && epVariant !== deployVariant
     ? `Recorded under ${epVariant}; the site now runs ${deployVariant}${SAME_SPY_SETTINGS.has(`${epVariant}>${deployVariant}`) ? ", which keeps the same SPY settings" : ""}.`
     : null;

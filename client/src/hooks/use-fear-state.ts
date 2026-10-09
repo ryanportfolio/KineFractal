@@ -11,6 +11,9 @@ export interface FundFear {
   sym: string;
   tf: string;
   tfLabel: string;
+  // engine generation of the report these numbers came from; follows the live
+  // board ahead of the bundled DEPLOY snapshot after a worker-only flip
+  variant: string;
   nowPct: number;
   floorPct: number;
   armed: boolean;
@@ -42,6 +45,7 @@ export function useFearState(): FearState {
           sym: d.sym,
           tf: d.tf,
           tfLabel: d.tfLabel,
+          variant: r.variant ?? d.variant,
           nowPct: f.nowPct,
           floorPct: f.floorPct,
           armed: f.nowPct >= f.floorPct,
