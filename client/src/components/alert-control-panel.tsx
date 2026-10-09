@@ -193,6 +193,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const sentWatchKey = useRef<string | null>(null);
   const latestSymbols = useRef<string[]>([]);
   const watchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // bumps on every watchlist edit, so a slow reload can tell it is outdated
+  const watchEdits = useRef(0);
   const [prefs, setPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [savedPrefs, setSavedPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [loading, setLoading] = useState(true);
@@ -247,6 +249,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   // Chip clicks and select all / clear only edit local state; one PUT saves the
   // settled list. Saving per click tripped the server rate limit mid-selection.
   const editSymbols = (next: string[]) => {
+    watchEdits.current += 1;
     setSymbols([...new Set(next)].sort());
     setWatchError(null);
     setWatchStatus(null);
@@ -284,12 +287,11 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       setWatchStatus("watchlist saved");
     } catch (reason: any) {
       failedWatchKey.current = key;
+      // this list never reached the server, so it no longer counts as sent
+      // (a newer request's key stays); otherwise re-selecting it never saves
+      if (sentWatchKey.current === key) sentWatchKey.current = savedSymbolsRef.current.join(",");
       // show what the server actually holds instead of an unsaved selection
-      setSymbols((current) => {
-        if (current.join(",") !== key) return current;
-        sentWatchKey.current = savedSymbolsRef.current.join(",");
-        return savedSymbolsRef.current;
-      });
+      setSymbols((current) => (current.join(",") === key ? savedSymbolsRef.current : current));
       setWatchStatus(null);
       setWatchError(reason?.message || "failed to save watchlist");
     } finally {
@@ -334,10 +336,14 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     // which another tab may have changed while this one was hidden.
     const reconcile = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
+      const editsAtStart = watchEdits.current;
       fetch("/api/watchlist", { credentials: "include" })
         .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
         .then((watchlist) => {
           const savedList: string[] = [...(watchlist.symbols ?? [])].sort();
+          // chips clicked while this reload was in flight win, and their save
+          // may already have landed: leave both lists to that save
+          if (watchEdits.current !== editsAtStart) return;
           failedWatchKey.current = null;
           sentWatchKey.current = savedList.join(",");
           setSavedSymbols(savedList);
