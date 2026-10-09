@@ -170,6 +170,9 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [watchStatus, setWatchStatus] = useState<string | null>(null);
   const [watchError, setWatchError] = useState<string | null>(null);
   const failedWatchKey = useRef<string | null>(null);
+  // key of the list last loaded from or sent to the server; null until loaded
+  const sentWatchKey = useRef<string | null>(null);
+  const latestSymbols = useRef<string[]>([]);
   const [prefs, setPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [savedPrefs, setSavedPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [loading, setLoading] = useState(true);
@@ -199,6 +202,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         const savedList: string[] = [...(watchlist.symbols ?? [])].sort();
         setSymbols(savedList);
         setSavedSymbols(savedList);
+        sentWatchKey.current = savedList.join(",");
+        void csrfFetch.prime().catch(() => {});
         setPrefs(normalized);
         setSavedPrefs(normalized);
       })
@@ -215,6 +220,9 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const dirty = JSON.stringify(prefs) !== JSON.stringify(savedPrefs);
   const watchKey = symbols.join(",");
   const watchDirty = watchKey !== savedSymbols.join(",");
+  // saved symbols can include tickers since dropped from the published set,
+  // so compare membership rather than counts
+  const allSelected = universe.every((symbol) => selected.has(symbol));
 
   // Chip clicks and select all / clear only edit local state; one PUT saves the
   // settled list. Saving per click tripped the server rate limit mid-selection.
@@ -230,6 +238,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   };
 
   const persistWatchlist = useCallback(async (next: string[], key: string) => {
+    sentWatchKey.current = key;
     setWatchSaving(true);
     setWatchError(null);
     try {
@@ -253,7 +262,11 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     } catch (reason: any) {
       failedWatchKey.current = key;
       // show what the server actually holds instead of an unsaved selection
-      setSymbols((current) => (current.join(",") === key ? savedSymbolsRef.current : current));
+      setSymbols((current) => {
+        if (current.join(",") !== key) return current;
+        sentWatchKey.current = savedSymbolsRef.current.join(",");
+        return savedSymbolsRef.current;
+      });
       setWatchStatus(null);
       setWatchError(reason?.message || "failed to save watchlist");
     } finally {
@@ -273,6 +286,30 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     }, 600);
     return () => clearTimeout(timer);
   }, [loading, persistWatchlist, symbols, watchDirty, watchKey, watchSaving]);
+
+  // The debounce above drops its timer when the panel unmounts or the tab
+  // closes; send any list that never went out, once, with keepalive so the
+  // request survives the page going away.
+  latestSymbols.current = symbols;
+  useEffect(() => {
+    const flush = () => {
+      const sent = sentWatchKey.current;
+      const next = latestSymbols.current;
+      const key = next.join(",");
+      if (sent === null || key === sent || key === failedWatchKey.current) return;
+      sentWatchKey.current = key;
+      void csrfFetch("/api/watchlist", {
+        method: "PUT",
+        body: JSON.stringify({ symbols: next }),
+        keepalive: true,
+      }).catch(() => {});
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, []);
 
   const updateWeekly = (patch: Partial<LevelsWeeklySettings>) => {
     setPrefs((current) => ({
@@ -383,8 +420,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             <div className="ml-auto flex gap-2 font-mono text-[11px] tracking-[0.12em]">
               <button
                 type="button"
-                onClick={() => editSymbols(universe)}
-                disabled={symbols.length === universe.length}
+                onClick={() => editSymbols([...symbols, ...universe])}
+                disabled={allSelected}
                 className="border border-[hsl(var(--beam-ghost))] px-3 py-1.5 text-beam-mid hover:border-beam-hot hover:text-beam-hot disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-[hsl(var(--beam-ghost))] disabled:hover:text-beam-mid"
               >
                 SELECT ALL

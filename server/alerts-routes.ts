@@ -7,7 +7,7 @@
 
 import crypto from "crypto";
 import type { Express, Request, Response } from "express";
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, eq, notInArray, sql } from "drizzle-orm";
 import { db } from "./db";
 import { alertPrefs, emailSuppression, watchlistSymbols } from "@shared/schema";
 import {
@@ -212,6 +212,11 @@ export function registerAlertsRoutes(app: Express): void {
       const desired = Array.from(new Set(raw.map((s) => String(s || "").toUpperCase().trim()).filter(Boolean)));
       const universe = await publishedUniverse();
       const symbols = await db.transaction(async (tx) => {
+        // Serialize replacements per user (two open tabs): without this, two
+        // READ COMMITTED transactions can both delete before either inserts
+        // and leave the union. Locks the key, not rows, so it also holds when
+        // the user has no saved symbols yet; released at commit or rollback.
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`watchlist:${u.id}`}, 0))`);
         const current = new Set(
           (await tx.select({ symbol: watchlistSymbols.symbol }).from(watchlistSymbols)
             .where(eq(watchlistSymbols.userId, u.id))).map((r) => r.symbol),

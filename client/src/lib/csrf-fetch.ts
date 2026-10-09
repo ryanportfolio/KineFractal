@@ -51,7 +51,7 @@ export function createCsrfFetch(fetchImpl: FetchLike = globalThis.fetch) {
     });
   };
 
-  return async (path: string, init: RequestInit = {}): Promise<Response> => {
+  const csrfFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
     const token = await acquireToken();
     const response = await send(path, init, token);
     if (!(await isCsrfFailure(response))) return response;
@@ -59,6 +59,12 @@ export function createCsrfFetch(fetchImpl: FetchLike = globalThis.fetch) {
     const freshToken = await acquireToken(true);
     return send(path, init, freshToken);
   };
+
+  // Fetch the token ahead of time so a save fired from pagehide goes out
+  // without first waiting on /api/csrf-token while the page unloads.
+  const prime = (): Promise<void> => acquireToken().then(() => undefined);
+
+  return Object.assign(csrfFetch, { prime });
 }
 
 export const csrfFetch = createCsrfFetch();
