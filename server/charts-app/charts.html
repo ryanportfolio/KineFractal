@@ -3007,7 +3007,7 @@ function openTickerReorder() {
 //
 // Layout: group tabs on top, the ticker list + filters on the left, the
 // levels on the right. The levels rebuild live on every change (no Build
-// step); the footer's Download CSV is the one primary action. Groups are
+// step); the banner's Download CSV is the one primary action. Groups are
 // named ticker sets: per account through /api/chart-groups when signed in,
 // in this browser (EXPORT_GROUPS_KEY) otherwise.
 var _exportRows = null;
@@ -3080,9 +3080,10 @@ function exportCandidates(sym, candles, ov, depthPct, minPct, strength) {
 }
 // Loads each ticker's candles + overlays (loadOnce caches them, so a rebuild
 // after the first only costs the compute). progress(i, n) reports the walk.
-function collectExportData(syms, done, progress) {
+function collectExportData(syms, done, progress, stale) {
   var out = [];
   (function next(i) {
+    if (stale && stale()) return;   // inputs changed or the dialog closed: stop fetching
     if (i >= syms.length) return done(out);
     var entry = superMap[syms[i]];
     if (!entry) return next(i + 1);
@@ -3270,8 +3271,13 @@ function normalizeExportGroups(list) {
   });
   return out;
 }
-function readLocalExportGroups() {
-  try { return normalizeExportGroups(JSON.parse(localStorage.getItem(EXPORT_GROUPS_KEY) || '[]')); }
+// The plain key holds signed-out groups. A signed-in visitor whose account copy
+// can't be reached keeps groups under a key with that account's email, so they
+// never show up for someone signed out or signed in as someone else.
+var _exportGroupsKey = EXPORT_GROUPS_KEY;   // where this dialog's browser copy lives
+function accountGroupsKey() { return EXPORT_GROUPS_KEY + ':' + (siteEmail || '').toLowerCase(); }
+function readLocalExportGroups(key) {
+  try { return normalizeExportGroups(JSON.parse(localStorage.getItem(key) || '[]')); }
   catch (e) { return []; }
 }
 var _groupsNote = { text: '', error: false };   // survives the tab row re-rendering
@@ -3286,42 +3292,56 @@ function setGroupsNote(text, isError) {
 function groupsSyncedKey() { return 'kf-export-groups-synced:' + (siteEmail || '').toLowerCase(); }
 function groupsSynced() { try { return localStorage.getItem(groupsSyncedKey()) === '1'; } catch (e) { return false; } }
 function markGroupsSynced() { try { localStorage.setItem(groupsSyncedKey(), '1'); } catch (e) {} }
-// Signed in: the account's list (a first sign-in carries this browser's groups
-// up once). Signed out, local mode, or the account call failing: this browser.
-function loadExportGroups(done) {
-  var local = readLocalExportGroups();
+// Signed in: the account's list. The first time an account opens this on a
+// browser, groups kept here for it (or, failing that, signed-out groups) move
+// up once. Signed out or local mode: this browser. A response that arrives
+// after the dialog closed or reopened changes nothing (openGen).
+function loadExportGroups(openGen, done) {
+  var signedIn = !!(SITE && _chartAccess && _chartAccess.account);
   _exportGroupsAccount = false;
+  _exportGroupsKey = signedIn ? accountGroupsKey() : EXPORT_GROUPS_KEY;
+  var local = readLocalExportGroups(_exportGroupsKey);
   setGroupsNote('');
-  if (!(SITE && _chartAccess && _chartAccess.account)) { _exportGroups = local; return done(); }
+  if (!signedIn) { _exportGroups = local; return done(); }
   fetch('/api/chart-groups', { credentials: 'same-origin', cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
     .then(function (j) {
+      if (openGen !== _exportOpenGen) return;
       var remote = normalizeExportGroups(j.groups);
-      if (!j.account) {
-        _exportGroups = local;
-      } else if (!j.stored) {            // account storage not ready yet
+      if (!j.account) {                  // the server sees no account after all
+        _exportGroupsKey = EXPORT_GROUPS_KEY;
+        _exportGroups = readLocalExportGroups(EXPORT_GROUPS_KEY);
+        return done();
+      }
+      if (!j.stored) {                   // account storage not ready yet
         _exportGroups = local;
         setGroupsNote('Groups are saved in this browser for now.');
-      } else if (!remote.length && local.length && !groupsSynced()) {
-        _exportGroupsAccount = true;     // first sign-in here: carry this browser's groups up once
-        _exportGroups = local;
+        return done();
+      }
+      var carryKey = local.length ? _exportGroupsKey : EXPORT_GROUPS_KEY;
+      var carry = local.length ? local : readLocalExportGroups(EXPORT_GROUPS_KEY);
+      _exportGroupsAccount = true;
+      if (!remote.length && carry.length && !groupsSynced()) {
+        _exportGroups = carry;
+        _groupSaving = true;
         saveExportGroups().then(function (ok) {
+          _groupSaving = false;
           if (!ok) return;
           markGroupsSynced();
           // they belong to this account now; cleared so a second account signing
           // in on this browser does not receive them too
-          try { localStorage.removeItem(EXPORT_GROUPS_KEY); } catch (e) {}
+          try { localStorage.removeItem(carryKey); } catch (e) {}
         });
       } else {
         // the account list is the truth from now on, even when empty (a group
         // deleted in another browser must not come back from this one's copy)
-        _exportGroupsAccount = true;
         _exportGroups = remote;
         markGroupsSynced();
       }
       done();
     })
     .catch(function () {
+      if (openGen !== _exportOpenGen) return;
       _exportGroups = local;
       setGroupsNote('Could not load your saved groups. Showing the ones saved in this browser.', true);
       done();
@@ -3356,11 +3376,11 @@ function putExportGroups(retried) {
     });
   });
 }
-// Signed out: this browser's copy. Signed in: the account's copy only, so one
-// account's groups never sit where the next account to sign in here reads them.
+// The account's copy when signed in; otherwise the browser copy for this
+// visitor (_exportGroupsKey), never another account's.
 function saveExportGroups() {
   if (!_exportGroupsAccount) {
-    try { localStorage.setItem(EXPORT_GROUPS_KEY, JSON.stringify(_exportGroups)); } catch (e) {}
+    try { localStorage.setItem(_exportGroupsKey, JSON.stringify(_exportGroups)); } catch (e) {}
     return Promise.resolve(true);
   }
   return putExportGroups(false)
@@ -3600,7 +3620,7 @@ function buildExportTable() {
     updateExportFooter(rows, sections.length);
   }, function (i, n) {
     if (gen === _exportGen) updateExportLoading(syms[i], i + 1, n);
-  });
+  }, function () { return gen !== _exportGen; });
 }
 var _exportBeam = null;
 function showExportLoading(sym, i, n) {
@@ -3974,7 +3994,10 @@ var _edSyms = [];
 var _edType = 'all';
 var _edDeleteArmed = false;
 var _edReturnFocus = null;
+var _groupSaving = false;   // a group list save is on its way to the account
+var _edGen = 0;             // bumped whenever the editor opens or closes
 function openExportEditor(groupId, presetSyms) {
+  _edGen++;
   var g = groupId ? exportGroupById(groupId) : null;
   _edGroupId = g ? g.id : null;
   _edSyms = g ? g.syms.slice() : (presetSyms || []).slice();
@@ -3998,6 +4021,7 @@ function openExportEditor(groupId, presetSyms) {
   document.getElementById('exportGroupName').focus();
 }
 function closeExportEditor(restoreFocus) {
+  _edGen++;
   document.getElementById('exportEditor').hidden = true;
   document.getElementById('exportBody').hidden = false;
   hideExportTip();
@@ -4061,6 +4085,7 @@ function renderExportEditor() {
   document.getElementById('exportEdSummary').textContent = parts.length ? parts.join(' · ') : '0 tickers';
 }
 function saveExportEditor() {
+  if (_groupSaving) { setEditorMsg('Still saving, one moment…'); return; }
   var name = document.getElementById('exportGroupName').value.replace(/\s+/g, ' ').trim().slice(0, 40);
   if (!name) { setEditorMsg('Give the group a name.', true); document.getElementById('exportGroupName').focus(); return; }
   if (!_edSyms.length) { setEditorMsg('Add at least one ticker.', true); return; }
@@ -4082,10 +4107,15 @@ function saveExportEditor() {
   persistExportPicks();
   var save = document.getElementById('exportGroupSave');
   save.disabled = true; save.textContent = 'Save group…';
+  _groupSaving = true;
+  var openGen = _exportOpenGen, edGen = _edGen;
   saveExportGroups().then(function (ok) {
+    _groupSaving = false;
     save.disabled = false; save.textContent = 'Save group';
+    if (openGen !== _exportOpenGen) return;   // dialog closed: the next open reloads the groups
+    if (!ok) _exportGroups = before;
+    if (edGen !== _edGen) { renderExportTabs(); return; }   // the editor was closed meanwhile
     if (!ok) {   // the edits stay in the editor, so Save can be tried again
-      _exportGroups = before;
       setEditorMsg('Could not save to your account. Your changes are still here; try Save again.', true);
       return;
     }
@@ -4098,6 +4128,7 @@ function saveExportEditor() {
 }
 function deleteExportGroup() {
   if (!_edGroupId) return;
+  if (_groupSaving) { setEditorMsg('Still saving, one moment…'); return; }
   var del = document.getElementById('exportGroupDelete');
   if (!_edDeleteArmed) {   // two clicks, so one stray click never loses a group
     _edDeleteArmed = true;
@@ -4110,9 +4141,18 @@ function deleteExportGroup() {
   rememberExportPicks();
   delete _exportPickMemory[id];
   persistExportPicks();
+  _groupSaving = true;
+  var openGen = _exportOpenGen, edGen = _edGen;
   saveExportGroups().then(function (ok) {
+    _groupSaving = false;
+    if (openGen !== _exportOpenGen) return;
+    if (!ok) _exportGroups = before;
+    if (edGen !== _edGen) {   // the editor was closed meanwhile; never close a newer one
+      renderExportTabs();
+      if (ok && _exportActive === id && document.getElementById('exportEditor').hidden) selectExportTab('all', false);
+      return;
+    }
     if (!ok) {
-      _exportGroups = before;
       _edDeleteArmed = false;
       del.textContent = 'Delete group';
       setEditorMsg('Could not delete it from your account. Try again in a minute.', true);
@@ -4150,7 +4190,7 @@ function openExportDialog() {
   dialog.setAttribute('aria-hidden', 'false');
   document.getElementById('exportBtn').setAttribute('aria-expanded', 'true');
   document.getElementById('exportClose').focus();
-  loadExportGroups(function () {
+  loadExportGroups(openGen, function () {
     if (openGen !== _exportOpenGen) return;   // closed or reopened while the groups loaded
     var saved = null;
     try { saved = localStorage.getItem(EXPORT_ACTIVE_KEY); } catch (e) {}
