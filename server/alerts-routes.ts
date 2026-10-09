@@ -158,11 +158,20 @@ async function ensureDefaultAlertPrefs(userId: string): Promise<void> {
   );
 }
 
-// Last applied watchlist save revision per user (PUT /api/watchlist). Kept in
-// process memory: the web service runs exactly one Railway replica. With more
-// replicas, or after a restart, this check stops ordering saves across
-// instances and needs a column in Postgres instead.
-const lastWatchlistRev = new Map<string, number>();
+// Last applied watchlist save per browser tab (PUT /api/watchlist), keyed
+// `${userId}:${tab}`. A tab numbers its saves 1, 2, 3...; a save numbered at
+// or below the last applied one from the same tab arrived out of order and is
+// dropped. Saves from different tabs apply in arrival order. Kept in process
+// memory: the web service runs exactly one Railway replica. With more replicas
+// this needs Postgres; after a restart a tab's next save simply applies.
+const lastWatchlistSeq = new Map<string, { seq: number; seen: number }>();
+const WATCHLIST_SEQ_IDLE_MS = 60 * 60 * 1000;
+
+function pruneWatchlistSeq(now: number): void {
+  for (const [key, entry] of Array.from(lastWatchlistSeq.entries())) {
+    if (now - entry.seen > WATCHLIST_SEQ_IDLE_MS) lastWatchlistSeq.delete(key);
+  }
+}
 
 // ---------------------------------------------------------------------------
 
@@ -216,8 +225,9 @@ export function registerAlertsRoutes(app: Express): void {
         return res.status(400).json({ error: "symbols must be a list" });
       }
       const desired = Array.from(new Set(raw.map((s) => String(s || "").toUpperCase().trim()).filter(Boolean)));
-      const rev = Number(req.body?.rev);
-      const hasRev = Number.isFinite(rev) && rev > 0;
+      const tab = typeof req.body?.tab === "string" && /^[A-Za-z0-9-]{1,64}$/.test(req.body.tab) ? req.body.tab : null;
+      const seq = Number(req.body?.seq);
+      const seqKey = tab && Number.isSafeInteger(seq) && seq > 0 ? `${u.id}:${tab}` : null;
       const universe = await publishedUniverse();
       const symbols = await db.transaction(async (tx) => {
         // Serialize replacements per user (two open tabs): without this, two
@@ -229,10 +239,10 @@ export function registerAlertsRoutes(app: Express): void {
           (await tx.select({ symbol: watchlistSymbols.symbol }).from(watchlistSymbols)
             .where(eq(watchlistSymbols.userId, u.id))).map((r) => r.symbol),
         );
-        // The lock orders arrival, not edit order: a save sent on page exit can
-        // overtake an earlier save still in flight. Drop anything older than
-        // the last applied revision and report what is stored instead.
-        if (hasRev && rev <= (lastWatchlistRev.get(u.id) ?? 0)) {
+        // The lock orders arrival, not edit order: a save a tab sends on page
+        // exit can overtake its own earlier save still in flight. Drop the
+        // older one and report what is stored instead.
+        if (seqKey && seq <= (lastWatchlistSeq.get(seqKey)?.seq ?? 0)) {
           return { stale: [...current].sort() };
         }
         // Symbols already saved may stay even if the published set dropped them;
@@ -249,7 +259,11 @@ export function registerAlertsRoutes(app: Express): void {
             .values(desired.map((symbol) => ({ userId: u.id, symbol })))
             .onConflictDoNothing();
         }
-        if (hasRev) lastWatchlistRev.set(u.id, rev);
+        if (seqKey) {
+          const now = Date.now();
+          pruneWatchlistSeq(now);
+          lastWatchlistSeq.set(seqKey, { seq, seen: now });
+        }
         return { saved: desired.sort() };
       });
       if ("invalid" in symbols) {

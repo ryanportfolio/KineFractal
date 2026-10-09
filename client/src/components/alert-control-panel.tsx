@@ -16,17 +16,21 @@ import {
   type AlertPrefsState,
 } from "@/lib/alert-control-model";
 
-// Every watchlist save carries an increasing revision so the server can drop a
-// save that arrives after a newer one. Wall-clock based so a later edit in any
-// tab outranks an earlier one; +1 keeps saves inside one millisecond ordered.
-let lastWatchRev = 0;
+// Each page load numbers its watchlist saves 1, 2, 3... under a random tab id,
+// so the server can drop a save from this tab that arrives after a later one
+// (the exit flush can overtake a save still in flight). No clocks involved.
+const watchTab =
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+let watchSeq = 0;
 
 function putWatchlist(symbols: string[]): Promise<Response> {
-  lastWatchRev = Math.max(lastWatchRev + 1, Date.now());
+  watchSeq += 1;
   // keepalive lets a save already in flight finish if the tab closes or reloads
   return csrfFetch("/api/watchlist", {
     method: "PUT",
-    body: JSON.stringify({ symbols, rev: lastWatchRev }),
+    body: JSON.stringify({ symbols, tab: watchTab, seq: watchSeq }),
     keepalive: true,
   });
 }
@@ -188,6 +192,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   // key of the list last loaded from or sent to the server; null until loaded
   const sentWatchKey = useRef<string | null>(null);
   const latestSymbols = useRef<string[]>([]);
+  const watchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [prefs, setPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [savedPrefs, setSavedPrefs] = useState<AlertPrefsState>(createDefaultAlertPrefs);
   const [loading, setLoading] = useState(true);
@@ -253,6 +258,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   };
 
   const persistWatchlist = useCallback(async (next: string[], key: string) => {
+    // the exit flush may already have sent this list
+    if (key === sentWatchKey.current) return;
     sentWatchKey.current = key;
     setWatchSaving(true);
     setWatchError(null);
@@ -268,15 +275,13 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       }
       const saved: string[] = Array.isArray(body.symbols) ? body.symbols : next;
       setSavedSymbols(saved);
-      // later clicks may have landed while this request was in flight; keep them.
-      // A stale reply means a newer save (another tab) won: show that list
-      // unless the user has edited since, in which case the edit saves next.
-      setSymbols((current) => {
-        if (current.join(",") !== key) return current;
-        sentWatchKey.current = saved.join(",");
-        return saved;
-      });
-      setWatchStatus(body.stale ? "a newer save from another tab was kept" : "watchlist saved");
+      // the server now holds `saved`, unless a later list was sent meanwhile
+      if (sentWatchKey.current === key) sentWatchKey.current = saved.join(",");
+      // later clicks may have landed while this request was in flight; keep
+      // them. A stale reply (this tab's later save got there first) carries
+      // the stored list and is not an error.
+      setSymbols((current) => (current.join(",") === key ? saved : current));
+      setWatchStatus("watchlist saved");
     } catch (reason: any) {
       failedWatchKey.current = key;
       // show what the server actually holds instead of an unsaved selection
@@ -299,18 +304,25 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   useEffect(() => {
     if (loading || watchSaving || !watchDirty) return;
     if (failedWatchKey.current === watchKey) return;
-    const timer = setTimeout(() => {
+    watchTimer.current = setTimeout(() => {
+      watchTimer.current = null;
       void persistWatchlist(symbols, watchKey);
     }, 600);
-    return () => clearTimeout(timer);
+    return () => {
+      if (watchTimer.current) clearTimeout(watchTimer.current);
+      watchTimer.current = null;
+    };
   }, [loading, persistWatchlist, symbols, watchDirty, watchKey, watchSaving]);
 
-  // The debounce above drops its timer when the panel unmounts or the tab
-  // closes; send any list that never went out, once. It may overtake a save
-  // still in flight; its higher rev makes the server keep it either way.
+  // On unmount or tab close, send any list that never went out, once, and
+  // cancel the pending debounce so a page restored from the back/forward cache
+  // does not send it again. It may overtake this tab's save still in flight;
+  // its higher seq makes the server keep it either way.
   latestSymbols.current = symbols;
   useEffect(() => {
     const flush = () => {
+      if (watchTimer.current) clearTimeout(watchTimer.current);
+      watchTimer.current = null;
       const sent = sentWatchKey.current;
       const next = latestSymbols.current;
       const key = next.join(",");
@@ -318,9 +330,28 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       sentWatchKey.current = key;
       void putWatchlist(next).catch(() => {});
     };
+    // A page restored from the back/forward cache shows what is stored now,
+    // which another tab may have changed while this one was hidden.
+    const reconcile = (event: PageTransitionEvent) => {
+      if (!event.persisted) return;
+      fetch("/api/watchlist", { credentials: "include" })
+        .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+        .then((watchlist) => {
+          const savedList: string[] = [...(watchlist.symbols ?? [])].sort();
+          failedWatchKey.current = null;
+          sentWatchKey.current = savedList.join(",");
+          setSavedSymbols(savedList);
+          setSymbols(savedList);
+          setWatchError(null);
+          setWatchStatus(null);
+        })
+        .catch(() => setWatchError("could not reload the saved watchlist · refresh the page"));
+    };
     window.addEventListener("pagehide", flush);
+    window.addEventListener("pageshow", reconcile);
     return () => {
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("pageshow", reconcile);
       flush();
     };
   }, []);

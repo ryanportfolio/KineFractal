@@ -145,9 +145,13 @@ export function getCSRFToken(req: Request, res: Response) {
     sessionId = generateSessionId();
   }
   
-  const token = generateCSRFToken();
+  // One token per csrf-session, reused until it expires. Minting a new one on
+  // every call replaced the token another open tab already held, and a save
+  // that tab sends while unloading cannot refresh and retry.
+  const existing = csrfTokens.get(sessionId);
+  const token = existing && existing.expires >= Date.now() ? existing.token : generateCSRFToken();
   const expires = Date.now() + (60 * 60 * 1000);
-  
+
   csrfTokens.set(sessionId, { token, expires });
   
   res.cookie('csrf-session', sessionId, {
