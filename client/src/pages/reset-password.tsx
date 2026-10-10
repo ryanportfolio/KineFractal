@@ -67,7 +67,7 @@ export default function ResetPassword() {
     <div className="bg-background text-foreground font-sans">
       <Navbar />
       <main className="pt-24 pb-16 container px-4 md:px-6 max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold uppercase tracking-tighter mb-8">
+        <h1 className="beam-heading mb-8" data-drawn="1">
           Reset password<span className="text-primary">_</span>
         </h1>
         <div className="max-w-md mx-auto border border-border rounded-lg p-6 bg-card/50">
