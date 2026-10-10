@@ -582,7 +582,7 @@ function ModuleCard({
       <div className={`px-4 py-2 border-b ${headerStyles[variant]} flex items-center justify-between`}>
         <div className="flex items-center gap-2">
           {icon}
-          <h3 className="font-mono text-xs uppercase tracking-wider">{title}</h3>
+          <h3 className="font-display text-sm font-bold uppercase tracking-wider">{title}</h3>
         </div>
       </div>
       <div className="p-4">
@@ -794,7 +794,7 @@ export default function RatioRelevance() {
                       <AIStressBadge signal={aiSignals.wreckingBallStress} isLoading={aiLoading} />
                     </div>
                     <div className="font-mono text-[10px] text-white/40">
-                      When USD rises AND yields rise → Maximum liquidity stress
+                      When USD rises AND yields rise → liquidity stress
                     </div>
                   </div>
                   

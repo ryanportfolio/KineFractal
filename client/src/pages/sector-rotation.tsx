@@ -617,8 +617,8 @@ export default function SectorRotation() {
                     <div className="relative z-20">
                         <div className="flex justify-between items-end mb-6 border-b border-primary/30 pb-2">
                             <div>
-                                <h2 className="text-lg font-bold text-primary text-shadow-[0_0_10px_hsl(var(--primary)/0.5)] text-pulse-glow">
-                                    &gt;&gt; SECTOR_PERFORMANCE_MATRIX
+                                <h2 className="beam-heading" data-drawn="1">
+                                    SECTOR PERFORMANCE MATRIX
                                 </h2>
                                 <p className="text-primary/60 mt-1 text-[15px] font-normal bg-[transparent]">
                                     RELATIVE_RETURN_MATRIX (ALPHA) // BENCHMARK: SPY
@@ -692,8 +692,8 @@ export default function SectorRotation() {
                     <div className="relative z-20">
                         <div className="flex justify-between items-end mb-6 border-b border-primary/30 pb-2">
                             <div>
-                                <h2 className="text-lg font-bold text-primary text-shadow-[0_0_10px_hsl(var(--primary)/0.5)] text-pulse-glow">
-                                    &gt;&gt; MACRO_REGIME_DASHBOARD
+                                <h2 className="beam-heading" data-drawn="1">
+                                    MACRO REGIME DASHBOARD
                                 </h2>
                                 <p className="text-primary/60 mt-1 text-[15px]">
                                     RATIO_ANALYSIS // Z-SCORE_MEAN_REVERSION // MOMENTUM_VECTORS
@@ -778,7 +778,7 @@ export default function SectorRotation() {
                 
                 <div className="relative z-20">
                     <div className="mb-4 border-b border-primary/30 pb-3">
-                        <h3 className="text-sm font-bold text-primary mb-1 text-pulse-glow">{'>>'} SIMPLE_3D_DECISION_ENGINE</h3>
+                        <h3 className="beam-heading mb-1" data-drawn="1">SIMPLE 3D DECISION ENGINE</h3>
                         <p className="text-primary/50 text-[15px]">MACD_HISTOGRAM_REVERSAL_DETECTOR // 3-DAY_LOGIC</p>
                     </div>
 
