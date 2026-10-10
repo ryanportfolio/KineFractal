@@ -55,3 +55,9 @@ Setting `canvas.width` or `canvas.height` clears the drawing buffer. Done after 
 ### 2026-10-01: Chrome refuses some local ports for a headed check
 
 Chrome blocks a fixed list of ports it treats as unsafe, and 5061 (SIP over TLS) is on it: `page.goto` fails with `net::ERR_UNSAFE_PORT` while `curl` against the same server works. A production-build check on `PORT=5061` failed on every page and had to be rerun on 5071. Pick a port such as 5055 or 5071-5079 for a local server that Chrome will load.
+
+### 2026-10-10: `var()` inside animated keyframe values makes Chrome step instead of interpolate
+
+A keyframe value built from a custom property, such as `stroke-dashoffset: calc(var(--len) + 1)` or `transform: translateX(calc(var(--to) * 1px))`, animated discretely in Chrome: the value held its start and flipped to its end at 50%. Every SVG draw-on in the logo prototypes popped in instead of drawing, and frame strips had to be rebuilt. Keep animated values constant: draw strokes with `pathLength="1"` plus `stroke-dasharray: 1 1.02` and offsets from `1.01` to `0`, write literal colours, and generate per-instance keyframes from script when a value has to vary. `var()` in `animation-delay` or `animation-duration` is fine.
+
+Related cost: an `infinite` CSS animation on SVG stroke properties keeps the main thread busy every frame, even through keyframe stretches where nothing changes (measured 19 to 42 ms per second for a 176 px nav logo; transform and opacity loops measured about 0). Run idle loops as bursts: a timer adds a class for one pass and removes it afterwards.

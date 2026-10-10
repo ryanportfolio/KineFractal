@@ -145,9 +145,11 @@ The evidence stamp is explicit:
 
 ## Chrome
 
-- **Navbar:** one compact bar, traced wordmark, active
+- **Navbar:** one compact bar, the logo (ring-and-waves mark plus traced
+  wordmark, `kine-fractal-logo.tsx`; its intro plays on the first page load), active
   cursor segment and optional current fear readout. Avoid a second status tier.
-- **Footer:** a static calibration plate with one low-energy breathing dot.
+- **Footer:** a calibration plate with the large logo, whose intro plays the
+  first time it scrolls into view, and one low-energy breathing dot.
 - **CRT tube:** global vignette, corner glare and slow scan drift. Flicker is a
   one-shot event, not a loop.
 - **Command drawer:** a scope control panel. Its report and trade output follows
@@ -179,8 +181,9 @@ The evidence stamp is explicit:
 
 - Use the `cubic-bezier(0.16,1,0.3,1)` family. No bounce except a stamp.
 - No two canvases animate simultaneously; DOM raster scans also consume the beam.
-- Idle motion is limited to the hero's low-energy sweep, one footer dot and any
-  restrained current-state rail motion.
+- Idle motion is limited to the hero's low-energy sweep, one footer dot, the
+  logo's band pass (one faint 1.4 s pass through the letters every 12 s, run as a
+  timed burst) and any restrained current-state rail motion.
 - Pause work off-screen and while `document.hidden`.
 - Do not branch on `prefers-reduced-motion`. Every visitor gets the same full
   motion (owner call, 2026-08-02); never reintroduce a reduced-motion path.

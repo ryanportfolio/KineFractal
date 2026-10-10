@@ -1,6 +1,6 @@
 // Footer — quiet brand plate, navigation, and legal context.
 import { Link } from "wouter";
-import { KINE_FRACTAL_BANNER } from "@/lib/ascii-banner";
+import { KineFractalLogo } from "@/components/kine-fractal-logo";
 
 export function Footer() {
   return (
@@ -22,13 +22,15 @@ export function Footer() {
         `}</style>
 
         <div className="pl-6">
-          {/* the wordmark stamped in plain text — the register the site grew up in */}
-          <pre
-            aria-hidden="true"
-            className="hidden md:block font-mono text-[10px] leading-[1.15] tracking-normal text-beam-dim/80 mb-4 select-none"
-          >
-            {KINE_FRACTAL_BANNER}
-          </pre>
+          {/* the large logo; its intro plays the first time it scrolls into view.
+              Below md the five waves crowd the small ring, so phones get the
+              three-wave nav lockup (a display:none copy never intersects, so it never runs). */}
+          <div className="hidden md:block w-full max-w-[640px] mb-4">
+            <KineFractalLogo size="large" play="visible" />
+          </div>
+          <div className="md:hidden w-full max-w-[280px] mb-4">
+            <KineFractalLogo play="visible" />
+          </div>
         </div>
 
         <div className="pl-6 mt-6 flex flex-wrap gap-x-6 gap-y-2">
