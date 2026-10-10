@@ -56,6 +56,8 @@ Setting `canvas.width` or `canvas.height` clears the drawing buffer. Done after 
 
 Chrome blocks a fixed list of ports it treats as unsafe, and 5061 (SIP over TLS) is on it: `page.goto` fails with `net::ERR_UNSAFE_PORT` while `curl` against the same server works. A production-build check on `PORT=5061` failed on every page and had to be rerun on 5071. Pick a port such as 5055 or 5071-5079 for a local server that Chrome will load.
 
+Check the port is free first (`netstat -ano | grep ":<port> "`). Other sessions use the same range, and on this machine a second server can bind a port another process already holds without `EADDRINUSE`: the dev server logged `serving on port 5077` while another worktree's prototype server also listened on `0.0.0.0:5077`, and Chrome got the other server's stale build (2026-10-10, a command drawer check had to be rerun on 5391).
+
 ### 2026-10-10: `var()` inside animated keyframe values makes Chrome step instead of interpolate
 
 A keyframe value built from a custom property, such as `stroke-dashoffset: calc(var(--len) + 1)` or `transform: translateX(calc(var(--to) * 1px))`, animated discretely in Chrome: the value held its start and flipped to its end at 50%. Every SVG draw-on in the logo prototypes popped in instead of drawing, and frame strips had to be rebuilt. Keep animated values constant: draw strokes with `pathLength="1"` plus `stroke-dasharray: 1 1.02` and offsets from `1.01` to `0`, write literal colours, and generate per-instance keyframes from script when a value has to vary. `var()` in `animation-delay` or `animation-duration` is fine.
