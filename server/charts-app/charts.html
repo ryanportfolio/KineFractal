@@ -3942,7 +3942,7 @@ function dailyCloses(candles) {
 function whyChartSvg(sec, lim) {
   var pts = dailyCloses(sec.candles);
   if (pts.length < 2) return '';
-  var W = 340, H = 180, padL = 4, padR = 56, padT = 10, padB = 22;
+  var W = 340, H = 180, padL = 4, padR = 66, padT = 10, padB = 22;
   var levels = [lim.row].concat(lim.members).map(function (r) { return r.limit; });
   var lo = Math.min.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
   var hi = Math.max.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
