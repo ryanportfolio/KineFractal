@@ -277,6 +277,9 @@
   #buildOvl .el { margin:0 0 12px; font-size:12px; color:var(--mut); }
   #buildOvl button.hideb { padding:6px 12px; font-size:12.5px; }
   /* build ended without a chart: the card stays up and says why */
+  /* the result card can open while Limit Buy or REORDER (75) is up, and it
+     claims keys first, so it sits above them; sign-in (90) stays on top */
+  #buildOvl.done { z-index:85; }
   #buildOvl.done canvas { display:none; }
   #buildOvl.done h3 { margin-top:0; font-size:17px; letter-spacing:.02em; }
   #buildOvl.done .st { color:var(--fg); font-size:14px; line-height:1.5; }
@@ -2568,8 +2571,16 @@ function hideBuildOvl() {
   var wasResult = buildResultOpen();
   if (el) el.classList.remove('open');
   stopBuildAnim();
-  if (wasResult) document.getElementById('addSym').focus();   // back to where the add started
+  if (wasResult) {
+    // back to where focus was when the result opened (a dialog the visitor
+    // opened during the build), else the add box
+    var back = _buildResultReturn;
+    _buildResultReturn = null;
+    if (!back || !back.isConnected || !back.offsetParent) back = document.getElementById('addSym');
+    back.focus();
+  }
 }
+var _buildResultReturn = null;
 function buildResultOpen() {
   var el = document.getElementById('buildOvl');
   return !!el && el.classList.contains('open') && el.classList.contains('done');
@@ -2585,6 +2596,7 @@ function showBuildResult(title, text) {
   var el = document.getElementById('buildOvl');
   if (!el) return;
   stopBuildAnim();
+  if (!buildResultOpen()) _buildResultReturn = document.activeElement;
   el.classList.add('open', 'done');
   el.setAttribute('role', 'alertdialog');
   el.setAttribute('aria-modal', 'true');
