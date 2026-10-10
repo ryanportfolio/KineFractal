@@ -276,6 +276,10 @@
   #buildOvl .st { margin:0 0 4px; font-size:13px; color:var(--sup); min-height:1.4em; }
   #buildOvl .el { margin:0 0 12px; font-size:12px; color:var(--mut); }
   #buildOvl button.hideb { padding:6px 12px; font-size:12.5px; }
+  /* build ended without a chart: the card stays up and says why */
+  #buildOvl.done canvas { display:none; }
+  #buildOvl.done h3 { margin-top:0; font-size:17px; letter-spacing:.02em; }
+  #buildOvl.done .st { color:var(--fg); font-size:14px; line-height:1.5; }
   /* site-native confirmation for removing a user-added ticker */
   /* z above tickerReorderDialog (75): the confirm can be opened from the reorder modal */
   #removeTickerDialog { display:none; position:fixed; inset:0; z-index:80; padding:20px;
@@ -2538,6 +2542,8 @@ function showBuildOvl(sym) {
     el.querySelector('button.hideb').onclick = hideBuildOvl;
     document.body.appendChild(el);
   }
+  el.classList.remove('done');
+  el.querySelector('button.hideb').textContent = 'hide, keep building';
   el.querySelector('h3').textContent = 'building ' + sym.toUpperCase();
   el.querySelector('.st').textContent = BUILD_STAGES[0][1];
   el.querySelector('.el').textContent = 'we pull the price history and compute every chart layer, usually under a minute';
@@ -2559,8 +2565,26 @@ function showBuildOvl(sym) {
 function hideBuildOvl() {
   var el = document.getElementById('buildOvl');
   if (el) el.classList.remove('open');
+  stopBuildAnim();
+}
+function stopBuildAnim() {
   if (_beam) { _beam.destroy(); _beam = null; }
   if (_buildTimer) { clearInterval(_buildTimer); _buildTimer = null; }
+}
+// The build ended without a chart (too little history, unknown ticker, still
+// building after the polls): keep the card up with the reason instead of
+// closing it, which read as a glitch next to an 11px status line.
+function showBuildResult(title, text) {
+  var el = document.getElementById('buildOvl');
+  if (!el) return;
+  stopBuildAnim();
+  el.classList.add('open', 'done');
+  el.querySelector('h3').textContent = title;
+  el.querySelector('.st').textContent = text;
+  el.querySelector('.el').textContent = '';
+  var ok = el.querySelector('button.hideb');
+  ok.textContent = 'OK';
+  ok.focus();
 }
 
 // --- per-user ticker access (SITE): which super buttons this visitor sees -----
@@ -2606,6 +2630,11 @@ function confirmTickerRemoval() {
     })
     .then(function () {
       state.btn.style.display = 'none';
+      if (_cmpSyms.indexOf(state.symbol) >= 0) {   // a removed ticker stops being compared
+        _cmpSyms = _cmpSyms.filter(function (x) { return x !== state.symbol; });
+        saveCompareSyms();
+        redraw();
+      }
       if (_chartAccess) {
         ['mine', 'curated'].forEach(function (k) {
           var list = _chartAccess[k];
@@ -4650,9 +4679,15 @@ function doAddTicker() {
           setTimeout(function () { attempt(pollN + 1); }, POLL_MS);
           return;
         }
-        reenable();
-        if (SITE && res.httpStatus === 401) { addMsg.textContent = ''; showAddCta(); return; }
-        addMsg.textContent = res.error || 'add failed';
+        if (SITE && res.httpStatus === 401) { reenable(); addMsg.textContent = ''; showAddCta(); return; }
+        var SYM = sym.toUpperCase(), why = res.error || 'add failed';
+        addBtn.disabled = false;
+        if (!SITE) { addMsg.textContent = why; hideBuildOvl(); return; }
+        addMsg.textContent = '';   // the card says it; a long status line re-wraps the toolbar
+        showBuildResult(res.reason === 'insufficient_history' ? 'Not enough history to chart ' + SYM
+          : res.reason === 'no_data' ? 'No data for ' + SYM
+          : res.pending ? SYM + ' is still building'
+          : 'Could not add ' + SYM, why);
         return;
       }
       var e = res.entry;
@@ -4725,7 +4760,9 @@ function doAddTicker() {
       addMsg.textContent = SITE
         ? 'connection dropped, the build may still be running. Refresh in a minute or two.'
         : 'Chart server not reachable — open Charts from the KineFractalLab launcher, or run: py fearlab/label_server.py';
-      reenable();
+      addBtn.disabled = false;
+      if (SITE) { showBuildResult('Lost the connection while building ' + sym.toUpperCase(), addMsg.textContent); addMsg.textContent = ''; }
+      else hideBuildOvl();
     });
   }
 }
@@ -4810,9 +4847,13 @@ function compareKey(sym, tf) {
   if (!e) return null;
   return tf && e.tf_keys ? (e.tf_keys[tf] || null) : e.key;   // never mix timeframes
 }
+// compares drawn now: none during the guided tour (it explains the normal layers), and only
+// tickers still on this visitor's row (a saved list can outlive a removed ticker)
 function compareSymsShown() {
   var cur = currentSuper();
-  return cur ? _cmpSyms.filter(function (s) { return s !== cur.sym; }) : [];
+  if (!cur || _tourActive) return [];
+  var row = visibleTickerSymbols();
+  return _cmpSyms.filter(function (s) { return s !== cur.sym && row.indexOf(s) >= 0; });
 }
 // One value per MAIN candle time: the other ticker's latest close at or before it.
 // Keeps every point on the candle grid (an off-grid time adds a phantom bar).
@@ -4830,11 +4871,11 @@ function drawCompareLines() {
   var cur = currentSuper();
   compareSymsShown().forEach(function (s) {
     var key = compareKey(s, cur.tf);
+    var payload = key && window.FEARLAB_REG[key];   // cached data wins over an earlier failed load
     var line = { sym: s, color: CMP_COLORS[_cmpSyms.indexOf(s) % CMP_COLORS.length], data: null,
-                 missing: !key || !!_cmpMissing[key] };
+                 missing: !key, failed: !payload && !!_cmpMissing[key] };
     _cmpLines.push(line);
-    if (line.missing) return;
-    var payload = window.FEARLAB_REG[key];
+    if (line.missing || line.failed) return;
     if (payload) {
       line.data = alignCloses(current.candles, payload.candles || []);
       chart.addLineSeries({ color: line.color, lineWidth: 2, title: s, priceLineVisible: false })
@@ -4874,7 +4915,8 @@ function renderCompareLegend() {
   }
   var html = item(currentSuper().sym, 'var(--fg)', fmtPctChange(has ? (c[i1].close / c[i0].close - 1) * 100 : null), false);
   _cmpLines.forEach(function (l) {
-    var text = l.missing ? 'no data on this timeframe' : !l.data ? 'loading…' : fmtPctChange(has ? pctBetween(l.data, t0, t1) : null);
+    var text = l.missing ? 'no data on this timeframe' : l.failed ? 'could not load, add it again to retry'
+      : !l.data ? 'loading…' : fmtPctChange(has ? pctBetween(l.data, t0, t1) : null);
     html += item(l.sym, l.color, text, true);
   });
   box.innerHTML = html;
@@ -4886,6 +4928,7 @@ function scheduleCompareLegend() {
   requestAnimationFrame(function () { _cmpLegendQueued = false; renderCompareLegend(); });
 }
 function addCompare(s) {
+  _cmpMissing = {};   // adding (again) retries any earlier failed load
   if (_cmpSyms.indexOf(s) < 0 && _cmpSyms.length < CMP_MAX) { _cmpSyms.push(s); saveCompareSyms(); }
   closeCompareMenu(true);
   redraw();

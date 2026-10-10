@@ -558,6 +558,27 @@ async function callBuilder(
   }
 }
 
+/**
+ * The builder's definitive rejections (range fearlab/add_ticker.py) in plain
+ * words, with a reason code the chart page can key its message on.
+ * "could not build super" only happens when emit_super.build_super found no
+ * support levels on any timeframe or no 2h candles: a ticker with too little
+ * trading history (e.g. HBIT, which first traded 2026-08-27).
+ */
+export function addRejection(sym: string, builderError?: string): { error: string; reason?: string } {
+  const s = sym.toUpperCase();
+  if (builderError?.startsWith("could not build super")) {
+    return {
+      reason: "insufficient_history",
+      error: `${s} doesn't have enough price history yet to find its levels. A recently listed ticker can be added once it has traded longer.`,
+    };
+  }
+  if (builderError?.startsWith("no data for")) {
+    return { reason: "no_data", error: `No price data found for ${s}. Check the ticker symbol.` };
+  }
+  return { error: builderError || "build failed" };
+}
+
 // In-flight builds (single web replica): a second add of the same symbol
 // while one is building gets a polite retry message instead of a dup build.
 const building = new Set<string>();
@@ -866,7 +887,7 @@ function registerChartSymbolRoutes(app: Express): void {
         await db
           .delete(chartSymbols)
           .where(and(eq(chartSymbols.userId, u.id), eq(chartSymbols.symbol, sym)));
-        return res.status(400).json({ ok: false, error: built.error || "build failed" });
+        return res.status(400).json({ ok: false, ...addRejection(sym, built.error) });
       } finally {
         building.delete(sym);
       }
