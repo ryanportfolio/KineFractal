@@ -97,12 +97,12 @@ The homepage is a showcase surface, organized in this order:
    telemetry beneath it.
 2. **Year by year** — completed independent calendar years ahead of buy-and-hold
    for SPY, QQQ and IWM, with the annual basis stated.
-3. **SPY v4.6 Strategy** — monthly strategy returns, with annual strategy and
+3. **SPY strategy** — the deployed SPY variant's monthly strategy returns, with annual strategy and
    buy-and-hold columns and partial-year status made clear.
 4. **How it buys / How it sells** — separate per-fund fear rails, buy lines and
    percentage-of-account sizing; then plain-language trim and protection rules.
-5. **SPY, step by step** — a labeled SPY v4.6 backtest replay using simulated
-   next-open fills. QQQ and IWM have different thresholds and exits.
+5. **SPY, step by step** — a labeled SPY backtest replay using simulated
+   next-open fills, named by the variant it was recorded under. QQQ and IWM have different thresholds and exits.
 6. **The record** — actual latest EOD decisions first, then a separately labeled
    list of recent simulated SPY backtest activity.
 
@@ -139,7 +139,8 @@ Future changes must preserve these rules:
 7. Never merge actual EOD decisions and simulated replay activity into one
    unlabeled ledger.
 8. Never reduce three deployed fund configurations to one universal rulebook.
-   State when a section describes SPY v4.6 specifically.
+   State when a section describes one SPY variant specifically, and name it
+   from data, not hand-written copy.
 9. Always identify partial periods and the latest data date where they can affect
    interpretation.
 10. Decorative behavior may be atmospheric, but numeric claims and plotted data
