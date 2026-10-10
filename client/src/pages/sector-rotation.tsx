@@ -288,6 +288,8 @@ export default function SectorRotation() {
       const rawData: Record<string, DailyData[]> = {};
       const macroData: Record<string, DailyData[]> = {};
       
+      const states: string[] = [];
+
       // Use any cached data we already have
       if (bulkData.data) {
         for (const ticker of TICKERS) {
@@ -331,7 +333,7 @@ export default function SectorRotation() {
         setProgress(percent);
 
         addLog(`Fetching ${ticker.symbol}...`);
-        const data = await fetchTiingoData(ticker.symbol, startDateStr);
+        const data = await fetchTiingoData(ticker.symbol, startDateStr, states);
         rawData[ticker.symbol] = data;
         addLog(`✔ ${ticker.symbol} acquired (${data.length} days).`);
 
@@ -360,7 +362,7 @@ export default function SectorRotation() {
         setProgress(percent);
         
         addLog(`Fetching [MACRO] ${symbol}...`);
-        const data = await fetchTiingoData(symbol, startDateMacroStr);
+        const data = await fetchTiingoData(symbol, startDateMacroStr, states);
         macroData[symbol] = data;
         addLog(`✔ ${symbol} acquired (${data.length} days).`);
         
@@ -371,9 +373,17 @@ export default function SectorRotation() {
       setProgress(100);
       addLog("All data acquired. Processing...");
       
-      setLastCacheDate(today);
-      setCacheStale(false);
-      setCacheState('fresh');
+      // Label the set the way the bulk route does: the oldest final bar across
+      // every series, and stale if any series came back stale.
+      if (bulkData.freshness && bulkData.data && Object.keys(bulkData.data).length) states.push(bulkData.freshness.state);
+      const asOf = [...Object.values(rawData), ...Object.values(macroData)].reduce((oldest, series) => {
+        const last = series[series.length - 1]?.date?.slice(0, 10) ?? '';
+        return !oldest || (last && last < oldest) ? last : oldest;
+      }, '');
+      const seriesState = states.includes('stale') ? 'stale' : states.includes('fresh') ? 'fresh' : 'cache';
+      setLastCacheDate(asOf || today);
+      setCacheStale(seriesState === 'stale');
+      setCacheState(seriesState);
 
       processDataForChart(rawData);
       calculatePerformance(rawData);
@@ -390,7 +400,7 @@ export default function SectorRotation() {
     }
   };
   
-  const fetchTiingoData = async (symbol: string, startDate: string): Promise<DailyData[]> => {
+  const fetchTiingoData = async (symbol: string, startDate: string, states?: string[]): Promise<DailyData[]> => {
         // Use server-side Tiingo proxy for reliable data fetching
         const response = await fetch(`/api/tiingo/${symbol}`);
         
@@ -399,6 +409,10 @@ export default function SectorRotation() {
              throw new Error(errorData.error || `API Error (${response.status})`);
         }
         
+        // fresh / cache / stale for this series (a stale cache entry still answers 200)
+        const state = response.headers.get('X-Market-Data-State');
+        if (state && states) states.push(state);
+
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error(`Invalid format received for ${symbol}`);
         if (data.length === 0) throw new Error(`No data returned for ${symbol}`);

@@ -384,19 +384,30 @@ function RatioWaveChart({
   // Recharts places the tooltip from its getBoundingClientRect width, which the
   // desktop root zoom inflates (1.2x/1.4x), so it never "fits" beside the cursor
   // and gets pinned to the chart's left edge. Instead the wrapper sits exactly on
-  // the cursor (see <Tooltip> below) and the box shifts itself to the free side.
+  // the cursor (see <Tooltip> below) and the box places itself from offsetWidth,
+  // which is in the same layout px as Recharts' coordinate and is not zoomed:
+  // right of the cursor, else left of it, clamped inside the plot.
   const CustomTooltip = ({ active, payload, label, coordinate, viewBox }: any) => {
     if (active && payload && payload.length) {
       const value = payload[0].value;
       const isAboveMean = value > mean;
-      const flip = coordinate && viewBox && coordinate.x > viewBox.x + viewBox.width / 2;
+      const place = (el: HTMLDivElement | null) => {
+        if (!el || !coordinate || !viewBox) return;
+        const w = el.offsetWidth;
+        const lo = viewBox.x, hi = viewBox.x + viewBox.width;
+        let left = coordinate.x + 8;
+        if (left + w > hi) left = coordinate.x - 8 - w;
+        left = Math.max(lo, Math.min(left, hi - w));
+        el.style.transform = `translateX(${left - coordinate.x}px)`;
+      };
       return (
         <div
-          className="bg-black/90 border border-white/20 rounded-sm px-1.5 py-1 font-mono text-[10px] leading-tight whitespace-nowrap"
-          style={{ transform: flip ? 'translateX(calc(-100% - 8px))' : 'translateX(8px)' }}
+          ref={place}
+          className="bg-black/90 border border-white/20 rounded-sm px-1.5 py-1 font-mono text-[10px] leading-tight w-max"
+          style={{ maxWidth: Math.min(viewBox?.width ?? 150, 150) }}
         >
-          <div className="text-white/60">{formatDate(label)}</div>
-          <div style={{ color: isAboveMean ? highColor : lowColor }}>
+          <div className="text-white/60 whitespace-nowrap">{formatDate(label)}</div>
+          <div className="whitespace-nowrap" style={{ color: isAboveMean ? highColor : lowColor }}>
             {ratioLabel}: {value.toFixed(4)}
           </div>
           <div className="text-white/40 text-[9px]">
