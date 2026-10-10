@@ -1549,14 +1549,13 @@ function tipDistHtml(price) {
   if (a < 0.005) return '<div class="dist">at current price</div>';
   return '<div class="dist">' + a.toFixed(a < 1 ? 2 : 1) + '% ' + (pct < 0 ? 'below' : 'above') + '</div>';
 }
-// the price a hit mark stands for now: a diagonal's value at the latest bar (along its
-// ray, measured on screen so it matches the drawn line in log or linear scale)
-function tipHitPrice(it) {
+// the price a hit mark stands for under the cursor: a diagonal's value at the cursor's
+// x (measured on screen so it matches the drawn line in log or linear scale)
+function tipHitPrice(it, x) {
   if (it.k !== 's') return it.p;
   var a = project(it.t1, it.p1), b = project(it.t2, it.p2);
-  var xNow = chart.timeScale().timeToCoordinate(current.candles[current.candles.length - 1].time);
-  if (!a || !b || a.x === b.x || xNow == null) return null;
-  return candleSeries.coordinateToPrice(a.y + (b.y - a.y) * (xNow - a.x) / (b.x - a.x));
+  if (!a || !b || a.x === b.x) return null;
+  return candleSeries.coordinateToPrice(a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x));
 }
 function escTip(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function r2(v) { return Number(Number(v).toFixed(2)); }
@@ -1598,7 +1597,7 @@ function onTipMove(ev) {
   var hit = tipHitTest(x, y);
   if (!hit) { hideTip(); return; }
   var tb = document.getElementById('tipBox');
-  tb.innerHTML = hit.html + tipDistHtml(tipHitPrice(hit));
+  tb.innerHTML = hit.html + tipDistHtml(tipHitPrice(hit, x));
   tb.style.display = 'block';
   // near the cursor, clamped inside the pane; flip above when it would spill the bottom
   var bw = tb.offsetWidth, bh = tb.offsetHeight, W = el.clientWidth, H = el.clientHeight;
