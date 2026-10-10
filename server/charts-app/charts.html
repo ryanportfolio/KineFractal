@@ -10,7 +10,7 @@
      below the first line are DATA colors — they encode meaning, do not retheme.
      HEX ONLY here: these vars feed lightweight-charts via getCss(), and its color
      parser rejects space-separated hsl() — hsl broke the whole viewer (2026-07-04). */
-  :root { --bg:#080808; --panel:#0d0d0d; --grid:#262626; --fg:#e6e6e6; --mut:#8c8c8c;
+  :root { --bg:#080808; --panel:#0d0d0d; --grid:#262626; --fg:#e6e6e6; --mut:#b8b8b8;
           --sup:#26c6da; --res:#ffa726; --lvl:#ab47bc; --gap:#caa84a; --ss:#ff5ec8; --ssr:#ffffff; --prom:#9aa0a6; --thr:#f5c518; --rr:#4f8cff;
           --cbuy:#21d07a; --csell:#ff5b5b; --pdeq:#9598a1; --mine:#c6ff00; --struct:#9d6bff; --dpool:#5b8def; --gex:#ffd60a;
           --uoac:#21d07a; --uoap:#ff5b5b; --meas:#3b82f6; }
@@ -98,14 +98,14 @@
   /* measure tool (Shift+drag ruler): blue pill label centered over the measured box */
   #measureBox { position:absolute; z-index:6; pointer-events:none; display:none;
                 transform:translate(-50%,-100%); background:var(--meas); color:#fff;
-                padding:5px 11px; border-radius:7px; font-size:12px; line-height:1.4;
+                padding:5px 11px; border-radius:7px; font-size:14px; line-height:1.4;
                 text-align:center; white-space:nowrap; font-weight:600;
                 box-shadow:0 3px 12px rgba(0,0,0,.5); }
-  #measureBox .sub { font-weight:400; opacity:.9; font-size:11.5px; }
+  #measureBox .sub { font-weight:400; opacity:.9; font-size:14px; }
   /* hover tips for on-chart marks: what THIS mark says (its own numbers) + its distance from the latest close */
   #tipBox { position:absolute; z-index:6; pointer-events:none; display:none; max-width:320px;
             background:rgba(13,13,13,.97); border:1px solid var(--grid); border-radius:8px;
-            padding:8px 11px; font-size:12.5px; line-height:1.45; color:var(--fg);
+            padding:8px 11px; font-size:14px; line-height:1.45; color:var(--fg);
             box-shadow:0 3px 12px rgba(0,0,0,.5); }
   #tipBox b { display:block; margin-bottom:2px; }
   #tipBox .dist { margin-top:6px; font:bold 24px Verdana,Geneva,sans-serif; line-height:1.2; color:var(--fg); }
@@ -125,8 +125,8 @@
   #cmpList button { display:flex; align-items:baseline; gap:8px; padding:5px 8px; border:0; background:none; text-align:left; }
   #cmpList button:hover, #cmpList button:focus-visible { background:rgba(38,198,218,.12); }
   #cmpList .sym { font-weight:bold; }
-  #cmpList .nm { overflow:hidden; color:var(--mut); font-size:12px; white-space:nowrap; text-overflow:ellipsis; }
-  #cmpList .note { margin:4px; color:var(--mut); font-size:12px; }
+  #cmpList .nm { overflow:hidden; color:var(--mut); font-size:14px; white-space:nowrap; text-overflow:ellipsis; }
+  #cmpList .note { margin:4px; color:var(--mut); font-size:14px; }
   label:has(#tLog:disabled), #drawBtn:disabled { opacity:.4; cursor:not-allowed; }
   /* ---- guided layer tour: a card pinned in the FUTURE_BARS whitespace, explaining one overlay at a time ---- */
   .tour-card { position:absolute; z-index:6; pointer-events:auto; width:calc(460px * var(--ts,1)); max-width:92%;
@@ -186,7 +186,7 @@
               box-shadow:0 6px 18px rgba(0,0,0,.5); }
   #siteMenu.open { display:block; }
   #siteMenu a { display:block; padding:7px 12px; color:var(--fg); text-decoration:none;
-                font-size:13px; letter-spacing:.04em; }
+                font-size:15px; letter-spacing:.04em; }
   #siteMenu a:hover { color:#00ff88; background:rgba(0,255,136,.06); }
   /* signed-out draw CTA (site mode only — built by showDrawCta()) */
   #drawCta { display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.55);
@@ -195,13 +195,13 @@
   #drawCta .box { background:var(--panel); border:1px solid var(--mine); padding:20px 24px;
                   max-width:340px; box-shadow:0 8px 28px rgba(0,0,0,.6); }
   #drawCta h3 { margin:0 0 8px; font-size:15px; letter-spacing:.04em; color:var(--mine); }
-  #drawCta p { margin:0 0 14px; font-size:13.5px; line-height:1.5; color:var(--fg); }
+  #drawCta p { margin:0 0 14px; font-size:15px; line-height:1.5; color:var(--fg); }
   #drawCta .row { display:flex; gap:8px; align-items:center; }
   #drawCta button.go { flex:1; padding:7px 10px; border-color:var(--mine); color:var(--mine);
-                       font-size:13px; letter-spacing:.04em; }
+                       font-size:15px; letter-spacing:.04em; }
   #drawCta button.go:hover { background:rgba(198,255,0,.08); }
-  #drawCta a.alt { padding:7px 6px; color:var(--fg); font-size:13px; }
-  #drawCta button.later { padding:7px 10px; font-size:13px; }
+  #drawCta a.alt { padding:7px 6px; color:var(--fg); font-size:15px; }
+  #drawCta button.later { padding:7px 10px; font-size:15px; }
   /* account control (site mode, right of Limit Buy Levels) + in-page sign-in dialog */
   #acct { position:relative; display:inline-flex; align-items:center; }
   #acct[hidden], #acct [hidden] { display:none !important; }
@@ -215,12 +215,12 @@
   #acctMenu { position:absolute; top:calc(100% + 6px); right:0; z-index:30; min-width:210px;
               background:var(--panel); border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5);
               padding:6px 0; white-space:normal; }
-  #acctMenuWho { margin:4px 12px 8px; color:var(--mut); font-size:12px; word-break:break-all; }
+  #acctMenuWho { margin:4px 12px 8px; color:var(--mut); font-size:14px; word-break:break-all; }
   #acctMenu a, #acctMenu button { display:block; width:100%; padding:8px 12px; text-align:left;
-                                  color:var(--fg); text-decoration:none; font-size:13px; border:0;
+                                  color:var(--fg); text-decoration:none; font-size:15px; border:0;
                                   background:none; letter-spacing:normal; font-weight:normal; }
   #acctMenu a:hover, #acctMenu button:hover { color:#00ff88; background:rgba(0,255,136,.06); }
-  #acctMenuErr { margin:0 12px; color:var(--csell); font-size:12px; }
+  #acctMenuErr { margin:0 12px; color:var(--csell); font-size:14px; }
   #acctMenuErr:empty { display:none; }
   #signInDialog { display:none; position:fixed; inset:0; z-index:90; padding:20px;
                   background:rgba(0,0,0,.72); align-items:center; justify-content:center; }
@@ -228,20 +228,20 @@
   #signInDialog .box { width:min(380px,100%); background:var(--panel); border:1px solid rgba(0,255,136,.45);
                        padding:22px; box-shadow:0 12px 38px rgba(0,0,0,.72); display:flex; flex-direction:column;
                        max-height:calc(100vh - 40px); overflow-y:auto; overscroll-behavior:contain; }
-  #signInDialog .eyebrow { margin-bottom:8px; color:#00ff88; font:11px monospace; letter-spacing:.16em;
+  #signInDialog .eyebrow { margin-bottom:8px; color:#00ff88; font:13px monospace; letter-spacing:.16em;
                            text-transform:uppercase; }
   #signInDialog h3 { margin:0 0 6px; color:var(--fg); font-size:18px; letter-spacing:.03em; }
-  #signInDialog .lede { margin:0 0 14px; color:var(--mut); font-size:13px; line-height:1.5; }
-  #signInDialog label { margin:8px 0 4px; color:var(--mut); font-size:12px; letter-spacing:.04em; }
+  #signInDialog .lede { margin:0 0 14px; color:var(--mut); font-size:15px; line-height:1.5; }
+  #signInDialog label { margin:8px 0 4px; color:var(--mut); font-size:14px; letter-spacing:.04em; }
   #signInDialog input { background:var(--bg); color:var(--fg); border:1px solid var(--grid); border-radius:0;
                         padding:8px 9px; font:14px "Space Grotesk","Segoe UI",sans-serif; }
   #signInDialog input:focus { outline:none; border-color:#00ff88; }
-  #signInDialog .err { min-height:19px; margin:10px 0 0; color:var(--csell); font-size:13px; }
+  #signInDialog .err { min-height:19px; margin:10px 0 0; color:var(--csell); font-size:15px; }
   #signInDialog .row { display:flex; align-items:center; gap:8px; margin-top:12px; }
-  #signInDialog a.alt { margin-right:auto; color:var(--fg); font-size:13px; }
-  #signInDialog a.forgot { align-self:flex-end; margin-top:6px; padding:2px 0; color:var(--mut); font-size:12px; }
+  #signInDialog a.alt { margin-right:auto; color:var(--fg); font-size:15px; }
+  #signInDialog a.forgot { align-self:flex-end; margin-top:6px; padding:2px 0; color:var(--mut); font-size:14px; }
   #signInDialog a.forgot:hover { color:#00ff88; }
-  #signInDialog button { padding:7px 12px; font-size:13px; }
+  #signInDialog button { padding:7px 12px; font-size:15px; }
   #signInDialog button.go { color:#00ff88; border-color:#00ff88; font-weight:bold; }
   #signInDialog button.go:hover { background:rgba(0,255,136,.1); }
   #signInDialog button:disabled { cursor:wait; opacity:.6; }
@@ -273,9 +273,9 @@
   #buildOvl canvas { display:block; width:100%; height:240px; background:#000;
                      border:1px solid var(--grid); }
   #buildOvl h3 { margin:12px 0 4px; font-size:15px; letter-spacing:.06em; color:var(--fg); }
-  #buildOvl .st { margin:0 0 4px; font-size:13px; color:var(--sup); min-height:1.4em; }
-  #buildOvl .el { margin:0 0 12px; font-size:12px; color:var(--mut); }
-  #buildOvl button.hideb { padding:6px 12px; font-size:12.5px; }
+  #buildOvl .st { margin:0 0 4px; font-size:15px; color:var(--sup); min-height:1.4em; }
+  #buildOvl .el { margin:0 0 12px; font-size:14px; color:var(--mut); }
+  #buildOvl button.hideb { padding:6px 12px; font-size:14px; }
   /* build ended without a chart: the card stays up and says why */
   /* the result card can open while Limit Buy or REORDER (75) is up, and it
      claims keys first, so it sits above them; sign-in (90) stays on top */
@@ -290,10 +290,10 @@
   #removeTickerDialog.open { display:flex; }
   #removeTickerDialog .box { width:min(400px,100%); background:var(--panel); border:1px solid var(--grid);
                              padding:22px; box-shadow:0 12px 38px rgba(0,0,0,.72); }
-  #removeTickerDialog .eyebrow { margin-bottom:10px; color:var(--csell); font:11px monospace;
+  #removeTickerDialog .eyebrow { margin-bottom:10px; color:var(--csell); font:13px monospace;
                                  letter-spacing:.16em; text-transform:uppercase; }
   #removeTickerDialog h3 { margin:0 0 8px; color:var(--fg); font-size:18px; letter-spacing:.03em; }
-  #removeTickerDialog p { margin:0; color:var(--mut); font-size:13px; line-height:1.5; }
+  #removeTickerDialog p { margin:0; color:var(--mut); font-size:15px; line-height:1.5; }
   #removeTickerDialog .err { min-height:19px; margin-top:9px; color:var(--csell); }
   #removeTickerDialog .row { display:flex; justify-content:flex-end; gap:8px; margin-top:15px; }
   #removeTickerDialog .remove { border-color:var(--csell); color:var(--csell); }
@@ -307,9 +307,9 @@
                               background:var(--panel); border:1px solid var(--sup); box-shadow:0 14px 44px rgba(0,0,0,.78); }
   .ticker-reorder-head { display:flex; align-items:flex-start; gap:18px; padding:18px 20px 14px; border-bottom:1px solid var(--grid); }
   .ticker-reorder-head .copy { flex:1 1 auto; min-width:0; }
-  .ticker-reorder-eyebrow { color:var(--sup); font:11px monospace; letter-spacing:.16em; text-transform:uppercase; }
+  .ticker-reorder-eyebrow { color:var(--sup); font:13px monospace; letter-spacing:.16em; text-transform:uppercase; }
   #tickerReorderTitle { margin:5px 0 4px; font-size:20px; letter-spacing:.03em; }
-  .ticker-reorder-help { margin:0; color:var(--mut); font-size:12.5px; line-height:1.45; white-space:normal; }
+  .ticker-reorder-help { margin:0; color:var(--mut); font-size:14px; line-height:1.45; white-space:normal; }
   #tickerReorderClose { flex:0 0 auto; min-width:68px; }
   #tickerReorderList { min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:10px 12px; }
   .ticker-reorder-row { display:flex; align-items:center; gap:10px; min-height:58px; padding:9px 10px;
@@ -321,9 +321,9 @@
                            font-size:18px; line-height:1; touch-action:none; }
   .ticker-reorder-handle:active { cursor:grabbing; }
   .ticker-reorder-symbol { flex:1 1 auto; min-width:70px; font:bold 15px monospace; letter-spacing:.08em; }
-  .ticker-reorder-position { color:var(--mut); font:11px monospace; white-space:nowrap; }
+  .ticker-reorder-position { color:var(--mut); font:13px monospace; white-space:nowrap; }
   .ticker-reorder-controls { display:flex; flex:0 0 auto; align-items:center; gap:5px; }
-  .ticker-reorder-controls button { min-width:50px; padding:6px 8px; font:11px monospace; }
+  .ticker-reorder-controls button { min-width:50px; padding:6px 8px; font:13px monospace; }
   .ticker-reorder-controls button:disabled { cursor:not-allowed; opacity:.35; }
   .ticker-reorder-sep { flex:0 0 1px; width:1px; height:20px; background:var(--grid); margin:0 5px; }
   .ticker-reorder-controls .reorder-delete { border-color:var(--csell); color:var(--csell); }
@@ -334,7 +334,7 @@
   /* SITE: the button row stays invisible until per-account access answers,
      so visitors never see the every-published-ticker flash (2.5s fail-open) */
   #superBtns.await-access { visibility:hidden; }
-  #tickerReorderMessage { flex:1 1 auto; min-width:0; color:var(--mut); font:12px monospace; white-space:normal; }
+  #tickerReorderMessage { flex:1 1 auto; min-width:0; color:var(--mut); font:14px monospace; white-space:normal; }
   #tickerReorderMessage.error { color:var(--csell); }
   #tickerReorderRetry { display:none; border-color:var(--csell); color:var(--csell); }
   /* scrollbars: thin, dark track, grey thumb that lights cyan while the pointer
@@ -349,13 +349,13 @@
   #exportDialog [hidden] { display:none !important; }   /* panels below set display; hidden must still win */
   #exportDialog .box { display:flex; flex-direction:column; width:100%; height:100%; max-height:none;
                        background:var(--panel); border:1px solid var(--sup); box-shadow:0 14px 44px rgba(0,0,0,.78); }
-  #exportDialog button { font:13px monospace; padding:6px 12px; }
+  #exportDialog button { font:15px monospace; padding:6px 12px; }
   /* banner: title left, the one primary action in the middle, Close right */
   #exportDialog .xp-head { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px;
                            padding:14px 20px 12px; border-bottom:1px solid var(--grid); }
   #exportDialog .xp-headact { display:flex; flex-direction:column; align-items:center; gap:4px; }
   #exportDialog .xp-head h2 { margin:2px 0 4px; font-size:20px; letter-spacing:.02em; }
-  #exportDialog .xp-lede { margin:0; color:var(--mut); font:12px monospace; }
+  #exportDialog .xp-lede { margin:0; color:var(--mut); font:14px monospace; }
   #exportClose { justify-self:end; align-self:start; }
   /* group tabs */
   #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid);
@@ -375,7 +375,7 @@
   #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) .xp-edit { border-left-color:rgba(38,198,218,.45); color:var(--sup); }
   #exportGroupTabs .xp-edit svg { width:13px; height:13px; }
   #exportGroupTabs .xp-new { color:var(--sup); border-style:dashed; }
-  #exportGroupsNote { flex-basis:100%; min-height:0; margin:0; color:var(--mut); font:12px monospace; }
+  #exportGroupsNote { flex-basis:100%; min-height:0; margin:0; color:var(--mut); font:14px monospace; }
   #exportGroupsNote:empty { display:none; }
   #exportGroupsNote.error { color:var(--csell); }
   /* two columns */
@@ -402,13 +402,13 @@
   #exportDialog .xp-main[aria-busy="true"] .xp-sec { opacity:.45; }
   #exportDialog h3 { margin:0; font-size:15px; letter-spacing:.03em; }
   #exportDialog .xp-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  #exportDialog .xp-count { color:var(--mut); font:12px monospace; }
+  #exportDialog .xp-count { color:var(--mut); font:14px monospace; }
   #exportDialog .xp-link { padding:2px 4px; border:0; background:none; color:var(--sup); text-decoration:underline; }
   #exportDialog .xp-link:hover { color:var(--fg); }
   #exportDialog .xp-link:disabled { color:var(--mut); text-decoration:none; cursor:not-allowed; }
   #exportDialog .xp-link.danger { color:var(--csell); }
   #exportDialog input[type="search"], #exportDialog input[type="text"], #exportDialog input[type="number"] {
-    background:var(--bg); color:var(--fg); border:1px solid var(--grid); padding:6px 8px; font:13px monospace; border-radius:0; }
+    background:var(--bg); color:var(--fg); border:1px solid var(--grid); padding:6px 8px; font:15px monospace; border-radius:0; }
   #exportDialog input:focus { outline:none; border-color:var(--sup); }
   #exportSearch { width:100%; box-sizing:border-box; }
   /* ticker list: symbol, full name */
@@ -421,21 +421,21 @@
   #exportPicks .xp-pick:last-child { border-bottom:0; }
   #exportPicks .xp-pick:hover, #exportPicks .xp-pick:focus-within { background:rgba(38,198,218,.08); }
   #exportPicks .xp-pick input { margin:0; accent-color:var(--sup); }
-  #exportPicks .xp-empty { padding:10px; color:var(--mut); font:12px monospace; }
+  #exportPicks .xp-empty { padding:10px; color:var(--mut); font:14px monospace; }
   #exportDialog .xp-sym { font:bold 13px Verdana,Geneva,sans-serif; letter-spacing:.03em; }
-  #exportDialog .xp-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--mut); font:12px monospace; }
-  #exportDialog .xp-type { padding:1px 5px; border:1px solid var(--grid); color:var(--mut); font:10px monospace;
+  #exportDialog .xp-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--mut); font:14px monospace; }
+  #exportDialog .xp-type { padding:1px 5px; border:1px solid var(--grid); color:var(--mut); font:12px monospace;
                            letter-spacing:.08em; text-transform:uppercase; }
   #exportDialog .xp-type.etf { border-color:rgba(38,198,218,.55); color:var(--sup); }
   /* filters */
   #exportDialog .xp-filters { display:flex; flex-direction:column; gap:10px; padding-top:12px; border-top:1px solid var(--grid); }
-  #exportDialog .xp-filters label { display:inline-flex; align-items:center; gap:6px; color:var(--mut); font:12px monospace; }
+  #exportDialog .xp-filters label { display:inline-flex; align-items:center; gap:6px; color:var(--mut); font:14px monospace; }
   #exportDialog .xp-field-group { display:flex; flex-direction:column; gap:6px; }
   #exportDialog .xp-fields { display:flex; gap:8px; }
   /* one dark box per field: label, number, unit; no native spinner arrows
      (the scroll wheel and arrow keys still step the value) */
   #exportDialog .xp-field { display:inline-flex; align-items:center; border:1px solid var(--grid); background:var(--bg);
-                            color:var(--mut); font:12px monospace; cursor:text; }
+                            color:var(--mut); font:14px monospace; cursor:text; }
   #exportDialog .xp-field:focus-within { border-color:var(--sup); }
   #exportDialog .xp-field > span { padding:0 0 0 9px; }
   #exportDialog .xp-field > .u { padding:0 9px 0 2px; }
@@ -472,18 +472,18 @@
   #exportResult .xp-cardhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; padding:9px 14px; border-bottom:1px solid var(--grid); }
   #exportResult .xp-cardhead .xp-sym { font-size:39px; }   /* same as the table view's group header */
   #exportResult .xp-cardhead .xp-name { flex:1 1 140px; color:var(--fg); white-space:normal; }
-  #exportResult .xp-meta { margin-left:auto; color:var(--mut); font:12px monospace; }
+  #exportResult .xp-meta { margin-left:auto; color:var(--mut); font:14px monospace; }
   #exportResult .xp-meta b { color:var(--fg); font:bold 13px Verdana,Geneva,sans-serif; }
-  #exportResult .xp-none, #exportResult .xp-help { margin:0; padding:10px 14px; color:var(--mut); font:12px monospace; }
-  #exportResult .xp-secfoot { display:flex; align-items:center; gap:8px; padding:6px 14px; border-top:1px solid var(--grid); color:var(--mut); font:12px monospace; }
+  #exportResult .xp-none, #exportResult .xp-help { margin:0; padding:10px 14px; color:var(--mut); font:14px monospace; }
+  #exportResult .xp-secfoot { display:flex; align-items:center; gap:8px; padding:6px 14px; border-top:1px solid var(--grid); color:var(--mut); font:14px monospace; }
   /* the lead price: nearest strong price, biggest thing in the card */
   #exportDialog .xp-hero { display:block; width:100%; padding:12px 14px; border:0; background:none; text-align:left; cursor:pointer; }
-  .xp-herolabel { display:block; color:var(--mut); font:12px monospace; letter-spacing:.04em; }
+  .xp-herolabel { display:block; color:var(--mut); font:14px monospace; letter-spacing:.04em; }
   .xp-heromain { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 16px; margin-top:2px; }
   .xp-heromain .xp-strength { align-self:center; }
   .xp-heropx { font:bold 36px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
   .xp-heropct { font:18px Verdana,Geneva,sans-serif; color:var(--fg); }
-  .xp-lmeta { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; color:var(--fg); font:13px Verdana,Geneva,sans-serif; }
+  .xp-lmeta { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; }
   .xp-strength { display:inline-flex; align-items:center; gap:6px; }
   .xp-meter { display:inline-flex; align-items:flex-end; gap:2px; height:13px; }
   .xp-meter i { display:block; width:4px; background:var(--grid); }
@@ -492,15 +492,15 @@
   .xp-sword { font:bold 12px monospace; }
   .tier-strong .xp-sword { color:var(--cbuy); } .tier-mid .xp-sword { color:var(--fg); } .tier-light .xp-sword { color:var(--mut); }
   .xp-reason { color:var(--fg); }
-  .xp-comb { color:var(--mut); font:12px monospace; }
-  .xp-why { font-size:12px; }
+  .xp-comb { color:var(--mut); font:14px monospace; }
+  .xp-why { font-size:14px; }
   /* price colour by strength (the % stays neutral) */
   .tier-strong .xp-heropx, .tier-strong .xp-rpx, .xp-whypx.tier-strong { color:var(--cbuy); }
   .tier-mid .xp-heropx, .tier-mid .xp-rpx, .xp-whypx.tier-mid { color:var(--fg); }
   .tier-light .xp-heropx, .tier-light .xp-rpx, .xp-whypx.tier-light { color:var(--mut); }
   /* the other prices, folded */
   #exportDialog .xp-more { display:block; width:100%; padding:8px 14px; border:0; border-top:1px solid var(--grid);
-                           background:none; color:var(--sup); text-align:left; font:12px monospace; }
+                           background:none; color:var(--sup); text-align:left; font:14px monospace; }
   #exportDialog .xp-more::after { content:" ›"; }
   #exportDialog .xp-more[aria-expanded="true"]::after { content:" ‹"; }
   #exportDialog .xp-more:hover { background:rgba(38,198,218,.06); }
@@ -519,11 +519,11 @@
   #exportDialog .xp-seg button:hover, #exportDialog .xp-seg button:focus-visible { z-index:2; }
   /* table view: every price for every ticker, one tight list */
   .xp-table { width:100%; max-width:820px; border-collapse:collapse; }
-  .xp-table thead th { padding:0 12px 8px; color:var(--mut); font:11px monospace; letter-spacing:.08em; text-transform:uppercase; text-align:left; font-weight:normal; }
+  .xp-table thead th { padding:0 12px 8px; color:var(--mut); font:13px monospace; letter-spacing:.08em; text-transform:uppercase; text-align:left; font-weight:normal; }
   .xp-tgroup th { padding:14px 12px 6px; border-top:1px solid var(--grid); text-align:left; font-weight:normal; }
   #exportResult .xp-tgroup .xp-sym { font-size:39px; margin-right:12px; }
-  .xp-tgroup .xp-name { color:var(--fg); font:12px monospace; }
-  .xp-tgroup .xp-meta { float:right; color:var(--mut); font:12px monospace; }
+  .xp-tgroup .xp-name { color:var(--fg); font:14px monospace; }
+  .xp-tgroup .xp-meta { float:right; color:var(--mut); font:14px monospace; }
   .xp-tgroup .xp-meta b { color:var(--fg); font:bold 13px Verdana,Geneva,sans-serif; }
   .xp-trow { cursor:pointer; }
   .xp-trow td { padding:6px 12px; border-top:1px solid rgba(38,38,38,.7); white-space:nowrap; }
@@ -534,7 +534,7 @@
   .xp-tpx { width:1%; font:bold 34px Verdana,Geneva,sans-serif; }
   .xp-tpct { font:14px Verdana,Geneva,sans-serif; color:var(--fg); }
   .xp-trow.tier-strong .xp-tpx { color:var(--cbuy); } .xp-trow.tier-mid .xp-tpx { color:var(--fg); } .xp-trow.tier-light .xp-tpx { color:var(--mut); }
-  .xp-tnote td { padding:4px 12px 8px; color:var(--mut); font:12px monospace; }
+  .xp-tnote td { padding:4px 12px 8px; color:var(--mut); font:14px monospace; }
   .xp-table .xp-none { padding:6px 12px; }
   /* why panel: third column beside the cards */
   #exportDialog .xp-body.why-open { grid-template-columns:minmax(300px,380px) 1fr minmax(320px,380px); }
@@ -550,15 +550,15 @@
   .xp-whychart .lvl { stroke:var(--cbuy); stroke-width:1.5; }
   .xp-whychart .mem { stroke:var(--mut); stroke-width:1; stroke-dasharray:4 3; }
   .xp-whychart .now { fill:var(--fg); }
-  .xp-whychart text { font:11px monospace; fill:var(--mut); }
+  .xp-whychart text { font:13px monospace; fill:var(--mut); }
   .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
-  .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:13px Verdana,Geneva,sans-serif; line-height:1.55; }
+  .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; line-height:1.55; }
   .xp-whylist li { margin-bottom:6px; }
-  .xp-whynote { margin:0; color:var(--mut); font:12px monospace; line-height:1.5; }
+  .xp-whynote { margin:0; color:var(--mut); font:14px monospace; line-height:1.5; }
   @media (max-width:900px) {
     #exportWhy { position:fixed; inset:0; z-index:79; border-left:0; }
   }
-  .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font:11px monospace; }
+  .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font:13px monospace; }
   .xp-limit.tier-strong .export-badge { font-weight:bold; }
   /* the purple wash reads as "strong LEVEL" — keep it off the green zone badges */
   .xp-limit.tier-strong .export-badge:not(.gap):not(.ob):not(.confl):not(.pd):not(.stack) { background:rgba(157,107,255,.14); }
@@ -568,7 +568,7 @@
   .export-badge.ob { border-color:var(--cbuy); color:var(--cbuy); }
   .export-badge.confl { border-color:var(--cbuy); color:var(--cbuy); }
   .export-badge.pd { border-color:var(--cbuy); color:var(--cbuy); }
-  #exportMsg { min-height:15px; color:var(--mut); font:12px monospace; text-align:center; }
+  #exportMsg { min-height:15px; color:var(--mut); font:14px monospace; text-align:center; }
   #exportMsg.error { color:var(--csell); }
   #exportDialog .xp-primary { padding:9px 22px; border-color:var(--sup); background:var(--sup);
                               color:var(--bg); font-weight:bold; font-size:14px; }
@@ -585,25 +585,25 @@
   #exportDialog #exportGroupName:focus { border-color:var(--sup); background:rgba(38,198,218,.10); box-shadow:0 0 0 1px var(--sup); }
   #exportEditor .xp-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; min-height:0; }
   #exportEditor .xp-col { display:flex; flex-direction:column; gap:8px; min-width:0; }
-  #exportEditor .xp-col h4 { margin:0; font-size:13px; letter-spacing:.04em; }
+  #exportEditor .xp-col h4 { margin:0; font-size:15px; letter-spacing:.04em; }
   #exportEdSearch { width:100%; box-sizing:border-box; }
   #exportEditor .xp-edlist { display:flex; flex-direction:column; height:min(46vh,420px); overflow:auto; border:1px solid var(--grid); }
   #exportEditor .xp-edrow { display:grid; grid-template-columns:58px 1fr auto 64px; align-items:center; gap:8px; width:100%;
                             padding:6px 10px; border:0; border-bottom:1px solid var(--grid); background:none; color:var(--fg); text-align:left; }
   #exportEditor .xp-edrow:hover, #exportEditor .xp-edrow:focus-visible { background:rgba(38,198,218,.08); }
-  #exportEditor .xp-edrow .act { color:var(--sup); font-size:12px; text-align:right; }
+  #exportEditor .xp-edrow .act { color:var(--sup); font-size:14px; text-align:right; }
   #exportEditor .xp-edrow .act.rm { color:var(--csell); }
   #exportEditor .xp-typefilter { display:inline-flex; margin-left:auto; }
   #exportEditor .xp-typefilter button { margin-left:-1px; padding:4px 10px; color:var(--mut); }
   #exportEditor .xp-typefilter button[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); position:relative; }
   #exportEditor .xp-actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
-  #exportEdMsg { color:var(--mut); font:12px monospace; }
+  #exportEdMsg { color:var(--mut); font:14px monospace; }
   #exportEdMsg.error { color:var(--csell); }
   #exportEditor .xp-actions .xp-primary { margin-left:0; }
   #exportEditor .xp-actions .spacer { flex:1 1 auto; }
   /* instant tooltip: one fixed element, so list scrolling never clips it */
   #exportTip { position:fixed; z-index:80; max-width:340px; padding:6px 9px; border:1px solid var(--sup);
-               background:var(--bg); color:var(--fg); font:12px monospace; line-height:1.45; pointer-events:none; }
+               background:var(--bg); color:var(--fg); font:14px monospace; line-height:1.45; pointer-events:none; }
   #exportTip[hidden] { display:none; }
   #exportTip b { font-family:Verdana,Geneva,sans-serif; }
   #exportTip .ln { display:block; white-space:nowrap; }
@@ -1549,14 +1549,13 @@ function tipDistHtml(price) {
   if (a < 0.005) return '<div class="dist">at current price</div>';
   return '<div class="dist">' + a.toFixed(a < 1 ? 2 : 1) + '% ' + (pct < 0 ? 'below' : 'above') + '</div>';
 }
-// the price a hit mark stands for now: a diagonal's value at the latest bar (along its
-// ray, measured on screen so it matches the drawn line in log or linear scale)
-function tipHitPrice(it) {
+// the price a hit mark stands for under the cursor: a diagonal's value at the cursor's
+// x (measured on screen so it matches the drawn line in log or linear scale)
+function tipHitPrice(it, x) {
   if (it.k !== 's') return it.p;
   var a = project(it.t1, it.p1), b = project(it.t2, it.p2);
-  var xNow = chart.timeScale().timeToCoordinate(current.candles[current.candles.length - 1].time);
-  if (!a || !b || a.x === b.x || xNow == null) return null;
-  return candleSeries.coordinateToPrice(a.y + (b.y - a.y) * (xNow - a.x) / (b.x - a.x));
+  if (!a || !b || a.x === b.x) return null;
+  return candleSeries.coordinateToPrice(a.y + (b.y - a.y) * (x - a.x) / (b.x - a.x));
 }
 function escTip(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function r2(v) { return Number(Number(v).toFixed(2)); }
@@ -1598,7 +1597,7 @@ function onTipMove(ev) {
   var hit = tipHitTest(x, y);
   if (!hit) { hideTip(); return; }
   var tb = document.getElementById('tipBox');
-  tb.innerHTML = hit.html + tipDistHtml(tipHitPrice(hit));
+  tb.innerHTML = hit.html + tipDistHtml(tipHitPrice(hit, x));
   tb.style.display = 'block';
   // near the cursor, clamped inside the pane; flip above when it would spill the bottom
   var bw = tb.offsetWidth, bh = tb.offsetHeight, W = el.clientWidth, H = el.clientHeight;
@@ -3943,7 +3942,7 @@ function dailyCloses(candles) {
 function whyChartSvg(sec, lim) {
   var pts = dailyCloses(sec.candles);
   if (pts.length < 2) return '';
-  var W = 340, H = 180, padL = 4, padR = 56, padT = 10, padB = 22;
+  var W = 340, H = 180, padL = 4, padR = 66, padT = 10, padB = 22;
   var levels = [lim.row].concat(lim.members).map(function (r) { return r.limit; });
   var lo = Math.min.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
   var hi = Math.max.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
@@ -4166,9 +4165,9 @@ function renderExportEditor() {
     if (q && sym.toLowerCase().indexOf(q) < 0 && tickerName(sym).toLowerCase().indexOf(q) < 0) return;
     avail.appendChild(editorRow(sym, false));
   });
-  if (!avail.children.length) avail.innerHTML = '<p class="xp-empty" style="padding:10px;color:var(--mut);font:12px monospace">Nothing to add here.</p>';
+  if (!avail.children.length) avail.innerHTML = '<p class="xp-empty" style="padding:10px;color:var(--mut);font:14px monospace">Nothing to add here.</p>';
   _edSyms.slice().sort().forEach(function (sym) { inList.appendChild(editorRow(sym, true)); });
-  if (!_edSyms.length) inList.innerHTML = '<p class="xp-empty" style="padding:10px;color:var(--mut);font:12px monospace">No tickers yet. Add some from the left.</p>';
+  if (!_edSyms.length) inList.innerHTML = '<p class="xp-empty" style="padding:10px;color:var(--mut);font:14px monospace">No tickers yet. Add some from the left.</p>';
   var stocks = 0, etfs = 0, other = 0;
   _edSyms.forEach(function (s) { var t = tickerType(s); if (t === 'stock') stocks++; else if (t === 'etf') etfs++; else other++; });
   var parts = [];
