@@ -34,10 +34,11 @@ IBM Plex Mono is the tube's voice for body copy, data, labels, navigation and th
 footer. Etched labels are small, tracked and dim. Labels must still be plain enough
 to understand without internal strategy vocabulary.
 
-Headlines use the single-stroke glyph set in
-`client/src/lib/trace-font.ts`, rendered as SVG polylines with a hidden text twin
-for accessibility. Orbitron and Space Grotesk remain legacy inner-page fonts, not
-homepage fonts.
+Headlines use `BeamHeading` (`client/src/components/beam-heading.tsx`): real text
+in Orbitron (`--font-display`), phosphor-hot, revealed by a left-to-right beam
+wipe. The logo's KINE FRACTAL wordmark draws from its own single-stroke glyphs in
+`client/src/lib/kf-logo-geometry.ts`. Space Grotesk remains a legacy inner-page
+font, not a homepage font.
 
 ## One-beam motion
 

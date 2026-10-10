@@ -5,7 +5,8 @@
 // at heading size. BeamHeading renders REAL text in the display face, phosphor-
 // hot with a soft glow, and reveals it with a left-to-right beam wipe when
 // `active` flips true — so the scope still "draws" the headline, but you can
-// read it. TracedText stays for the hero + navbar wordmark only.
+// read it. TracedText has since been removed; the logo draws its own glyphs
+// (kine-fractal-logo.tsx).
 //
 // Drop-in for TracedText's heading props (text / as / active / instant), plus
 // an optional delay. A visually-hidden twin is not needed: the text is real,
