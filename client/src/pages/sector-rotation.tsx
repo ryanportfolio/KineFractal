@@ -516,11 +516,11 @@ export default function SectorRotation() {
                   SECTOR ROTATION
                 </h1>
 
-                <div className="flex items-center gap-4 mt-4 md:mt-0">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 md:mt-0 md:flex-nowrap">
                   <span
                     role="status"
                     aria-live="polite"
-                    className={`font-mono text-xs whitespace-nowrap ${marketDataStatus.tone === 'caution' ? 'text-amber-300' : 'text-white/70'}`}
+                    className={`min-w-0 font-mono text-xs md:whitespace-nowrap ${marketDataStatus.tone === 'caution' ? 'text-amber-300' : 'text-white/70'}`}
                     data-testid="text-market-data-status"
                   >
                     {marketDataStatus.text}

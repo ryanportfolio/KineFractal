@@ -753,6 +753,14 @@ export default function RatioRelevance() {
                   <h3 className="font-mono text-red-400 font-bold">Error Loading Data</h3>
                   <p className="font-mono text-sm text-red-400/70">{error}</p>
                 </div>
+                <button
+                  onClick={fetchData}
+                  disabled={loading}
+                  className="ml-auto px-3 py-1.5 border border-red-500/50 text-red-400 font-mono text-xs hover:bg-red-500/10 disabled:opacity-60 transition-colors"
+                  data-testid="button-retry"
+                >
+                  {loading ? 'RETRY…' : 'RETRY'}
+                </button>
               </div>
             </div>
           )}
