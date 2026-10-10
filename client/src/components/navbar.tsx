@@ -17,7 +17,7 @@ import { openKfTerminal } from "@/components/command-line";
 // `external` = full-page app served by the server (not a SPA route) -> plain <a>
 const LINKS: { href: string; label: string; match: (loc: string) => boolean; external?: boolean }[] = [
   { href: "/lab", label: "board", match: (l) => l.startsWith("/lab") },
-  { href: "/ratio-relevance", label: "sectors", match: (l) => l === "/ratio-relevance" },
+  { href: "/ratio-relevance", label: "sectors", match: (l) => l === "/ratio-relevance" || l === "/sector-rotation" },
   { href: "/charts/", label: "charts", match: () => false, external: true },
   { href: "/about", label: "about", match: (l) => l === "/about" },
   { href: "/alerts", label: "alerts", match: (l) => l === "/alerts" },
