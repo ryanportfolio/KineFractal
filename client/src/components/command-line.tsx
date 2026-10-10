@@ -26,12 +26,14 @@ type Phosphor = (typeof PHOSPHORS)[number];
 
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
 
-// signals.v1 regime states in plain words; the raw enum never reaches the screen
+// signals.v1 regime states in plain words; the raw enum never reaches the screen.
+// A state says nothing about orders: a break with no lots or a reclaim with an
+// empty pool flips the state and queues nothing (orders live in cell.intents).
 const STATE_TEXT: Record<string, string> = {
   long: "protection line intact",
-  break_pending: "protection line broke · protective sell queued for the next open",
-  protect_broken: "protection line broken · stepped aside",
-  reclaim_pending: "protection line reclaimed · rebuy queued for the next open",
+  break_pending: "protection line broke at this close",
+  protect_broken: "protection line broken",
+  reclaim_pending: "protection line reclaimed at this close",
   protect_off: "no protection rule on this fund",
 };
 const CAUTION_STATES = new Set(["break_pending", "protect_broken"]);
