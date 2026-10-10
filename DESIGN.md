@@ -70,7 +70,9 @@ themes recolor the whole ramp and stay coherent.
   scheduler drives the heading's reveal.
 - **Inner page header.** `Navbar`, then a `main` with top padding clearing the
   navbar, content in `max-w-6xl mx-auto px-5 md:px-10`, an etched label, then a
-  `BeamHeading` h1.
+  `BeamHeading` h1. Two pages lead differently on purpose: `/about` opens on its
+  own hero (a large mono title with a rotating word), and a `/lab/:key` report
+  leads with its score, the edge in pp, under a hairline meta bar.
 
 ## Motion
 
@@ -165,8 +167,11 @@ SPY protection in plain language. Exact engines and thresholds differ by fund.
 
 ### 5. SPY, step by step
 
-This is a full-history backtest of the deployed SPY variant, viewed through a
-selected episode. Label it as simulated and state the next-open fill assumption.
+This is a full-history SPY backtest viewed through a recorded episode. Label it
+as simulated and state the next-open fill assumption. The label names the variant
+the episode was recorded under, read from the episode itself; when the site now
+runs a different variant, a note says so. Never relabel a recorded episode with
+the deployed version.
 The explanation may walk through fear buys, trims, recycle and protection, but
 must not imply QQQ and IWM share SPY's exact rules.
 
@@ -240,8 +245,8 @@ The evidence stamp is explicit, with the variant read from data:
 - Do not describe backtest trades or fills as actual or live, and do not use a
   provenance slogan in place of a simulation label. A value can be engine-derived
   while the trade remains hypothetical.
-- Version numbers come from data. Copy says "the deployed SPY variant" rather
-  than naming one.
+- Version numbers come from data, never from hand-written copy: the deployed
+  variant from the snapshot, a recorded artifact's variant from that artifact.
 
 ## Bans
 
@@ -256,13 +261,16 @@ The evidence stamp is explicit, with the variant read from data:
 
 ## Known exceptions
 
-These break the rules above. The logo is approved as it is; the rest are debt to
-fix when the surface is next reworked, and the command drawer comes first because
-it breaks an evidence rule.
+These break the rules above. The first two are owner-approved and stay; the rest
+are debt to fix when the surface is next reworked, and the command drawer comes
+first because it breaks an evidence rule.
 
-- **Logo colors.** The logo's cyan-to-green ring and red-to-green top wave are a
-  fourth hue. Approved with the logo (2026-10-10); no other component may borrow
-  them.
+- **Logo colors** (approved). The logo's cyan-to-green ring and red-to-green top
+  wave are a fourth hue. Approved with the logo (2026-10-10); no other component
+  may borrow them.
+- **About page motion** (approved). The hero title's word rotation keeps running
+  beside the margin figure once the hero entrance has played, an owner call over
+  the one-moving-section rule (recorded in `about-rail.tsx`).
 - **Command drawer** (`command-line.tsx`): the board and trades output prints
   backtest returns and fills without a simulated label; the header says
   "live EOD data"; the intro line is a provenance slogan ("real end-of-day
