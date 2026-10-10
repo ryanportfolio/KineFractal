@@ -2543,6 +2543,7 @@ function showBuildOvl(sym) {
     document.body.appendChild(el);
   }
   el.classList.remove('done');
+  ['role', 'aria-modal', 'aria-labelledby', 'aria-describedby'].forEach(function (a) { el.removeAttribute(a); });
   el.querySelector('button.hideb').textContent = 'hide, keep building';
   el.querySelector('h3').textContent = 'building ' + sym.toUpperCase();
   el.querySelector('.st').textContent = BUILD_STAGES[0][1];
@@ -2564,8 +2565,14 @@ function showBuildOvl(sym) {
 }
 function hideBuildOvl() {
   var el = document.getElementById('buildOvl');
+  var wasResult = buildResultOpen();
   if (el) el.classList.remove('open');
   stopBuildAnim();
+  if (wasResult) document.getElementById('addSym').focus();   // back to where the add started
+}
+function buildResultOpen() {
+  var el = document.getElementById('buildOvl');
+  return !!el && el.classList.contains('open') && el.classList.contains('done');
 }
 function stopBuildAnim() {
   if (_beam) { _beam.destroy(); _beam = null; }
@@ -2579,6 +2586,12 @@ function showBuildResult(title, text) {
   if (!el) return;
   stopBuildAnim();
   el.classList.add('open', 'done');
+  el.setAttribute('role', 'alertdialog');
+  el.setAttribute('aria-modal', 'true');
+  el.querySelector('h3').id = 'buildOvlTitle';
+  el.querySelector('.st').id = 'buildOvlText';
+  el.setAttribute('aria-labelledby', 'buildOvlTitle');
+  el.setAttribute('aria-describedby', 'buildOvlText');
   el.querySelector('h3').textContent = title;
   el.querySelector('.st').textContent = text;
   el.querySelector('.el').textContent = '';
@@ -2675,6 +2688,7 @@ function applyTickerAccess() {
     b.style.display = v ? '' : 'none';
     if (v === 2 || (v === 1 && _chartAccess.account)) enableTickerRemoval(b, s);
   });
+  reconcileCompares();
   applyTickerOrder(preferredTickerOrder());
   if (document.getElementById('tickerReorderDialog').classList.contains('open')) renderTickerReorderList();
 }
@@ -4559,6 +4573,13 @@ function buildDropdown() {
     // Account dialogs and menu handle their own keys (onAccountKeydown); while
     // one is open, no key reaches the chart shortcuts below.
     if (accountUiOwnsKeys(e)) return;
+    // A failed-add result card is modal: Esc closes it, Tab stays on its one
+    // button (Enter/Space press it), and no chart shortcut runs behind it.
+    if (buildResultOpen()) {
+      if (e.key === 'Escape') { e.preventDefault(); hideBuildOvl(); }
+      else if (e.key === 'Tab') { e.preventDefault(); document.querySelector('#buildOvl button.hideb').focus(); }
+      return;
+    }
     // The remove-confirm sits ABOVE the reorder modal (it can be opened from
     // a reorder row), so it claims keys first while open.
     var removeDialog = document.getElementById('removeTickerDialog');
@@ -4904,8 +4925,10 @@ function fmtPctChange(v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.to
 function renderCompareLegend() {
   var box = document.getElementById('cmpLegend');
   if (!_cmpLines.length || !chart || !current || !current.candles.length) { box.innerHTML = ''; return; }
+  // bars at least partly on screen (floor/ceil): the same bounds lightweight-charts 4.2 uses
+  // to pick each series' first visible value, the 0% of the percent axis
   var c = current.candles, n = c.length, lr = chart.timeScale().getVisibleLogicalRange();
-  var i0 = lr ? Math.max(0, Math.ceil(lr.from)) : 0, i1 = lr ? Math.min(n - 1, Math.floor(lr.to)) : n - 1;
+  var i0 = lr ? Math.max(0, Math.floor(lr.from)) : 0, i1 = lr ? Math.min(n - 1, Math.ceil(lr.to)) : n - 1;
   var has = i0 <= i1, t0 = has ? c[i0].time : 0, t1 = has ? c[i1].time : 0;
   function item(sym, color, text, removable) {
     return '<span class="it"><span class="sym" style="color:' + color + '">' + escHtml(sym) + '</span>'
@@ -4927,6 +4950,17 @@ function scheduleCompareLegend() {
   _cmpLegendQueued = true;
   requestAnimationFrame(function () { _cmpLegendQueued = false; renderCompareLegend(); });
 }
+// Once the visitor's row is known, drop saved compares that are not on it (removed
+// elsewhere, another account), so they neither stay drawn nor hold a slot of the limit.
+function reconcileCompares() {
+  var row = visibleTickerSymbols();
+  var kept = _cmpSyms.filter(function (s) { return row.indexOf(s) >= 0; });
+  if (kept.length === _cmpSyms.length) return;
+  _cmpSyms = kept;
+  saveCompareSyms();
+  if (current) redraw();
+  if (compareMenuOpen()) renderCompareList();
+}
 function addCompare(s) {
   _cmpMissing = {};   // adding (again) retries any earlier failed load
   if (_cmpSyms.indexOf(s) < 0 && _cmpSyms.length < CMP_MAX) { _cmpSyms.push(s); saveCompareSyms(); }
@@ -4945,6 +4979,7 @@ function openCompareMenu() {
   var r = btn.getBoundingClientRect();
   menu.style.left = Math.max(4, Math.min(window.innerWidth - 244, r.left)) + 'px';
   menu.style.top = (r.bottom + 4) + 'px';
+  menu.style.maxHeight = Math.max(140, Math.min(340, window.innerHeight - r.bottom - 12)) + 'px';
   menu.hidden = false;
   btn.setAttribute('aria-expanded', 'true');
   var find = document.getElementById('cmpFind');
@@ -4989,6 +5024,11 @@ function wireCompare() {
     if (first) first.click();
   };
   document.addEventListener('mousedown', function (e) {
+    if (compareMenuOpen() && !e.target.closest('#cmpMenu, #cmpBtn')) closeCompareMenu(false);
+  });
+  // focus landing anywhere outside the picker (Tab, including a wrap through the browser's
+  // own UI) closes it, so chart shortcuts never stay blocked behind it
+  document.addEventListener('focusin', function (e) {
     if (compareMenuOpen() && !e.target.closest('#cmpMenu, #cmpBtn')) closeCompareMenu(false);
   });
   document.getElementById('cmpLegend').onclick = function (e) {
