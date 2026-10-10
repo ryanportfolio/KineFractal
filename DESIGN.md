@@ -262,8 +262,7 @@ The evidence stamp is explicit, with the variant read from data:
 ## Known exceptions
 
 These break the rules above. The first two are owner-approved and stay; the rest
-are debt to fix when the surface is next reworked, and the command drawer comes
-first because it breaks an evidence rule.
+are debt to fix when the surface is next reworked.
 
 - **Logo colors** (approved). The logo's cyan-to-green ring and red-to-green top
   wave are a fourth hue. Approved with the logo (2026-10-10); no other component
@@ -271,11 +270,6 @@ first because it breaks an evidence rule.
 - **About page motion** (approved). The hero title's word rotation keeps running
   beside the margin figure once the hero entrance has played, an owner call over
   the one-moving-section rule (recorded in `about-rail.tsx`).
-- **Command drawer** (`command-line.tsx`): the board and trades output prints
-  backtest returns and fills without a simulated label; the header says
-  "live EOD data"; the intro line is a provenance slogan ("real end-of-day
-  data"); it prints raw internal states (`protect_broken`, "buy zone armed"); a
-  `$` price appears without an ETF quote label; one column uses a hex gray.
 - **Hero:** a `CodeRain` canvas animates alongside the WebGL beam, and the hero
   mark runs an infinite pulse glow. A comment in `hero-signal.tsx` still
   describes a reduced-motion frame that no longer exists.

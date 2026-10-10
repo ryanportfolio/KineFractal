@@ -26,6 +26,16 @@ type Phosphor = (typeof PHOSPHORS)[number];
 
 const day = (ts: number) => new Date(ts * 1000).toISOString().slice(0, 10);
 
+// signals.v1 regime states in plain words; the raw enum never reaches the screen
+const STATE_TEXT: Record<string, string> = {
+  long: "protection line intact",
+  break_pending: "protection line broke · protective sell queued for the next open",
+  protect_broken: "protection line broken · stepped aside",
+  reclaim_pending: "protection line reclaimed · rebuy queued for the next open",
+  protect_off: "no protection rule on this fund",
+};
+const CAUTION_STATES = new Set(["break_pending", "protect_broken"]);
+
 // ---- output line primitives -------------------------------------------------
 type Line = { id: number; node: ReactNode };
 let lineId = 0;
@@ -93,7 +103,7 @@ export function CommandLine() {
         >
           {KINE_FRACTAL_BANNER}
         </pre>
-        <div className={DIM}>ask the engine directly · real end-of-day data, nothing typed in by hand</div>
+        <div className={DIM}>read-only · latest EOD decisions and simulated backtest results, each labelled</div>
         <div className={DIM}>
           try <span className={G}>board</span> · <span className={G}>trades SPY</span> ·{" "}
           <span className={G}>fear SPY</span> · or <span className={G}>help</span> for everything
@@ -150,11 +160,11 @@ export function CommandLine() {
   const cmdHelp = () => {
     const rows: [string, string][] = [
       ["help", "this list"],
-      ["board [SYM]", "the EOD board · full windows, or every window for one fund"],
-      ["scan SYM [TF]", "headline metrics for a fund (default 1d) · e.g. scan SPY 1d"],
-      ["trades SYM [TF]", "latest closed + recent fills for a fund"],
-      ["fear SYM [TF]", "where the fear gauge sits right now"],
-      ["signals", "the engine's posture per fund, straight off the wire"],
+      ["board [SYM]", "simulated backtest results · full windows, or every window for one fund"],
+      ["scan SYM [TF]", "simulated backtest metrics for a fund (default 1d) · e.g. scan SPY 1d"],
+      ["trades SYM [TF]", "recent simulated backtest fills for a fund"],
+      ["fear SYM [TF]", "the fear gauge at the report's last close"],
+      ["signals", "latest EOD decision per fund · protection line and ETF quote"],
       ["report SYM [TF]", "open the full lab report page"],
       ["sweep", "run the 33-year storage sweep (alias: replay)"],
       ["trace", "jump to the verdict channels"],
@@ -180,7 +190,7 @@ export function CommandLine() {
     if (!rows.length) { print(<div className={ERR}>no board rows{symArg ? ` for ${symArg}` : ""}</div>); return; }
     print(
       <div>
-        <div className={DIM}>board · generated {b.generated}</div>
+        <div className={DIM}>backtest board · simulated returns, hypothetical next-open fills · generated {b.generated}</div>
         <div className={`${DIM} grid grid-cols-[110px_70px_1fr_1fr_1fr_64px] gap-2 border-b border-primary/20 pb-1 mt-1`}>
           <span>fund</span><span>window</span><span className="text-right">strategy</span>
           <span className="text-right">buy&amp;hold</span><span className="text-right">ahead</span><span className="text-right">trades</span>
@@ -190,7 +200,7 @@ export function CommandLine() {
             <span>{c.sym} · {c.tf}</span>
             <span className={DIM}>{c.start}</span>
             <span className={`${G} text-right`}>{fmtPct(c.ret)}</span>
-            <span className="text-right" style={{ color: "#7f8aa0" }}>{fmtPct(c.bench_ret)}</span>
+            <span className="text-right text-beam-dim">{fmtPct(c.bench_ret)}</span>
             <span className={`${G} text-right font-bold`}>{fmtPp(c.ret - c.bench_ret)}pp</span>
             <span className={`${DIM} text-right`}>{c.trades}</span>
           </div>
@@ -206,12 +216,12 @@ export function CommandLine() {
     const h = r.headline;
     print(
       <div>
-        <div className={DIM}>$ scan {t.sym} {t.tf} · {SYM_NAME[t.sym]} · {TF_LABEL[t.tf]} · window {r.window.start} → {r.window.end}</div>
-        <div className={`${G} font-bold my-1`}>{h.trades} TRADES · {fmtPct(h.ret)} vs {fmtPct(h.bench_ret)} buy&amp;hold · {fmtPp(h.edge_pp)}pp ahead</div>
+        <div className={DIM}>$ scan {t.sym} {t.tf} · {SYM_NAME[t.sym]} · {TF_LABEL[t.tf]} · simulated backtest {r.window.start} → {r.window.end} · hypothetical next-open fills</div>
+        <div className={`${G} font-bold my-1`}>{h.trades} SIMULATED TRADES · {fmtPct(h.ret)} vs {fmtPct(h.bench_ret)} buy&amp;hold · {fmtPp(h.edge_pp)}pp ahead</div>
         <Kv k="irr">{fmtPct(h.irr, 2)} <span className={DIM}>vs {fmtPct(h.bench_irr, 2)} bench</span></Kv>
         <Kv k="max drawdown">{h.dd.toFixed(1)}% <span className={DIM}>vs {h.bench_dd.toFixed(1)}% bench</span></Kv>
         <Kv k="win rate">{h.win_rate}% <span className={DIM}>· profit factor {h.profit_factor ?? "n/a"}</span></Kv>
-        <Kv k="exposure">{h.exposure_end.toFixed(1)}% <span className={DIM}>now · {h.exposure_avg.toFixed(1)}% average · open lots {h.open_lots}</span></Kv>
+        <Kv k="exposure">{h.exposure_end.toFixed(1)}% <span className={DIM}>at window end · {h.exposure_avg.toFixed(1)}% average · open lots {h.open_lots}</span></Kv>
         <div className={`${DIM} mt-1`}>generated {r.generated} · src /fearlab/{r.key}.json</div>
       </div>,
     );
@@ -222,10 +232,10 @@ export function CommandLine() {
     if (typeof t === "string") { print(<div className={ERR}>{t}</div>); return; }
     const r = await getReport(await keyOf(t.sym, t.tf));
     const rows = r.recent.slice(-10).reverse();
-    if (!rows.length) { print(<div className={ERR}>no recent fills for {t.sym} {t.tf}</div>); return; }
+    if (!rows.length) { print(<div className={ERR}>no recent simulated fills for {t.sym} {t.tf}</div>); return; }
     print(
       <div>
-        <div className={DIM}>{t.sym} {TF_LABEL[t.tf]} · last {rows.length} fills · newest first</div>
+        <div className={DIM}>{t.sym} {TF_LABEL[t.tf]} · last {rows.length} simulated backtest fills · hypothetical next-open fills · newest first</div>
         {rows.map((f, i) => (
           <div key={i} className="tabular-nums">
             <span className={DIM}>{day(f.ts)}</span>{" "}
@@ -258,14 +268,16 @@ export function CommandLine() {
     ).join("");
     print(
       <div>
-        <div className={DIM}>{t.sym} {TF_LABEL[t.tf]} · Williams VIX Fix percentile</div>
+        <div className={DIM}>{t.sym} {TF_LABEL[t.tf]} · Williams VIX Fix percentile · {r.window.end} close</div>
         <div className="tabular-nums my-1">
           <span className={armed ? G : DIM}>[{bar}]</span>{" "}
           <span className={`${G} font-bold`}>{ord(f.nowPct)}</span>{" "}
-          <span className={DIM}>· floor {ord(f.floorPct)}</span>
+          <span className={DIM}>· buy line {ord(f.floorPct)}</span>
         </div>
         <div className={armed ? `${G} font-bold` : DIM}>
-          {armed ? "▲ ABOVE FLOOR · buy zone armed" : "quiet · below the buy floor, engine waits"}
+          {armed
+            ? "▲ above the buy line · first buy check passed; cooldown, protection and cash can still block a buy"
+            : "quiet · below the buy line, engine waits"}
         </div>
       </div>,
     );
@@ -296,13 +308,13 @@ export function CommandLine() {
     }
     print(
       <div>
-        <div className={DIM}>engine posture · as of {s.trading_date} close · src signals/latest</div>
+        <div className={DIM}>latest EOD decision · {s.trading_date} close · decisions, not broker fills · src signals/latest</div>
         {s.cells.map((cell) => (
           <div key={`${cell.symbol}-${cell.tf}`} className="tabular-nums">
             <span className={`${G} inline-block w-12`}>{cell.symbol}</span>
             <span className={DIM}>{TF_LABEL[cell.tf] ?? cell.tf} · </span>
-            <span className={cell.state === "protect_broken" ? "text-accent" : G}>{cell.state}</span>
-            <span className={DIM}> @ ${cell.price.toFixed(2)}</span>
+            <span className={CAUTION_STATES.has(cell.state) ? "text-accent" : G}>{STATE_TEXT[cell.state] ?? "state not recognized"}</span>
+            <span className={DIM}> · ETF quote ${cell.price.toFixed(2)}</span>
           </div>
         ))}
       </div>,
@@ -467,7 +479,7 @@ export function CommandLine() {
         <div className="relative max-w-5xl mx-auto px-4 md:px-8 py-4 font-mono text-[13px] leading-relaxed">
           <div className="flex items-center justify-between border-b border-primary/20 pb-2 mb-2">
             <span className={`${DIM} text-[10px] tracking-[0.25em] uppercase`}>
-              <span className={G}>●</span> kf terminal · live EOD data
+              <span className={G}>●</span> kf terminal · EOD decisions · simulated backtests
             </span>
             <button
               onClick={() => setOpen(false)}
