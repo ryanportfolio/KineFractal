@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'wouter';
-import { RefreshCw, Activity, AlertTriangle, TrendingUp, TrendingDown, Loader2, ArrowLeft, Cpu } from 'lucide-react';
+import { Activity, AlertTriangle, TrendingUp, TrendingDown, Loader2, ArrowLeft, Cpu } from 'lucide-react';
 import { Navbar } from '@/components/navbar';
+import { SectorToolsMenu } from '@/components/sector-tools-menu';
 import { useDocumentMeta } from '@/hooks/use-document-meta';
 import { RatioRelevanceTerminal, type ModuleSignals } from '@/components/ratio-relevance-terminal';
 import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, Area, AreaChart } from 'recharts';
@@ -380,17 +381,36 @@ function RatioWaveChart({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
   
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  // Recharts places the tooltip from its getBoundingClientRect width, which the
+  // desktop root zoom inflates (1.2x/1.4x), so it never "fits" beside the cursor
+  // and gets pinned to the chart's left edge. Instead the wrapper sits exactly on
+  // the cursor (see <Tooltip> below) and the box places itself from offsetWidth,
+  // which is in the same layout px as Recharts' coordinate and is not zoomed:
+  // right of the cursor, else left of it, clamped inside the plot.
+  const CustomTooltip = ({ active, payload, label, coordinate, viewBox }: any) => {
     if (active && payload && payload.length) {
       const value = payload[0].value;
       const isAboveMean = value > mean;
+      const place = (el: HTMLDivElement | null) => {
+        if (!el || !coordinate || !viewBox) return;
+        const w = el.offsetWidth;
+        const lo = viewBox.x, hi = viewBox.x + viewBox.width;
+        let left = coordinate.x + 8;
+        if (left + w > hi) left = coordinate.x - 8 - w;
+        left = Math.max(lo, Math.min(left, hi - w));
+        el.style.transform = `translateX(${left - coordinate.x}px)`;
+      };
       return (
-        <div className="bg-black/90 border border-white/20 rounded-sm p-2 font-mono text-xs">
-          <div className="text-white/60">{formatDate(label)}</div>
-          <div style={{ color: isAboveMean ? highColor : lowColor }}>
+        <div
+          ref={place}
+          className="bg-black/90 border border-white/20 rounded-sm px-1.5 py-1 font-mono text-[10px] leading-tight w-max"
+          style={{ maxWidth: Math.min(viewBox?.width ?? 150, 150) }}
+        >
+          <div className="text-white/60 whitespace-nowrap">{formatDate(label)}</div>
+          <div className="whitespace-nowrap" style={{ color: isAboveMean ? highColor : lowColor }}>
             {ratioLabel}: {value.toFixed(4)}
           </div>
-          <div className="text-white/40 text-[10px]">
+          <div className="text-white/40 text-[9px]">
             {isAboveMean ? highTooltip : lowTooltip}
           </div>
         </div>
@@ -447,7 +467,7 @@ function RatioWaveChart({
               tickFormatter={(v) => v.toFixed(3)}
               width={45}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={<CustomTooltip />} offset={0} position={{ y: 0 }} allowEscapeViewBox={{ x: true, y: true }} isAnimationActive={false} wrapperStyle={{ pointerEvents: 'none' }} />
             <ReferenceLine 
               y={mean} 
               stroke="rgba(255,255,255,0.4)" 
@@ -618,7 +638,6 @@ export default function RatioRelevance() {
   const [data, setData] = useState<RatioData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [aiSignals, setAiSignals] = useState<ModuleSignals>({});
   const [aiLoading, setAiLoading] = useState(true);
 
@@ -644,7 +663,6 @@ export default function RatioRelevance() {
       }
       const result = await response.json();
       setData(result);
-      setLastUpdated(new Date());
     } catch (err: any) {
       console.error('[Ratio Relevance] Error:', err);
       setError(err.message || 'Failed to load data');
@@ -695,12 +713,10 @@ export default function RatioRelevance() {
           
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-8">
             <div>
-              <h1 className="font-mono text-3xl md:text-4xl font-bold text-[#00ff88] mb-2 text-shadow-[0_0_20px_rgba(0,255,136,0.4)]" data-testid="text-page-title">
+              {/* Same type as the BeamHeading page titles (alerts, lab); drawn at once, no wipe. */}
+              <h1 className="beam-heading mb-2" data-drawn="1" data-testid="text-page-title">
                 RATIO RELEVANCE
               </h1>
-              <p className="font-mono text-sm text-white/50">
-                Intermarket Analysis • Liquidity Constraints • Sector Rotation
-              </p>
             </div>
             
             <div className="flex items-center gap-4 mt-4 md:mt-0">
@@ -717,68 +733,10 @@ export default function RatioRelevance() {
               >
                 {marketDataStatus.text}
               </span>
-              {lastUpdated && (
-                <span className="font-mono text-[10px] text-white/40">
-                  Updated: {lastUpdated.toLocaleTimeString()}
-                </span>
-              )}
-              <button 
-                onClick={fetchData}
-                disabled={loading}
-                className="flex items-center gap-2 px-3 py-1.5 border border-[#00ff88]/50 text-[#00ff88] font-mono text-xs hover:bg-[#00ff88]/10 transition-colors disabled:opacity-50"
-                data-testid="button-refresh"
-              >
-                <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-                {loading ? 'LOADING...' : 'REFRESH'}
-              </button>
             </div>
           </div>
 
-          {/* CTA Buttons Grid - Navigation Section */}
-          <div className="space-y-4 mb-8">
-            {/* MORE Indicator */}
-            <div className="flex justify-center">
-              <div className="font-mono text-xs text-muted-foreground/60 flex items-center gap-2 animate-pulse">
-                <span>MORE</span>
-                <span>↓</span>
-              </div>
-            </div>
-
-            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-              {/* Sector Rotation Button */}
-              <Link href="/sector-rotation">
-                <div className="group cursor-pointer bg-black border-2 border-blue-500/50 p-4 overflow-hidden shadow-[0_0_20px_rgba(59,130,246,0.2)] transition-all duration-300 hover:border-blue-500 hover:shadow-[0_0_40px_rgba(59,130,246,0.5)] hover:scale-105 h-full">
-                  <div className="font-mono text-xs text-blue-500/90 leading-tight transition-colors duration-300 group-hover:text-blue-400 space-y-2">
-                    <div className="text-center font-bold">→ $ SECTOR_ROTATION</div>
-                    <div className="text-blue-400/70 text-center text-xs">Macro rotation analysis</div>
-                    <div className="text-blue-500/50 text-center">[ENTER]</div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Alerts Button */}
-              <Link href="/alerts">
-                <div className="group cursor-pointer bg-black border-2 border-emerald-500/50 p-4 overflow-hidden shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all duration-300 hover:border-emerald-500 hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] hover:scale-105 h-full">
-                  <div className="font-mono text-xs text-emerald-500/90 leading-tight transition-colors duration-300 group-hover:text-emerald-400 space-y-2">
-                    <div className="text-center font-bold">→ ◊ ALERT_TERMINAL</div>
-                    <div className="text-emerald-400/70 text-center text-xs">Free custom email alerts</div>
-                    <div className="text-emerald-500/50 text-center">[ENTER]</div>
-                  </div>
-                </div>
-              </Link>
-
-              {/* Ratio Relevance Button */}
-              <Link href="/ratio-relevance">
-                <div className="group cursor-pointer bg-black border-2 border-cyan-500/50 p-4 overflow-hidden shadow-[0_0_20px_rgba(34,211,238,0.2)] transition-all duration-300 hover:border-cyan-500 hover:shadow-[0_0_40px_rgba(34,211,238,0.5)] hover:scale-105 h-full">
-                  <div className="font-mono text-xs text-cyan-500/90 leading-tight transition-colors duration-300 group-hover:text-cyan-400 space-y-2">
-                    <div className="text-center font-bold">→ ◊ RATIO_RELEVANCE</div>
-                    <div className="text-cyan-400/70 text-center text-xs">Capital flow analysis</div>
-                    <div className="text-cyan-500/50 text-center">[CURRENT]</div>
-                  </div>
-                </div>
-              </Link>
-            </div>
-          </div>
+          <SectorToolsMenu current="ratio-relevance" />
 
           {loading && !data && (
             <div className="flex flex-col items-center justify-center py-20">
@@ -795,6 +753,14 @@ export default function RatioRelevance() {
                   <h3 className="font-mono text-red-400 font-bold">Error Loading Data</h3>
                   <p className="font-mono text-sm text-red-400/70">{error}</p>
                 </div>
+                <button
+                  onClick={fetchData}
+                  disabled={loading}
+                  className="ml-auto px-3 py-1.5 border border-red-500/50 text-red-400 font-mono text-xs hover:bg-red-500/10 disabled:opacity-60 transition-colors"
+                  data-testid="button-retry"
+                >
+                  {loading ? 'RETRY…' : 'RETRY'}
+                </button>
               </div>
             </div>
           )}

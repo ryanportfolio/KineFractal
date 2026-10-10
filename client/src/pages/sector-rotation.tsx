@@ -1,15 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Link } from 'wouter';
-import { AlertTriangle, Play, Database, Clock, Loader2, RefreshCw, Menu, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, Play, Clock, RefreshCw, Menu, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { FinancialMath, type DailyData } from '@/lib/financial-math';
 import { Navbar } from '@/components/navbar';
 import { useDocumentMeta } from '@/hooks/use-document-meta';
 import { PlaybookCTA } from '@/components/playbook-cta';
+import { SectorToolsMenu } from '@/components/sector-tools-menu';
 
 // --- CONFIGURATION ---
 // Server-side cache handles daily caching automatically via /api/tiingo/:ticker
@@ -60,7 +59,7 @@ interface MacroRatioStats {
 }
 
 export default function SectorRotation() {
-  const [status, setStatus] = useState<'IDLE' | 'FETCHING' | 'COMPLETE' | 'ERROR'>('IDLE');
+  const [status, setStatus] = useState<'IDLE' | 'FETCHING' | 'COMPLETE' | 'ERROR'>('FETCHING');
   const [progress, setProgress] = useState(0);
   const [currentTicker, setCurrentTicker] = useState<string>('');
   const [logs, setLogs] = useState<string[]>([]);
@@ -70,6 +69,7 @@ export default function SectorRotation() {
   const [error, setError] = useState<string | null>(null);
   const [lastCacheDate, setLastCacheDate] = useState<string | null>(null);
   const [cacheStale, setCacheStale] = useState(false);
+  const [cacheState, setCacheState] = useState<string | null>(null);
 
   useDocumentMeta({
     title: "Sector rotation",
@@ -271,6 +271,7 @@ export default function SectorRotation() {
         
         setLastCacheDate(bulkData.cacheDate);
         setCacheStale(bulkData.freshness?.state === 'stale');
+        setCacheState(bulkData.freshness?.state ?? null);
         processDataForChart(rawData);
         calculatePerformance(rawData);
         calculateMacroStats(macroData);
@@ -287,6 +288,8 @@ export default function SectorRotation() {
       const rawData: Record<string, DailyData[]> = {};
       const macroData: Record<string, DailyData[]> = {};
       
+      const states: string[] = [];
+
       // Use any cached data we already have
       if (bulkData.data) {
         for (const ticker of TICKERS) {
@@ -330,7 +333,7 @@ export default function SectorRotation() {
         setProgress(percent);
 
         addLog(`Fetching ${ticker.symbol}...`);
-        const data = await fetchTiingoData(ticker.symbol, startDateStr);
+        const data = await fetchTiingoData(ticker.symbol, startDateStr, states);
         rawData[ticker.symbol] = data;
         addLog(`✔ ${ticker.symbol} acquired (${data.length} days).`);
 
@@ -359,7 +362,7 @@ export default function SectorRotation() {
         setProgress(percent);
         
         addLog(`Fetching [MACRO] ${symbol}...`);
-        const data = await fetchTiingoData(symbol, startDateMacroStr);
+        const data = await fetchTiingoData(symbol, startDateMacroStr, states);
         macroData[symbol] = data;
         addLog(`✔ ${symbol} acquired (${data.length} days).`);
         
@@ -370,7 +373,17 @@ export default function SectorRotation() {
       setProgress(100);
       addLog("All data acquired. Processing...");
       
-      setLastCacheDate(today);
+      // Label the set the way the bulk route does: the oldest final bar across
+      // every series, and stale if any series came back stale.
+      if (bulkData.freshness && bulkData.data && Object.keys(bulkData.data).length) states.push(bulkData.freshness.state);
+      const asOf = [...Object.values(rawData), ...Object.values(macroData)].reduce((oldest, series) => {
+        const last = series[series.length - 1]?.date?.slice(0, 10) ?? '';
+        return !oldest || (last && last < oldest) ? last : oldest;
+      }, '');
+      const seriesState = states.includes('stale') ? 'stale' : states.includes('fresh') ? 'fresh' : 'cache';
+      setLastCacheDate(asOf || today);
+      setCacheStale(seriesState === 'stale');
+      setCacheState(seriesState);
 
       processDataForChart(rawData);
       calculatePerformance(rawData);
@@ -387,7 +400,7 @@ export default function SectorRotation() {
     }
   };
   
-  const fetchTiingoData = async (symbol: string, startDate: string): Promise<DailyData[]> => {
+  const fetchTiingoData = async (symbol: string, startDate: string, states?: string[]): Promise<DailyData[]> => {
         // Use server-side Tiingo proxy for reliable data fetching
         const response = await fetch(`/api/tiingo/${symbol}`);
         
@@ -396,6 +409,10 @@ export default function SectorRotation() {
              throw new Error(errorData.error || `API Error (${response.status})`);
         }
         
+        // fresh / cache / stale for this series (a stale cache entry still answers 200)
+        const state = response.headers.get('X-Market-Data-State');
+        if (state && states) states.push(state);
+
         const data = await response.json();
         if (!Array.isArray(data)) throw new Error(`Invalid format received for ${symbol}`);
         if (data.length === 0) throw new Error(`No data returned for ${symbol}`);
@@ -465,159 +482,100 @@ export default function SectorRotation() {
     'XLC': '#aa0000', // Comm - Dark Red
   };
 
+  const marketDataStatus: { text: string; tone: 'caution' | 'muted' } =
+    status === 'ERROR'
+      ? { text: 'Market data: UNAVAILABLE', tone: 'caution' }
+      : status === 'FETCHING'
+        ? currentTicker
+          ? { text: `Market data: FETCHING ${currentTicker} • ${progress}%`, tone: 'muted' }
+          : { text: 'Market data: LOADING', tone: 'muted' }
+        : status === 'COMPLETE' && lastCacheDate
+          ? { text: `Market data: ${(cacheState ?? 'fresh').toUpperCase()} • ${lastCacheDate}`, tone: cacheStale ? 'caution' : 'muted' }
+          : { text: 'Market data: FETCH CANCELLED', tone: 'caution' };
+
   return (
       <>
           <Navbar />
-          <div className="min-h-screen bg-background text-white font-mono p-8 pt-24">
+          <div className="min-h-screen bg-background text-white font-mono px-4 md:px-6 pt-24 pb-12">
             <div className="max-w-7xl mx-auto space-y-8">
             
-            {/* HEADER */}
-            <div className="flex justify-between items-end border-b border-primary/30 pb-4">
-              <div className="flex-1">
-                {/* Same type as the BeamHeading page titles (alerts, lab); drawn at once, no wipe. */}
-                <h1 className="beam-heading mb-2 flex items-center gap-3" data-drawn="1">
-                  <Database className="w-8 h-8 shrink-0" />
-                  <span className="hidden sm:inline">SECTOR_ROTATION_ANALYSIS</span>
-                  <span className="sm:hidden">SECTOR_ROTATION</span>
-                </h1>
-                <p className="text-primary/60 text-sm hidden sm:block">RELATIVE STRENGTH (SECTOR / SPY)</p>
+            {/* HEADER: same layout as /ratio-relevance */}
+            <div>
+              <div className="flex items-center gap-4 mb-2">
+                <Link href="/">
+                  <button className="flex items-center gap-2 text-white/50 hover:text-[#00ff88] transition-colors font-mono text-xs" data-testid="link-back-home">
+                    <ArrowLeft className="w-4 h-4" />
+                    BACK
+                  </button>
+                </Link>
               </div>
-              <div className="flex items-center gap-4">
-                <button
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                  className="md:hidden p-2 hover:bg-primary/10 border border-primary/30 rounded text-primary"
-                  data-testid="button-mobile-menu"
-                >
-                  {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-                </button>
-                <div className="text-right text-xs text-primary/50 hidden sm:block">
-                  <div>MARKET_FEED: LIVE</div>
-                  <div>STATUS: OPERATIONAL</div>
+
+              <div className="flex flex-col md:flex-row md:items-end justify-between">
+                {/* Same type as the BeamHeading page titles (alerts, lab); drawn at once, no wipe. */}
+                <h1 className="beam-heading mb-2" data-drawn="1" data-testid="text-page-title">
+                  SECTOR ROTATION
+                </h1>
+
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-4 md:mt-0 md:flex-nowrap">
+                  <span
+                    role="status"
+                    aria-live="polite"
+                    className={`min-w-0 font-mono text-xs md:whitespace-nowrap ${marketDataStatus.tone === 'caution' ? 'text-amber-300' : 'text-white/70'}`}
+                    data-testid="text-market-data-status"
+                  >
+                    {marketDataStatus.text}
+                  </span>
+                  {status === 'FETCHING' && currentTicker && (
+                    <button
+                      onClick={() => { isCancelledRef.current = true; }}
+                      className="px-3 py-1.5 border border-[#ff3333]/50 text-[#ff3333] font-mono text-xs hover:bg-[#ff3333]/10 transition-colors"
+                      data-testid="button-cancel-fetch"
+                    >
+                      CANCEL FETCH
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="md:hidden p-2 hover:bg-primary/10 border border-primary/30 rounded text-primary"
+                    aria-label={mobileMenuOpen ? "Close operation log" : "Open operation log"}
+                    data-testid="button-mobile-menu"
+                  >
+                    {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+                  </button>
                 </div>
               </div>
             </div>
 
-            {/* CONTROLS & STATUS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              
-              {/* STATUS CARD */}
-              <Card className="bg-black/40 border-primary/30 text-primary">
-                <CardHeader className="py-2">
-                  <CardTitle className="text-sm tracking-widest">SYSTEM STATUS</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 py-2">
-                   {status === 'IDLE' && (
-                     <div className="flex flex-col gap-2">
-                        <Alert className="bg-yellow-500/10 border-yellow-500/50 text-yellow-500">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Data Outdated</AlertTitle>
-                            <AlertDescription>
-                               System will automatically fetch today's data.
-                               <br/>
-                               Est. Duration: 144s
-                            </AlertDescription>
-                        </Alert>
-                     </div>
-                   )}
+            <SectorToolsMenu current="sector-rotation" />
 
-                   {status === 'FETCHING' && (
-                     <div className="space-y-2">
-                        <div className="flex justify-between text-xs">
-                            <span>ACQUIRING: {currentTicker}</span>
-                            <span>{progress}%</span>
-                        </div>
-                        <Progress value={progress} className="h-2 bg-primary/20" />
-                        <div className="flex items-center gap-2 text-xs text-primary/50 animate-pulse mt-2">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            <span>THROTTLING NETWORK (12s DELAY)...</span>
-                        </div>
-                        <Button 
-                          onClick={() => { isCancelledRef.current = true; }}
-                          variant="outline" 
-                          size="sm"
-                          className="w-full mt-3 border-[#ff3333]/50 text-[#ff3333] hover:bg-[#ff3333]/10"
-                          data-testid="button-cancel-fetch"
-                        >
-                          ⚠ CANCEL FETCH
-                        </Button>
-                     </div>
-                   )}
-
-                   {status === 'COMPLETE' && !cacheStale && (
-                     <div className="text-center space-y-2">
-                        <div className="text-4xl">✔</div>
-                        <div className="text-sm font-bold text-primary">DATA LOCKED & CACHED</div>
-                        <div className="text-xs text-primary/50">
-                            Market data through <span className="whitespace-nowrap">{lastCacheDate}</span>
-                        </div>
-                     </div>
-                   )}
-
-                   {status === 'COMPLETE' && cacheStale && (
-                     <Alert className="bg-yellow-500/10 border-yellow-500/50 text-yellow-500" data-testid="alert-stale-data">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>STALE DATA</AlertTitle>
-                        <AlertDescription>
-                           Market data through <span className="whitespace-nowrap">{lastCacheDate}</span> • REFRESH FAILED
-                        </AlertDescription>
-                     </Alert>
-                   )}
-
-                   {status === 'ERROR' && (
-                     <div className="text-red-500">
-                        <div className="font-bold">SEQUENCE FAILED</div>
-                        <div className="text-xs mt-2">{error}</div>
-                        <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setStatus('IDLE')}
-                            className="mt-4 border-red-500 text-red-500 hover:bg-red-500/10"
-                        >
-                            RESET
-                        </Button>
-                     </div>
-                   )}
-                </CardContent>
-              </Card>
-
-              {/* CACHE STATUS */}
-              <Card className="bg-black/40 border-primary/30 text-primary">
-                <CardHeader className="py-2">
-                  <CardTitle className="text-sm tracking-widest">CACHE STATUS</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-1 py-2 text-xs font-mono">
-                  <div className="flex justify-between">
-                    <span>Type:</span>
-                    <span className="text-primary">Server-side (daily)</span>
+            {status === 'ERROR' && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-sm p-6">
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="w-6 h-6 text-red-400" />
+                  <div>
+                    <h3 className="font-mono text-red-400 font-bold">Error Loading Data</h3>
+                    <p className="font-mono text-sm text-red-400/70">{error}</p>
                   </div>
-                  <div className="flex justify-between gap-2">
-                    <span>Data Through:</span>
-                    <span className={`whitespace-nowrap ${cacheStale ? "text-yellow-500" : "text-primary"}`}>{lastCacheDate || 'N/A'}</span>
-                  </div>
-                  <div className="flex justify-between gap-2">
-                    <span>Refreshes:</span>
-                    <span className="whitespace-nowrap text-primary/70">Weekdays 18:30 ET</span>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </div>
+            )}
 
-              {/* LOG TERMINAL - DESKTOP */}
-              <Card className="bg-black border-primary/30 text-primary md:col-span-2 font-mono text-xs hidden md:block">
-                 <CardHeader className="py-2 border-b border-primary/10">
-                    <CardTitle className="text-xs flex items-center gap-2">
-                        <Clock className="w-3 h-3" /> OPERATION LOG
-                    </CardTitle>
-                 </CardHeader>
-                 <CardContent className="h-[120px] overflow-y-auto p-2 space-y-0 scrollbar-thin scrollbar-thumb-primary/20">
-                    {logs.length === 0 && <div className="opacity-30 italic">Waiting for command...</div>}
-                    {logs.map((log, i) => (
-                        <div key={i} className="border-l-2 border-primary/20 pl-2 hover:bg-primary/5">
-                            {log}
-                        </div>
-                    ))}
-                 </CardContent>
-              </Card>
-            </div>
+            {/* LOG TERMINAL - DESKTOP */}
+            <Card className="bg-black border-primary/30 text-primary font-mono text-xs hidden md:block">
+               <CardHeader className="py-2 border-b border-primary/10">
+                  <CardTitle className="text-xs flex items-center gap-2">
+                      <Clock className="w-3 h-3" /> OPERATION LOG
+                  </CardTitle>
+               </CardHeader>
+               <CardContent className="h-[120px] overflow-y-auto p-2 space-y-0 scrollbar-thin scrollbar-thumb-primary/20">
+                  {logs.length === 0 && <div className="opacity-30 italic">Waiting for command...</div>}
+                  {logs.map((log, i) => (
+                      <div key={i} className="border-l-2 border-primary/20 pl-2 hover:bg-primary/5">
+                          {log}
+                      </div>
+                  ))}
+               </CardContent>
+            </Card>
 
             {/* MOBILE TERMINAL MENU */}
             {mobileMenuOpen && (
