@@ -102,13 +102,32 @@
                 text-align:center; white-space:nowrap; font-weight:600;
                 box-shadow:0 3px 12px rgba(0,0,0,.5); }
   #measureBox .sub { font-weight:400; opacity:.9; font-size:11.5px; }
-  /* hover tips for on-chart marks: what THIS mark says (its own numbers) + a practical read */
+  /* hover tips for on-chart marks: what THIS mark says (its own numbers) + its distance from the latest close */
   #tipBox { position:absolute; z-index:6; pointer-events:none; display:none; max-width:320px;
             background:rgba(13,13,13,.97); border:1px solid var(--grid); border-radius:8px;
             padding:8px 11px; font-size:12.5px; line-height:1.45; color:var(--fg);
             box-shadow:0 3px 12px rgba(0,0,0,.5); }
   #tipBox b { display:block; margin-bottom:2px; }
-  #tipBox .read { color:var(--mut); margin-top:3px; }
+  #tipBox .dist { margin-top:6px; font:bold 24px Verdana,Geneva,sans-serif; line-height:1.2; color:var(--fg); }
+  /* compare: legend over the chart's top-left corner + the ticker picker under "+ Compare" */
+  #cmpLegend { position:absolute; top:6px; left:8px; z-index:5; display:flex; flex-wrap:wrap; gap:4px 8px;
+               max-width:calc(100% - 120px); pointer-events:none; font:bold 14px Verdana,Geneva,sans-serif; }
+  #cmpLegend:empty { display:none; }
+  #cmpLegend .it { display:inline-flex; align-items:center; gap:6px; padding:2px 6px; background:rgba(13,13,13,.85);
+                   border:1px solid var(--grid); pointer-events:auto; }
+  #cmpLegend .pct { color:var(--fg); font-weight:normal; }
+  #cmpLegend button { padding:0 3px; border:0; background:none; color:var(--mut); font-size:15px; line-height:1; }
+  #cmpLegend button:hover { color:var(--csell); }
+  #cmpMenu { position:fixed; z-index:70; display:flex; flex-direction:column; gap:6px; width:240px; max-height:340px;
+             padding:8px; background:var(--panel); border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5); }
+  #cmpMenu[hidden] { display:none; }
+  #cmpList { display:flex; flex-direction:column; overflow:auto; }
+  #cmpList button { display:flex; align-items:baseline; gap:8px; padding:5px 8px; border:0; background:none; text-align:left; }
+  #cmpList button:hover, #cmpList button:focus-visible { background:rgba(38,198,218,.12); }
+  #cmpList .sym { font-weight:bold; }
+  #cmpList .nm { overflow:hidden; color:var(--mut); font-size:12px; white-space:nowrap; text-overflow:ellipsis; }
+  #cmpList .note { margin:4px; color:var(--mut); font-size:12px; }
+  label:has(#tLog:disabled), #drawBtn:disabled { opacity:.4; cursor:not-allowed; }
   /* ---- guided layer tour: a card pinned in the FUTURE_BARS whitespace, explaining one overlay at a time ---- */
   .tour-card { position:absolute; z-index:6; pointer-events:auto; width:calc(460px * var(--ts,1)); max-width:92%;
                padding:24px 26px; background:rgba(13,13,13,.97); border:1px solid var(--grid);
@@ -628,6 +647,7 @@
   <span id="topActions"><span id="topUtil"><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
   <span id="tickerStrip"><span id="superBtns" title="super (MTF) charts"></span></span>
   <input id="addSym" placeholder="add ticker" maxlength="12" style="width:88px" title="add a chart-only watchlist ticker (live build)"><button id="addBtn">+ Add</button><span id="addMsg" class="addmsg"></span>
+  <button id="cmpBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cmpMenu" title="compare other tickers as % change">+ Compare</button>
   <select id="combo" title="per-timeframe board combos"></select>
   <span id="tfBtns" title="super chart candle timeframe — same multi-TF levels, candles + line fits per timeframe"></span>
   <label title="trendlines (auto-detected; thin = refit on the recent window only — same lines a history-capped feed showed)"><input type="checkbox" id="tTrend"><span class="swatch" style="background:var(--sup)"></span>TL</label>
@@ -662,7 +682,11 @@
   <span id="dpAggBadge" title=""></span>
   <span id="meta"></span>
 </div>
-<div id="chart"><div id="handles"></div><div id="measureBox"></div><div id="tipBox"></div></div>
+<div id="chart"><div id="handles"></div><div id="measureBox"></div><div id="tipBox"></div><div id="cmpLegend"></div></div>
+<div id="cmpMenu" role="dialog" aria-label="Compare a ticker" hidden>
+  <input id="cmpFind" placeholder="find ticker" maxlength="40" autocomplete="off" aria-label="Find a ticker to compare">
+  <div id="cmpList"></div>
+</div>
 <div id="msg"></div>
 <div id="legend">
   <button id="legendClose" title="close (Esc)">&#10005;</button>
@@ -1120,6 +1144,8 @@ function mineData(l) {
 // supports attachPrimitive + useBitmapCoordinateSpace (forced-paint screenshot test).
 function rayLineList() {
   var out = [];
+  if (_cmpOnNow) return out;   // no diagonals while comparing
+
   // palette read ONCE per paint (getComputedStyle is the cost; this runs on every frame)
   var C = { sup: getCss('--sup'), res: getCss('--res'), ss: getCss('--ss'),
             ssr: getCss('--ssr'), prom: getCss('--prom'), mine: getCss('--mine'),
@@ -1204,7 +1230,7 @@ var rayPrimitive = {
 // chart's coordinates a frame late during a zoom, which is what made lines shift).
 function renderMineSeries() {
   userSeries = {};   // chart was just recreated -> drop stale refs
-  if (!document.getElementById('tMine').checked) return;
+  if (!document.getElementById('tMine').checked || _cmpOnNow) return;
   userLines.forEach(function (l) {
     var s = chart.addLineSeries({
       color: getCss('--mine'), lineWidth: l.id === selId ? 3 : 2, lineStyle: 0,
@@ -1495,8 +1521,8 @@ document.getElementById('chart').addEventListener('mousedown', onMeasureDown, tr
 // ===========================================================================
 // HOVER TIPS — every on-chart mark (level, band, arrow, strike, trendline)
 // registers a tooltip entry during redraw; hovering within a few px pops a
-// card saying what THAT exact mark means (its own numbers) + a practical
-// "Read:" line. Three hit shapes: 'h' horizontal price line (y only),
+// card saying what THAT exact mark means (its own numbers) + how far it sits
+// above or below the latest close. Three hit shapes: 'h' horizontal price line (y only),
 // 's' diagonal segment+forward-ray (reuses _lineDist, same geometry as line
 // selection), 'p' point mark (arrow / badge). Points win over diagonals win
 // over horizontals (a full-width line matches everywhere, so it gets the
@@ -1507,8 +1533,23 @@ var tipItems = [];
 function tipH(price, html)         { tipItems.push({ k: 'h', p: price, html: html }); }
 function tipSeg(t1, p1, t2, p2, h) { tipItems.push({ k: 's', t1: t1, p1: p1, t2: t2, p2: p2, html: h }); }
 function tipPt(t, p, html)         { tipItems.push({ k: 'p', t: t, p: p, html: html }); }
-function tip(title, what, read) {
-  return '<b>' + title + '</b>' + what + (read ? '<div class="read">' + read + '</div>' : '');
+function tip(title, what) { return '<b>' + title + '</b>' + what; }
+// How far the hovered mark sits from the latest close, shown big at the foot of its tip.
+function tipDistHtml(price) {
+  var c = current && current.candles[current.candles.length - 1];
+  if (!c || !(c.close > 0) || !(price > 0)) return '';
+  var pct = (price / c.close - 1) * 100, a = Math.abs(pct);
+  if (a < 0.005) return '<div class="dist">at current price</div>';
+  return '<div class="dist">' + a.toFixed(a < 1 ? 2 : 1) + '% ' + (pct < 0 ? 'below' : 'above') + '</div>';
+}
+// the price a hit mark stands for now: a diagonal's value at the latest bar (along its
+// ray, measured on screen so it matches the drawn line in log or linear scale)
+function tipHitPrice(it) {
+  if (it.k !== 's') return it.p;
+  var a = project(it.t1, it.p1), b = project(it.t2, it.p2);
+  var xNow = chart.timeScale().timeToCoordinate(current.candles[current.candles.length - 1].time);
+  if (!a || !b || a.x === b.x || xNow == null) return null;
+  return candleSeries.coordinateToPrice(a.y + (b.y - a.y) * (xNow - a.x) / (b.x - a.x));
 }
 function escTip(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 function r2(v) { return Number(Number(v).toFixed(2)); }
@@ -1550,7 +1591,7 @@ function onTipMove(ev) {
   var hit = tipHitTest(x, y);
   if (!hit) { hideTip(); return; }
   var tb = document.getElementById('tipBox');
-  tb.innerHTML = hit.html;
+  tb.innerHTML = hit.html + tipDistHtml(tipHitPrice(hit));
   tb.style.display = 'block';
   // near the cursor, clamped inside the pane; flip above when it would spill the bottom
   var bw = tb.offsetWidth, bh = tb.offsetHeight, W = el.clientWidth, H = el.clientHeight;
@@ -1699,6 +1740,7 @@ function _lineDist(px, py, a, b, W) {
 // layer toggle is on and not temp-hidden) so you can grab any visible line from anywhere along it.
 var HIT_PX = 11;
 function lineHitTest(px, py) {
+  if (_cmpOnNow) return null;   // no diagonals on screen while comparing
   var best = null, bestD = HIT_PX;
   var W = document.getElementById('chart').clientWidth;
   if (document.getElementById('tMine').checked) {
@@ -4447,6 +4489,7 @@ function buildDropdown() {
   var tickerReorderDialog = document.getElementById('tickerReorderDialog');
   tickerReorderDialog.onclick = function (e) { if (e.target === tickerReorderDialog) closeTickerReorder(); };
   wireExportDialog();
+  wireCompare();
   document.getElementById('addBtn').onclick = doAddTicker;
   document.getElementById('addSym').onkeydown = function (e) {
     if (e.key === 'Enter') { e.preventDefault(); doAddTicker(); }
@@ -4510,6 +4553,10 @@ function buildDropdown() {
     if (tickerReorderDialog.classList.contains('open')) {
       if (e.key === 'Escape') { e.preventDefault(); closeTickerReorder(); }
       else if (e.key === 'Tab') trapTickerReorderFocus(e);
+      return;
+    }
+    if (compareMenuOpen()) {
+      if (e.key === 'Escape') { e.preventDefault(); closeCompareMenu(true); }
       return;
     }
     var onField = document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
@@ -4729,12 +4776,198 @@ function etCrosshairTime(t) {
   return _etFmt(t, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) + ' ET';
 }
 
+// ---- compare: other tickers as % change, TradingView-style ----------------------
+// Up to CMP_MAX tickers from the chart row, drawn as close-price lines on the same
+// timeframe. While any is on, the price axis switches to percent mode (every series
+// reads 0% at the first visible bar) and the diagonal lines hide: the library would
+// rebase each line series to its own first point, so they would no longer sit on
+// price. Horizontal levels are price lines on the candle series and stay correct.
+var CMP_KEY = 'kf-chart-compare-v1', CMP_MAX = 4;
+var CMP_COLORS = ['#f5a623', '#4fc3f7', '#f06292', '#b39ddb'];
+var _cmpSyms = readCompareSyms();
+var _cmpLines = [];        // [{sym, color, data, missing}] drawn by the last redraw
+var _cmpOnNow = false;     // percent mode is live (read on every paint by rayLineList)
+var _cmpLoading = {}, _cmpMissing = {};   // data key -> true
+function readCompareSyms() {
+  try {
+    var v = JSON.parse(localStorage.getItem(CMP_KEY) || '[]');
+    return Array.isArray(v) ? v.filter(function (s) { return typeof s === 'string'; }).slice(0, CMP_MAX) : [];
+  } catch (e) { return []; }
+}
+function saveCompareSyms() { try { localStorage.setItem(CMP_KEY, JSON.stringify(_cmpSyms)); } catch (e) {} }
+// the ticker chart on screen and its timeframe; null for a board combo
+function currentSuper() {
+  if (!current) return null;
+  for (var s in superMap) {
+    var keys = superMap[s].tf_keys || {};
+    for (var tf in keys) if (keys[tf] === current.key) return { sym: s, tf: tf };
+    if (superMap[s].key === current.key) return { sym: s, tf: null };
+  }
+  return null;
+}
+function compareKey(sym, tf) {
+  var e = superMap[sym];
+  if (!e) return null;
+  return tf && e.tf_keys ? (e.tf_keys[tf] || null) : e.key;   // never mix timeframes
+}
+function compareSymsShown() {
+  var cur = currentSuper();
+  return cur ? _cmpSyms.filter(function (s) { return s !== cur.sym; }) : [];
+}
+// One value per MAIN candle time: the other ticker's latest close at or before it.
+// Keeps every point on the candle grid (an off-grid time adds a phantom bar).
+function alignCloses(main, other) {
+  var out = [], j = 0, last = null, end = other.length ? other[other.length - 1].time : -Infinity;
+  for (var i = 0; i < main.length; i++) {
+    var t = main[i].time;
+    if (t > end) break;
+    while (j < other.length && other[j].time <= t) { last = other[j].close; j++; }
+    if (last != null) out.push({ time: t, value: last });
+  }
+  return out;
+}
+function drawCompareLines() {
+  var cur = currentSuper();
+  compareSymsShown().forEach(function (s) {
+    var key = compareKey(s, cur.tf);
+    var line = { sym: s, color: CMP_COLORS[_cmpSyms.indexOf(s) % CMP_COLORS.length], data: null,
+                 missing: !key || !!_cmpMissing[key] };
+    _cmpLines.push(line);
+    if (line.missing) return;
+    var payload = window.FEARLAB_REG[key];
+    if (payload) {
+      line.data = alignCloses(current.candles, payload.candles || []);
+      chart.addLineSeries({ color: line.color, lineWidth: 2, title: s, priceLineVisible: false })
+           .setData(line.data);
+    } else if (!_cmpLoading[key]) {
+      _cmpLoading[key] = true;
+      loadOnce(window.FEARLAB_REG, 'data-', key,
+        function () { delete _cmpLoading[key]; requestAnimationFrame(redraw); },
+        function () { delete _cmpLoading[key]; _cmpMissing[key] = true; requestAnimationFrame(redraw); });
+    }
+  });
+}
+// % change from the first point at/after t0 to the last at/before t1
+function pctBetween(points, t0, t1) {
+  var a = null, b = null;
+  for (var i = 0; i < points.length; i++) {
+    var p = points[i];
+    if (p.time < t0) continue;
+    if (p.time > t1) break;
+    if (a == null) a = p.value;
+    b = p.value;
+  }
+  return a ? (b / a - 1) * 100 : null;
+}
+function fmtPctChange(v) { return v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+function renderCompareLegend() {
+  var box = document.getElementById('cmpLegend');
+  if (!_cmpLines.length || !chart || !current || !current.candles.length) { box.innerHTML = ''; return; }
+  var c = current.candles, n = c.length, lr = chart.timeScale().getVisibleLogicalRange();
+  var i0 = lr ? Math.max(0, Math.ceil(lr.from)) : 0, i1 = lr ? Math.min(n - 1, Math.floor(lr.to)) : n - 1;
+  var has = i0 <= i1, t0 = has ? c[i0].time : 0, t1 = has ? c[i1].time : 0;
+  function item(sym, color, text, removable) {
+    return '<span class="it"><span class="sym" style="color:' + color + '">' + escHtml(sym) + '</span>'
+      + '<span class="pct">' + text + '</span>'
+      + (removable ? '<button type="button" data-cmp-remove="' + escHtml(sym) + '" aria-label="Stop comparing '
+        + escHtml(sym) + '" title="stop comparing">×</button>' : '') + '</span>';
+  }
+  var html = item(currentSuper().sym, 'var(--fg)', fmtPctChange(has ? (c[i1].close / c[i0].close - 1) * 100 : null), false);
+  _cmpLines.forEach(function (l) {
+    var text = l.missing ? 'no data on this timeframe' : !l.data ? 'loading…' : fmtPctChange(has ? pctBetween(l.data, t0, t1) : null);
+    html += item(l.sym, l.color, text, true);
+  });
+  box.innerHTML = html;
+}
+var _cmpLegendQueued = false;
+function scheduleCompareLegend() {
+  if (_cmpLegendQueued || !_cmpLines.length) return;
+  _cmpLegendQueued = true;
+  requestAnimationFrame(function () { _cmpLegendQueued = false; renderCompareLegend(); });
+}
+function addCompare(s) {
+  if (_cmpSyms.indexOf(s) < 0 && _cmpSyms.length < CMP_MAX) { _cmpSyms.push(s); saveCompareSyms(); }
+  closeCompareMenu(true);
+  redraw();
+}
+function removeCompare(s) {
+  _cmpSyms = _cmpSyms.filter(function (x) { return x !== s; });
+  saveCompareSyms();
+  redraw();
+  document.getElementById('cmpBtn').focus();
+}
+function compareMenuOpen() { return !document.getElementById('cmpMenu').hidden; }
+function openCompareMenu() {
+  var menu = document.getElementById('cmpMenu'), btn = document.getElementById('cmpBtn');
+  var r = btn.getBoundingClientRect();
+  menu.style.left = Math.max(4, Math.min(window.innerWidth - 244, r.left)) + 'px';
+  menu.style.top = (r.bottom + 4) + 'px';
+  menu.hidden = false;
+  btn.setAttribute('aria-expanded', 'true');
+  var find = document.getElementById('cmpFind');
+  find.value = '';
+  renderCompareList();
+  find.focus();
+}
+function closeCompareMenu(refocus) {
+  if (!compareMenuOpen()) return;
+  document.getElementById('cmpMenu').hidden = true;
+  document.getElementById('cmpBtn').setAttribute('aria-expanded', 'false');
+  if (refocus) document.getElementById('cmpBtn').focus();
+}
+function renderCompareList() {
+  var list = document.getElementById('cmpList'), cur = currentSuper();
+  var q = document.getElementById('cmpFind').value.trim().toUpperCase();
+  list.innerHTML = '';
+  function note(text) { list.innerHTML = '<p class="note">' + text + '</p>'; }
+  if (!cur) return note('Open a ticker chart first.');
+  if (_cmpSyms.length >= CMP_MAX) return note('Up to ' + CMP_MAX + ' at once. Remove one with its × first.');
+  var syms = visibleTickerSymbols().filter(function (s) {
+    return s !== cur.sym && _cmpSyms.indexOf(s) < 0
+      && (!q || s.indexOf(q) === 0 || (tickerName(s) || '').toUpperCase().indexOf(q) >= 0);
+  }).sort();
+  if (!syms.length) return note('No matching ticker on your chart row.');
+  syms.forEach(function (s) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.innerHTML = '<span class="sym">' + escHtml(s) + '</span><span class="nm">' + escHtml(tickerName(s) || '') + '</span>';
+    b.onclick = function () { addCompare(s); };
+    list.appendChild(b);
+  });
+}
+function wireCompare() {
+  document.getElementById('cmpBtn').onclick = function () { compareMenuOpen() ? closeCompareMenu(false) : openCompareMenu(); };
+  var find = document.getElementById('cmpFind');
+  find.oninput = renderCompareList;
+  find.onkeydown = function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    var first = document.querySelector('#cmpList button');
+    if (first) first.click();
+  };
+  document.addEventListener('mousedown', function (e) {
+    if (compareMenuOpen() && !e.target.closest('#cmpMenu, #cmpBtn')) closeCompareMenu(false);
+  });
+  document.getElementById('cmpLegend').onclick = function (e) {
+    var b = e.target.closest('[data-cmp-remove]');
+    if (b) removeCompare(b.getAttribute('data-cmp-remove'));
+  };
+}
+
 function redraw() {
   if (!current) return;
   var el = document.getElementById('chart');
   if (ro) { ro.disconnect(); ro = null; }
   if (chart) { chart.remove(); chart = null; }
   var log = document.getElementById('tLog').checked;
+  var comparing = _cmpOnNow = compareSymsShown().length > 0;
+  _cmpLines = [];
+  document.getElementById('tLog').disabled = comparing;     // the % axis replaces log/linear
+  document.getElementById('drawBtn').disabled = comparing;  // drawn lines are hidden while comparing
+  if (comparing) {
+    if (drawMode) setDrawMode(false);
+    selId = null; selSys = null;
+  }
   chart = LightweightCharts.createChart(el, {
     width: el.clientWidth, height: el.clientHeight,  // owned below by a ResizeObserver
     layout: { background: { color: getCss('--bg') }, textColor: getCss('--fg'), fontSize: 16 },
@@ -4745,7 +4978,7 @@ function redraw() {
     // tighter than the library default {top:0.2, bottom:0.1}: the 20% top margin left a
     // big empty band ABOVE price where far overlay lines float, making price look small /
     // the view zoomed-out. 8% each side keeps the candles filling the pane.
-    rightPriceScale: { mode: log ? 1 : 0, scaleMargins: { top: 0.08, bottom: 0.08 } },
+    rightPriceScale: { mode: comparing ? 2 : (log ? 1 : 0), scaleMargins: { top: 0.08, bottom: 0.08 } },
     // crosshair lines at 50% opacity (softer than the library default opaque gray #9598a1)
     crosshair: {
       mode: 0,
@@ -4776,6 +5009,7 @@ function redraw() {
   chart.subscribeClick(placeClick);          // no-op unless draw mode is armed
   chart.subscribeCrosshairMove(previewMove); // rubber-band preview while placing
   if (drawMode) chart.applyOptions({ handleScroll: false, handleScale: false });  // freeze persists across redraw
+  if (comparing) drawCompareLines();
 
   // THRUST markers — joint-ignition bars. emit_super attaches a per-bar 'thrust'
   // = geometric mean of the rate-of-change of {price, volatility, volume}, each a
@@ -4804,9 +5038,7 @@ function redraw() {
                        size: up ? 1 : 2 });   // sell (down) arrows 2x bigger
         tipPt(c.time, up ? c.low : c.high, tip(
           'Thrust — joint ignition ' + (up ? '▲' : '▼'),
-          'On this bar price, volatility AND volume all expanded together (top ~1.5% of bars, local peak). One of them spiking alone never draws this arrow.',
-          up ? 'Read: high-conviction bullish push — breakouts that start like this follow through more often than a bare volume spike.'
-             : 'Read: high-conviction bearish break — sell-side ignition; bounces back into it tend to struggle.'));
+          'On this bar price, volatility AND volume all expanded together (top ~1.5% of bars, local peak). One of them spiking alone never draws this arrow.'));
       });
       cs.setMarkers(markers);
     }
@@ -4867,13 +5099,14 @@ function redraw() {
         + (glyph === '●' ? 'Sharp single-price magnet (● — the $ sits in one bucket' + (shareTxt ? ',' + shareTxt + ' in the hottest' : '') + ').'
           : glyph === '◐' ? 'Mixed concentration (◐).'
           : glyph === '○' ? 'Smeared fuzzy zone (○ — spread across many prices).' : '')
-        + (an >= 3 ? ' ⚡⚡ surging vs this band\'s own trailing norm.' : an >= 2 ? ' ⚡ hot vs its own norm.' : an <= 0.5 ? ' ❄ unusually QUIET vs its own norm.' : ''),
-        'Read: marks institutional ACTIVITY, not proven support/resistance — the tape is sideless (includes ETF plumbing). Price often gravitates back to heavy bands; a sharp ● magnet is the strongest pull.'));
+        + (an >= 3 ? ' ⚡⚡ surging vs this band\'s own trailing norm.' : an >= 2 ? ' ⚡ hot vs its own norm.' : an <= 0.5 ? ' ❄ unusually QUIET vs its own norm.' : '')
+        + ' Marks institutional activity, not proven support or resistance: the tape is sideless and includes ETF plumbing.'));
       // (2) onset highlight segment — THE emphasis layer. WIDTH = $ size, OPACITY + solid/dashed =
       // RARENESS, from the onset bar to the right edge. So a rare recent band = a bold solid short
       // stub that pops, a routine band = a fainter dashed longer segment. Every level reads the same
       // way. Snap the onset to a real bar; if it lands AT/AFTER the last candle (dpool store fresher
       // than these candles) draw a short stub near the right edge — never a full-width line.
+      if (comparing) return;   // the onset segment is a line series: it would not sit on price in % mode
       var _si = (d.startTs != null) ? timeIndexOf(d.startTs) : 0;
       if (_si >= _dpLast) _si = Math.max(0, _dpLast - 3);
       var startT = current.candles[_si].time;
@@ -4893,6 +5126,7 @@ function redraw() {
   //   supersuper/recent (count optimizer) -> 'super+' toggle, pink / white
   //   prominent (human-eye swings)        -> 'swings' toggle, grey
   ov.trendlines.forEach(function (t) {
+    if (comparing) return;                     // diagonals hide while comparing (see compare above)
     var opt = t.supersuper || t.recent;
     var toggle = t.spine ? 'tSpine' : t.prominent ? 'tProm' : (opt ? 'tSS' : 'tTrend');
     if (!document.getElementById(toggle).checked) return;
@@ -4928,14 +5162,13 @@ function redraw() {
     else if (t.supersuper)  { _tn = 'Count-optimized line (S+)';  _tw = 'Reaction-fitness optimizer pick — one of the handful of diagonals price has respected most.'; }
     else                    { _tn = (t.kind === 'support' ? 'Support' : 'Resistance') + ' trendline (TL)';
                               _tw = 'Auto-detected diagonal, fit in log price' + ((t.tfs || 1) > 1 ? ', confirmed on ' + t.tfs + ' timeframes' : '') + '.'; }
-    tipSeg(t.t1, t.p1, t.t2, t.p2, tip(_tn + (_sl ? ' ' + _sl : ''), _tw + (t.live === false ? ' Dashed = no longer live (price broke away).' : ''),
-      'Read: watch the REACTION at the line — a bounce/rejection means respected; a decisive close through it usually flips its role (old support starts acting as resistance).'));
+    tipSeg(t.t1, t.p1, t.t2, t.p2, tip(_tn + (_sl ? ' ' + _sl : ''), _tw + (t.live === false ? ' Dashed = no longer live (price broke away).' : '')));
   });
   // reaction-ranked STRUCTURAL supports (additive layer; surface_structural in trendlines.py).
   // Deep secular lines price springs off across decades that the count gate misses; own 'RX'
   // toggle + violet colour. The forward projection is drawn as a ray by rayPrimitive like the
   // others. Nothing in the regular trendline/level/gap layers changes.
-  if (document.getElementById('tStruct').checked) {
+  if (!comparing && document.getElementById('tStruct').checked) {
     (ov.structural || []).forEach(function (s) {
       var id = sysLineId('rx', s);
       if (sysHidden[id]) return;
@@ -4952,19 +5185,17 @@ function redraw() {
       var _ssl = fmtSlope(s.t1, s.p1, s.t2, s.p2);
       tipSeg(s.t1, s.p1, s.t2, s.p2, tip('Structural support (RX)' + (_ssl ? ' ' + _ssl : '') + (s.projected ? ' · from 1D' : ''),
         'Deep secular line ranked by how hard price SPRINGS off it — reaction-tested across decades, not just touch-counted.'
-        + (s.projected ? ' Measured on the 1D history and projected onto this timeframe — the same floor, shown here.' : ''),
-        'Read: the springboard lines. When price falls into one after a long slide, the bounce odds are what earned it the violet — watch for the reaction, not just the touch.'));
+        + (s.projected ? ' Measured on the 1D history and projected onto this timeframe — the same floor, shown here.' : '')));
     });
   }
   // hand-drawn lines: drawn as LIBRARY line series (zoom/pan-correct), with draggable
   // DOM handle dots layered on top (set up after applyView below). See renderMineSeries.
   renderMineSeries();
-  if (document.getElementById('tMine').checked) {
+  if (!comparing && document.getElementById('tMine').checked) {
     userLines.forEach(function (l) {
       var _msl = fmtSlope(l.t1, l.p1, l.t2, l.p2);
       tipSeg(l.t1, l.p1, l.t2, l.p2, tip('Hand-drawn line' + (_msl ? ' ' + _msl : ''),
-        (l.note ? escTip(l.note) : 'Your reaction/relevance line' + (l.drawn_at ? ' (drawn ' + l.drawn_at + ')' : '') + '.'),
-        'Read: your own marked level — saved to the label store, where it grades the auto-detector (a good line the detector misses is exactly the signal).'));
+        (l.note ? escTip(l.note) : 'Your reaction/relevance line' + (l.drawn_at ? ' (drawn ' + l.drawn_at + ')' : '') + '.')));
     });
   }
   lvlTags = [];   // rebuilt each redraw; drawLevelTags paints the sub-×10 badges
@@ -4986,8 +5217,7 @@ function redraw() {
       });
       if (!strong) lvlTags.push({ p: h.price, text: tag });
       tipH(h.price, tip('Level ' + r2(h.price) + ' — ×' + h.touches,
-        'Horizontal shelf price has touched ' + h.touches + ' times' + (tfs > 1 ? ', confirmed on ' + tfs + ' timeframes (bolder = more TFs)' : '') + '.',
-        'Read: more touches + more timeframes = stronger. A bounce here = respected; a decisive close through it usually converts it — old support acts as resistance and vice versa.'));
+        'Horizontal shelf price has touched ' + h.touches + ' times' + (tfs > 1 ? ', confirmed on ' + tfs + ' timeframes (bolder = more TFs)' : '') + '.'));
     });
   }
   // WEEK-VS-BASELINE $ BADGE (ov.dpoolAgg, darkpool.week_aggregate) — same lo/hi price clip as
@@ -5063,9 +5293,7 @@ function redraw() {
       tipPt(g.time, g.price, tip('Block print $' + amt + (g.n > 1 ? ' (×' + g.n + ' prints summed)' : '') + bglyph,
         g.side === 'BUY' ? '▲ Huge off-exchange print(s) that cleared the ASK — an aggressive, confident buy.'
         : g.side === 'SELL' ? '▼ Huge off-exchange print(s) that hit the BID — an aggressive, confident sell.'
-        : '◆ Printed inside the spread — mechanical-ish flow (ETF create/redeem, rebalance crosses), direction not confidently signable.',
-        g.side === 'MID' ? 'Read: size worth knowing about, but grey = context only — don\'t read direction into it.'
-        : 'Read: one huge directional bet, not summed flow. Watch whether price defends the print level — big buyers tend to defend their entry.'));
+        : '◆ Printed inside the spread — mechanical-ish flow (ETF create/redeem, rebalance crosses), direction not confidently signable.'));
     });
   }
   if (document.getElementById('tGaps').checked) {
@@ -5076,8 +5304,7 @@ function redraw() {
     (ov.gaps || []).forEach(function (g) {
       var fill = g.kind === 'support' ? g.bottom : g.top;
       var gapHtml = tip('Unfilled gap ' + r2(g.bottom) + '–' + r2(g.top) + (g.kind === 'support' ? ' (support)' : ' (resistance)'),
-        'Price jumped clean over this zone and has never traded back through it. The ' + (g.kind === 'support' ? 'BOTTOM' : 'TOP') + ' edge (' + r2(fill) + ', the labelled one) is the fill target.',
-        'Read: gaps act like magnets — "fill the gap" revisits are common, and the zone often produces a reaction on first touch.');
+        'Price jumped clean over this zone and has never traded back through it. The ' + (g.kind === 'support' ? 'BOTTOM' : 'TOP') + ' edge (' + r2(fill) + ', the labelled one) is the fill target.');
       [g.top, g.bottom].forEach(function (price) {
         var isFill = price === fill;
         cs.createPriceLine({  // labelled fill edge solid-ish; the other lid faint so it isn't read as an orphan line
@@ -5101,8 +5328,7 @@ function redraw() {
         axisLabelVisible: true, title: 'conf ×' + z.n
       });
       tipH(z.price, tip('Confluence ×' + z.n + ' (' + z.role + ')',
-        z.n + ' INDEPENDENT trendlines' + (z.layers && z.layers.length ? ' (from ' + (z.layers.join ? z.layers.join(' + ') : z.layers) + ')' : '') + ' stack within this band at the live edge — the centroid is drawn, faint lids show the band width.',
-        'Read: where lines cluster, reactions cluster — a high-attention zone to plan around, NOT a sizing/conviction signal by itself.'));
+        z.n + ' INDEPENDENT trendlines' + (z.layers && z.layers.length ? ' (from ' + (z.layers.join ? z.layers.join(' + ') : z.layers) + ')' : '') + ' stack within this band at the live edge — the centroid is drawn, faint lids show the band width.'));
       if (z.hi !== z.lo) [z.lo, z.hi].forEach(function (edge) {
         cs.createPriceLine({ price: edge, color: col + '44', lineWidth: 1, lineStyle: 2,
                              axisLabelVisible: false, title: '' });
@@ -5126,9 +5352,7 @@ function redraw() {
       var alpha = o.mitigated ? 'ff' : 'cc';   // tested zones full-opacity (still dashed to distinguish), fresh solid bold
       var style = o.mitigated ? 2 : 0;          // tested dashed, fresh solid
       var obHtml = tip((o.role === 'bullish' ? 'Bullish' : 'Bearish') + ' order block' + (o.mitigated ? ' — tested' : ' — fresh'),
-        'Zone ' + r2(o.lo) + '–' + r2(o.hi) + ': the last ' + (o.role === 'bullish' ? 'down' : 'up') + '-candle before a joint-ignition impulse — the base the move launched from.',
-        o.mitigated ? 'Read: price has already traded back into it once — weaker, kept as faded structure.'
-                    : 'Read: unrevisited — the FIRST return into a fresh zone is where the reaction usually happens (the origin of the impulse gets defended).');
+        'Zone ' + r2(o.lo) + '–' + r2(o.hi) + ': the last ' + (o.role === 'bullish' ? 'down' : 'up') + '-candle before a joint-ignition impulse — the base the move launched from.');
       [o.hi, o.lo].forEach(function (price, k) {
         cs.createPriceLine({
           price: price, color: col + alpha, lineWidth: 1, lineStyle: style,
@@ -5153,14 +5377,11 @@ function redraw() {
     cs.createPriceLine({ price: pd.lo, color: getCss('--cbuy') + '88', lineWidth: 1, lineStyle: 2,
                          axisLabelVisible: true, title: 'discount' });
     tipH(pd.hi, tip('Premium — range high ' + r2(pd.hi),
-      'Top of the current dealing range (trailing 300-bar high/low).',
-      'Read: price up here is RICH vs the range — chasing longs pays premium; range traders look for fade setups. In a real breakout the range simply re-draws higher.'));
+      'Top of the current dealing range (trailing 300-bar high/low).'));
     tipH(pd.eq, tip('EQ — range midpoint ' + r2(pd.eq),
-      '50% of the current 300-bar dealing range.',
-      'Read: above EQ = premium (sell-bias), below = discount (buy-bias). Holding one side of EQ, or flipping it, often sets the short-term tone.'));
+      '50% of the current 300-bar dealing range.'));
     tipH(pd.lo, tip('Discount — range low ' + r2(pd.lo),
-      'Bottom of the current dealing range (trailing 300-bar high/low).',
-      'Read: price down here is CHEAP vs the range — where value buyers step in; longs initiated in discount carry the better range-trade odds.'));
+      'Bottom of the current dealing range (trailing 300-bar high/low).'));
   }
   if (document.getElementById('tGex').checked && ov.gex && ov.gex.flip != null) {
     // GAMMA FLIP — the spot where aggregate dealer gamma (GEX) crosses zero (gex.py, from the
@@ -5170,8 +5391,7 @@ function redraw() {
     cs.createPriceLine({ price: ov.gex.flip, color: getCss('--gex'), lineWidth: 2, lineStyle: 2,
                          axisLabelVisible: true, title: 'G-Flip' });
     tipH(ov.gex.flip, tip('Gamma flip ' + r2(ov.gex.flip),
-      'The spot where aggregate dealer gamma crosses zero, computed from the stored OPRA option chain.',
-      'Read: BELOW this line dealers hedge WITH the move — drops accelerate, tape gets jumpier. ABOVE it they hedge against it — moves get dampened, price pins easier. Context, not a signal (the dealer-side sign is a heuristic).'));
+      'The spot where aggregate dealer gamma crosses zero, computed from the stored OPRA option chain. Context, not a signal: the dealer-side sign is a heuristic.'));
   }
   if (document.getElementById('tUoa').checked && ov.uoa && (ov.uoa.strikes || []).length) {
     // UNUSUAL OPTIONS ACTIVITY — the strikes carrying the most traded $-premium in the latest
@@ -5196,12 +5416,13 @@ function redraw() {
       tipH(s.strike, tip('UOA strike ' + s.strike + (tier ? ' ' + '⚡'.repeat(tier) : ''),
         '$' + s.premM + 'M of ' + sideWord + ' premium traded here (top-' + (ov.uoa.strikes.length) + ' strike by $). '
         + (s.volOI >= 1 ? 'Volume ran ' + s.volOI + '× the contracts that existed before today — mostly BRAND-NEW positioning.'
-                        : 'Volume stayed below existing open interest — mostly churn on old positions.'),
-        tier ? 'Read: someone is building ' + sideWord + ' exposure at ' + s.strike + (tier >= 3 ? ' at an EXTREME clip' : '') + '. Heavy strikes tend to pin/magnetize price into expiry. Weekly snapshot, not live flow.'
-             : 'Read: big money but routine turnover — note the level, don\'t over-read it. Weekly snapshot, not live flow.'));
+                        : 'Volume stayed below existing open interest — mostly churn on old positions.')
+        + ' Weekly snapshot, not live flow.'));
     });
   }
   applyView();
+  renderCompareLegend();
+  chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleCompareLegend);
   chart.timeScale().subscribeVisibleLogicalRangeChange(saveView);
   // keep the handle dots pinned as the view pans/zooms. The line itself is a series
   // (the library redraws it). Defer the dots to the next frame so they read the chart's
