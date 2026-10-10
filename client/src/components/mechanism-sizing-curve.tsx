@@ -74,7 +74,8 @@ const apart = (a: Box, b: Box) =>
 function CurvePlot({ fund, width, drawn, instant }: { fund: FundFear; width: number; drawn: boolean; instant: boolean }) {
   const narrow = width < 560;
   const H = narrow ? 260 : 330;
-  const m = { l: narrow ? 40 : 52, r: narrow ? 14 : 24, t: 28, b: 54 };
+  // top margin holds two label lanes: the y-axis title, then the buy line label
+  const m = { l: narrow ? 40 : 52, r: narrow ? 14 : 24, t: 51, b: 54 };
   const pw = Math.max(10, width - m.l - m.r);
   const ph = H - m.t - m.b;
   const top = fund.maxPct > 0 ? fund.maxPct : 1;
@@ -97,7 +98,8 @@ function CurvePlot({ fund, width, drawn, instant }: { fund: FundFear; width: num
   const yTicks = [0, top / 2, top];
   const xTickY = m.t + ph + 18;
   const buyLane = m.t - 14;
-  // y-axis title, above the axis in the same lane as the buy line label
+  const titleLane = buyLane - ASC - DESC - GAP; // its own lane, clear of the buy label
+  // y-axis title, above the axis
   const yTitle = narrow ? "% of account" : "order size, % of account";
 
   // Fixed labels: axis numbers and the axis titles.
@@ -105,7 +107,7 @@ function CurvePlot({ fund, width, drawn, instant }: { fund: FundFear; width: num
     ...[0, 25, 50, 75, 100].map((f): Label => ({ x: x(f), y: xTickY, anchor: f === 0 ? "start" : f === 100 ? "end" : "middle", text: String(f) })),
     ...yTicks.map((s): Label => ({ x: m.l - 8, y: y(s) + 4, anchor: "end", text: pct(s) })),
     { x: m.l + pw / 2, y: H - 6, anchor: "middle", text: "fear percentile" },
-    { x: 0, y: buyLane, anchor: "start", text: yTitle },
+    { x: 1, y: titleLane, anchor: "start", text: yTitle },
   ];
 
   // Placed labels: each has candidate spots in order of preference. The first
@@ -191,7 +193,7 @@ function CurvePlot({ fund, width, drawn, instant }: { fund: FundFear; width: num
       ))}
       <line x1={m.l} y1={m.t} x2={m.l} y2={m.t + ph} stroke="hsl(var(--beam-dim) / .6)" />
       <text x={m.l + pw / 2} y={H - 6} textAnchor="middle" fontSize="11" fill="hsl(var(--beam-dim))">fear percentile</text>
-      <text x={0} y={buyLane} fontSize="11" fill="hsl(var(--beam-dim))">{yTitle}</text>
+      <text x={1} y={titleLane} fontSize="11" fill="hsl(var(--beam-dim))">{yTitle}</text>
 
       {/* buy line */}
       <g style={fade(150)}>

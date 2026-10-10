@@ -7,7 +7,7 @@ export default function Disclaimer() {
     <div className="min-h-screen bg-background text-foreground font-sans overflow-x-hidden">
       <Navbar />
       <div className="container px-4 md:px-6 mx-auto py-24 max-w-4xl">
-        <h1 className="text-3xl font-bold uppercase mb-8 text-white">Legal Disclaimer</h1>
+        <h1 className="beam-heading mb-8" data-drawn="1">Legal Disclaimer</h1>
         
         <div className="space-y-6 text-muted-foreground font-mono text-sm leading-relaxed">
           <p className="text-xs text-primary/50 mb-6">Last Updated: November 25, 2025</p>
