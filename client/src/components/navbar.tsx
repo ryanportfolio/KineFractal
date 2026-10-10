@@ -1,7 +1,8 @@
 // Navbar — one 52px bar of quiet chrome, imported by every page.
 //
-// The wordmark is the KineFractalWordmark — candlestick-filled letterforms,
-// the same mark the hero carries (the only glowing element in the bar);
+// The logo is KineFractalLogo: the ring-and-waves mark beside the traced
+// wordmark, drawn by its intro on the first page load (the only glowing
+// element in the bar);
 // links speak in the etched-label register; a 2px beam cursor
 // slides to rest under the active route; the far right carries the terminal
 // button — a labeled key, not a bare "/", so people who never touch
@@ -11,7 +12,7 @@
 import { Link, useLocation } from "wouter";
 import { useEffect, useRef, useState } from "react";
 import { Menu, X } from "lucide-react";
-import { KineFractalWordmark } from "@/components/kine-fractal-wordmark";
+import { KineFractalLogo } from "@/components/kine-fractal-logo";
 import { openKfTerminal } from "@/components/command-line";
 
 // `external` = full-page app served by the server (not a SPA route) -> plain <a>
@@ -80,8 +81,8 @@ export function Navbar() {
       style={{ background: "hsl(var(--background) / 0.85)" }}>
       <div className="relative flex items-center justify-between h-[52px] px-4 md:px-8 max-w-[1400px] mx-auto">
         <Link href="/" className="flex items-center shrink-0" aria-label="Kine Fractal · home">
-          <div className="w-[150px] md:w-[176px]">
-            <KineFractalWordmark className="block w-full" />
+          <div className="w-[168px] md:w-[200px]">
+            <KineFractalLogo />
           </div>
         </Link>
 
