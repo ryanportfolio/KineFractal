@@ -8,7 +8,8 @@
 // through the beam tokens).
 //
 // Idle: a faint band passes through the letters every 12 s. Each pass is a
-// one-shot animation started by a timer, so nothing animates between passes.
+// one-shot animation started by a timer, so nothing animates between passes, and
+// a pass is skipped while the tab is hidden or the logo is off-screen.
 //
 // `play`: "load" runs the intro on the first mount of each page load (the navbar
 // remounts on every route, later mounts show the finished mark); "visible" runs it
@@ -48,6 +49,7 @@ export function KineFractalLogo({
     const timers: number[] = [];
     const anims: Animation[] = [];
     let cancelled = false;
+    let visible = false;
     const later = (s: number, fn: () => void) => timers.push(window.setTimeout(fn, s * 1000));
 
     const q = <T extends Element>(sel: string) => svg.querySelector(sel) as T;
@@ -56,8 +58,8 @@ export function KineFractalLogo({
     const lead = 0.97 * BAND;
 
     const loopPass = () => {
-      if (cancelled || !svg.isConnected) return;
-      band.animate(
+      if (cancelled) return;
+      if (visible && !document.hidden) band.animate(
         [
           { opacity: 0.6, transform: `translateX(${tx - 2 - lead}px)` },
           { opacity: 0.6, offset: 0.97 },
@@ -68,7 +70,8 @@ export function KineFractalLogo({
       later(LOOP_EVERY, loopPass);
     };
 
-    const runIntro = () => {
+    // returns the time (s) the last intro animation ends
+    const runIntro = (): number => {
       const cs = getComputedStyle(svg);
       const HOT = `hsl(${cs.getPropertyValue("--beam-hot").trim()})`;
       const CORE = `hsl(${cs.getPropertyValue("--beam-core").trim()})`;
@@ -128,38 +131,42 @@ export function KineFractalLogo({
       });
       A(ringEl, [{ strokeDasharray: "1 1.02", strokeDashoffset: 1.01 }, { strokeDasharray: "1 1.02", strokeDashoffset: 0 }], t0 + 0.45, 0.6, "cubic-bezier(0.3,0.1,0.3,1)", "forwards");
 
-      // done: drop every animation so the static SVG (and its theme tokens) is what remains
-      later(3.4, () => {
-        introPlayedThisLoad = true;
+      // done once the last animation ends: drop them all so the static SVG (and its
+      // theme tokens) is what remains
+      const end = Math.max(...anims.map((a) => Number(a.effect?.getComputedTiming().endTime ?? 0))) / 1000;
+      later(end + 0.05, () => {
         anims.forEach((a) => a.cancel());
         anims.length = 0;
         copies.replaceChildren();
       });
+      return end;
     };
 
+    let started = false;
     const start = (intro: boolean) => {
-      if (intro) runIntro();
-      later(intro ? LOOP_FIRST : LOOP_EVERY / 2, loopPass);
+      started = true;
+      // claimed at the start, so a route change mid-intro shows the finished logo
+      if (intro && play === "load") introPlayedThisLoad = true;
+      const end = intro ? runIntro() : 0;
+      later(intro ? Math.max(LOOP_FIRST, end + 0.3) : LOOP_EVERY / 2, loopPass);
     };
 
-    let io: IntersectionObserver | undefined;
-    if (play === "load") {
-      start(!introPlayedThisLoad);
-    } else {
-      io = new IntersectionObserver(
-        (entries) => {
-          if (!entries.some((e) => e.isIntersecting)) return;
-          io?.disconnect();
-          start(true);
-        },
-        { threshold: 0.6 },
-      );
-      io.observe(svg);
-    }
+    // tracks whether the logo is on screen (idle passes skip when it is not); the
+    // footer's intro waits until 60% of it is in view
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[entries.length - 1];
+        visible = e.isIntersecting;
+        if (!started && play === "visible" && e.intersectionRatio >= 0.6) start(true);
+      },
+      { threshold: [0, 0.6] },
+    );
+    io.observe(svg);
+    if (play === "load") start(!introPlayedThisLoad);
 
     return () => {
       cancelled = true;
-      io?.disconnect();
+      io.disconnect();
       timers.forEach((t) => window.clearTimeout(t));
       anims.forEach((a) => a.cancel());
     };
