@@ -257,11 +257,6 @@
   #buildOvl .st { margin:0 0 4px; font-size:13px; color:var(--sup); min-height:1.4em; }
   #buildOvl .el { margin:0 0 12px; font-size:12px; color:var(--mut); }
   #buildOvl button.hideb { padding:6px 12px; font-size:12.5px; }
-  /* remove-x on user-added super buttons (site, signed in) */
-  /* remove-x stays hidden until the ticker button is hovered or keyboard-focused */
-  .superbtn .rmx { display:none; margin-left:6px; color:var(--mut); cursor:pointer; font-weight:bold; }
-  .superbtn:hover .rmx, .superbtn:focus-within .rmx { display:inline; }
-  .superbtn .rmx:hover { color:var(--csell); }
   /* site-native confirmation for removing a user-added ticker */
   /* z above tickerReorderDialog (75): the confirm can be opened from the reorder modal */
   #removeTickerDialog { display:none; position:fixed; inset:0; z-index:80; padding:20px;
@@ -2603,29 +2598,22 @@ function applyTickerAccess() {
     if (!b) return;
     var v = ok[s.toLowerCase()];
     b.style.display = v ? '' : 'none';
-    if (v === 2 || (v === 1 && _chartAccess.account)) addRemoveX(b, s);
+    if (v === 2 || (v === 1 && _chartAccess.account)) enableTickerRemoval(b, s);
   });
   applyTickerOrder(preferredTickerOrder());
   if (document.getElementById('tickerReorderDialog').classList.contains('open')) renderTickerReorderList();
 }
-function addRemoveX(btn, s) {
-  if (btn.querySelector('.rmx')) return;
-  var x = document.createElement('span');
-  x.className = 'rmx';
-  x.textContent = '×';
-  x.title = 'remove ' + s + ' from your charts';
-  x.tabIndex = 0;
-  x.setAttribute('role', 'button');
-  x.setAttribute('aria-label', 'Remove ' + s + ' from your charts');
-  x.onclick = function (ev) {
-    ev.stopPropagation();
-    openRemoveTickerDialog(btn, s, x);
-  };
-  x.onkeydown = function (ev) {
-    if (ev.key !== 'Enter' && ev.key !== ' ') return;
-    ev.preventDefault(); ev.stopPropagation(); openRemoveTickerDialog(btn, s, x);
-  };
-  btn.appendChild(x);
+// Right-click a removable ticker to get the remove prompt. No hover "x": showing
+// it widened the button and shifted the whole row. The context-menu key and
+// Shift+F10 fire the same event from the keyboard; REORDER also has Delete.
+function enableTickerRemoval(btn, s) {
+  if (btn.dataset.removable) return;
+  btn.dataset.removable = '1';
+  btn.title += ' · right-click to remove';
+  btn.addEventListener('contextmenu', function (ev) {
+    ev.preventDefault();
+    openRemoveTickerDialog(btn, s, btn);
+  });
 }
 
 // send: explicitly push the current chart's hand-drawn lines into the repo label store
