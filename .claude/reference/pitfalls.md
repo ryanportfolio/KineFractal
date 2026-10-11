@@ -69,3 +69,9 @@ Related cost: an `infinite` CSS animation on SVG stroke properties keeps the mai
 ### 2026-10-11: Drizzle's "Failed query" message hides the Postgres error
 
 A failed Drizzle query throws an error whose `message` is only `Failed query: <sql>` plus the parameters. The Postgres error (code, message, detail) is on `e.cause`, and the route handlers log only `e.message`. A local unsubscribe test returned 500 and was left unexplained for a session; logging `e.cause` showed `23503` (foreign key violation): the token's user id was not in the hand-inserted `user` table. When a query fails locally, print `e.cause.code`, `e.cause.message` and `e.cause.detail` before guessing. For local alert tests, build the schema from `migrations/*.sql` (strip `--> statement-breakpoint`) and mint tokens for user ids that exist.
+
+### 2026-10-11: Source-text tests pin the alerts page's copy and defaults
+
+Several tests read source files as text instead of rendering them: `scripts/alerts-ux.test.mjs` (the on-by-default insert in `server/alerts-routes.ts`, the `InfoTip` structure in `alert-control-panel.tsx`, and a ban on sentence-ending full stops in visible prose of `alerts.tsx` and `alert-control-panel.tsx`), `client/src/pages/alerts-copy.test.tsx` (exact hero and signed-out sentences) and `client/src/components/alert-control-panel.test.tsx` (exact class strings). Changing the opt-in default or the page copy failed `npm test` in two rounds whose write scope left these files out. Before changing alerts behavior or wording, grep the tests for the strings you are changing and update only the assertions the change overturns.
+
+Related: the site's root font size is 22px at some widths, so Tailwind rem classes (`h-11`, `gap-3`, `text-xs`) render larger than their nominal pixel sizes. Use px values (`h-[44px]`) where an exact size matters, such as 44px touch targets.
