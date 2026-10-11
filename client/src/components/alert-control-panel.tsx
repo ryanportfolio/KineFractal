@@ -7,6 +7,7 @@ import {
   type GapDailySettings,
   type LevelsWeeklySettings,
 } from "@shared/alert-settings";
+import { GAP_PLACEMENTS, normalizeGapPlacement, type GapPlacement } from "@shared/gap-placement";
 import { csrfFetch } from "@/lib/auth-client";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -55,12 +56,15 @@ const CONTROL_HELP = {
   recency: "Only support levels that price traded down to within this many days can make the weekly digest",
   maxBelow: "Leaves out levels more than this percent below the latest close; zero removes the limit",
   resultCap: "Keeps only the strongest levels across your whole watchlist, up to this many; zero keeps every level that qualifies",
-  confluence: "Adds Gap × OB (gap and order block) levels: an open gap below the price that sits close to a fresh order block, the zone where a strong move up started; fresh means price has not come back into that zone since it formed",
-  confluenceDistance: "How far apart, in percent, an open gap and a fresh order block (price has not come back into it since it formed) can be and still count as a Gap × OB level",
-  tripleDistance: "How far apart, in percent, an open gap, a fresh order block (price has not come back into it since it formed) and a support level can be and still count as a Triple level; the email uses the price halfway between them",
+  gapPlacement: "Where the suggested buy limit sits inside an open gap below the price: the top is the first price a drop reaches, the middle is halfway in, and a full fill is the bottom of the gap, where it closes completely; the weekly email prices gap + order block and Triple levels this way, and so does the Limit Buy dialog on the charts page",
+  confluence: "Adds gap + order block levels: an open gap below the price whose middle sits close to the middle of a fresh order block, the zone where a strong move up started; fresh means price has not come back into that zone since it formed; the price shown is the gap at your gap limit price",
+  confluenceDistance: "How far apart, in percent, the middles of an open gap and a fresh order block (price has not come back into it since it formed) can be and still count as a gap + order block level",
+  tripleDistance: "How far apart, in percent, an open gap, a fresh order block (price has not come back into it since it formed) and a support level can be and still count as a Triple level; the email prices it at the gap, using your gap limit price",
   dedupDays: "Skips a ticker and level already emailed to you within this many days, then lets it back in once that time passes; zero sends every standing level in every digest",
   dedupTolerance: "Two levels within this percent of each other count as the same level; a level that moves farther than this counts as new and sends again",
 } as const;
+
+const GAP_PLACEMENT_LABEL: Record<GapPlacement, string> = { top: "Top", middle: "Middle", fill: "Full fill" };
 
 function InfoTip({ label, text, large = false }: { label: string; text: string; large?: boolean }) {
   // Hover and keyboard focus open the tip while they last (Radix's own state).
@@ -175,6 +179,7 @@ function NumberField({
   hint,
   tooltip,
   onChange,
+  onPending,
   large = false,
 }: {
   id: string;
@@ -187,6 +192,9 @@ function NumberField({
   hint: string;
   tooltip?: string;
   onChange: (value: number) => void;
+  // true while the box holds text that is not the saved value yet (waiting to
+  // go out, or invalid until blur puts the saved value back)
+  onPending?: (pending: boolean) => void;
   large?: boolean;
 }) {
   // The field edits a draft string so it can sit empty or half-typed; only a
@@ -200,7 +208,12 @@ function NumberField({
     if (pushTimer.current) clearTimeout(pushTimer.current);
     pushTimer.current = null;
   };
-  useEffect(() => cancelPush, []);
+  const pendingRef = useRef(onPending);
+  pendingRef.current = onPending;
+  useEffect(() => () => {
+    cancelPush();
+    pendingRef.current?.(false);
+  }, []);
   const parse = (raw: string) => {
     const next = Number(raw);
     if (raw.trim() === "" || !Number.isFinite(next) || next < min || next > max) return null;
@@ -229,9 +242,11 @@ function NumberField({
             setDraft(event.target.value);
             cancelPush();
             const next = parse(event.target.value);
+            onPending?.(next !== value);
             if (next !== null && next !== value) pushTimer.current = setTimeout(() => {
               pushTimer.current = null;
               onChange(next);
+              onPending?.(false);
             }, 400);
           }}
           onBlur={() => {
@@ -239,6 +254,7 @@ function NumberField({
             const next = parse(draft);
             if (next === null) setDraft(String(value));
             else if (next !== value) onChange(next);
+            onPending?.(false);
           }}
           className={`min-w-0 flex-1 bg-transparent px-3 py-2 font-mono tabular-nums text-beam-hot outline-none ${large ? "text-xl" : "text-sm"}`}
         />
@@ -276,6 +292,65 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [error, setError] = useState<string | null>(null);
   const failedSnapshot = useRef<string | null>(null);
   const [statusZone, setStatusZone] = useState<StatusZone>("channels");
+  // Gap limit placement lives with the chart preferences (/api/chart-prefs),
+  // not in alert_prefs: the Limit Buy dialog uses it whether or not alerts are
+  // on. It saves on click; only the latest click's answer is shown.
+  const [gapPlacement, setGapPlacement] = useState<GapPlacement>("top");
+  const [gapPlacementState, setGapPlacementState] = useState<"loading" | "idle" | "saving" | "saved">("loading");
+  const [gapPlacementError, setGapPlacementError] = useState<string | null>(null);
+  const savedGapPlacement = useRef<GapPlacement>("top");
+  const gapPlacementSeq = useRef(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch("/api/chart-prefs", { credentials: "include", cache: "no-store", signal: controller.signal })
+      .then((response) => (response.ok ? response.json() : Promise.reject(new Error(`HTTP ${response.status}`))))
+      .then((body) => {
+        if (!body.account || !body.stored) throw new Error("unavailable");
+        const value = normalizeGapPlacement(body.gapPlacement);
+        savedGapPlacement.current = value;
+        setGapPlacement(value);
+        setGapPlacementState("idle");
+      })
+      .catch((reason) => {
+        if (reason?.name === "AbortError") return;
+        setGapPlacementState("idle");
+        setGapPlacementError("gap limit price is unavailable right now · try again later");
+      });
+    return () => controller.abort();
+  }, []);
+  const chooseGapPlacement = async (value: GapPlacement) => {
+    const seq = ++gapPlacementSeq.current;
+    setGapPlacement(value);
+    setGapPlacementError(null);
+    setGapPlacementState("saving");
+    try {
+      const response = await csrfFetch("/api/chart-prefs", { method: "PUT", body: JSON.stringify({ gapPlacement: value }) });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
+      savedGapPlacement.current = value;
+      if (seq === gapPlacementSeq.current) setGapPlacementState("saved");
+    } catch (reason: any) {
+      if (seq !== gapPlacementSeq.current) return;
+      setGapPlacement(savedGapPlacement.current);
+      setGapPlacementState("idle");
+      setGapPlacementError(`${reason?.message || "failed to save"} · gap limit price restored to the last saved choice`);
+    }
+  };
+  // number boxes whose typed value has not reached the settings yet
+  const [pendingDrafts, setPendingDrafts] = useState<ReadonlySet<string>>(() => new Set());
+  const trackDraft = (id: string, zone: StatusZone) => (pending: boolean) => {
+    setPendingDrafts((current) => {
+      if (current.has(id) === pending) return current;
+      const next = new Set(current);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+    if (pending) {
+      setStatusZone(zone);
+      setStatus(null);
+    }
+  };
 
   useEffect(() => {
     const controller = new AbortController();
@@ -536,7 +611,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         <span className="text-red-400">{error}</span>
       ) : saving ? (
         <span className="text-beam-dim">saving settings…</span>
-      ) : dirty ? (
+      ) : dirty || pendingDrafts.size > 0 ? (
         <span className="text-beam-dim">changes pending…</span>
       ) : status ? (
         <span className="text-beam-mid">{status}</span>
@@ -751,10 +826,10 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
 
         <div className="mt-8">
           <div className="mb-3 flex items-center gap-2">
-            <div className="etched text-lg text-beam-dim">MINIMUM STRENGTH</div>
-            <InfoTip label="Minimum strength" text={CONTROL_HELP.minStrength} large />
+            <div className="etched text-lg text-beam-dim">MINIMUM TIMEFRAME RELEVANCE</div>
+            <InfoTip label="Minimum timeframe relevance" text={CONTROL_HELP.minStrength} large />
           </div>
-          <div className="inline-flex border border-[hsl(var(--beam-ghost))] p-1" role="group" aria-label="Minimum timeframes agreeing">
+          <div className="inline-flex border border-[hsl(var(--beam-ghost))] p-1" role="group" aria-label="Minimum timeframe relevance">
             {[1, 2, 3].map((value) => (
               <button
                 key={value}
@@ -776,22 +851,57 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         </div>
 
         <div className="mt-8 grid gap-8 md:grid-cols-3">
-          <NumberField large={true} id="lookback-days" label="LAST TESTED WITHIN" value={weekly.lookbackDays} min={1} max={3650} unit="days" hint="Only support price touched within this many days counts" tooltip={CONTROL_HELP.recency} onChange={(value) => updateWeekly("limits", { lookbackDays: value })} />
-          <NumberField large={true} id="max-below" label="MAX DISTANCE BELOW" value={weekly.maxBelowPct} min={0} max={100} step={0.5} unit="%" hint="Skips levels farther below the close than this; zero removes the limit" tooltip={CONTROL_HELP.maxBelow} onChange={(value) => updateWeekly("limits", { maxBelowPct: value })} />
-          <NumberField large={true} id="max-setups" label="LEVELS PER EMAIL" value={weekly.maxSetups} min={0} max={1000} unit="levels" hint="Keeps the strongest levels up to this number; zero sends them all" tooltip={CONTROL_HELP.resultCap} onChange={(value) => updateWeekly("limits", { maxSetups: value })} />
+          <NumberField large={true} id="lookback-days" label="LAST TESTED WITHIN" value={weekly.lookbackDays} min={1} max={3650} unit="days" hint="Only support price touched within this many days counts" tooltip={CONTROL_HELP.recency} onPending={trackDraft("lookback-days", "limits")} onChange={(value) => updateWeekly("limits", { lookbackDays: value })} />
+          <NumberField large={true} id="max-below" label="MAX DISTANCE BELOW" value={weekly.maxBelowPct} min={0} max={100} step={0.5} unit="%" hint="Skips levels farther below the close than this; zero removes the limit" tooltip={CONTROL_HELP.maxBelow} onPending={trackDraft("max-below", "limits")} onChange={(value) => updateWeekly("limits", { maxBelowPct: value })} />
+          <NumberField large={true} id="max-setups" label="LEVELS PER EMAIL" value={weekly.maxSetups} min={0} max={1000} unit="levels" hint="Keeps the strongest levels up to this number; zero sends them all" tooltip={CONTROL_HELP.resultCap} onPending={trackDraft("max-setups", "limits")} onChange={(value) => updateWeekly("limits", { maxSetups: value })} />
         </div>
         {saveStatus("limits")}
 
         <div className="mt-9 border-t border-[hsl(var(--beam-ghost))] pt-7">
+          <div className="mb-3 flex items-center gap-2">
+            <div id="gap-placement-label" className="etched text-lg text-beam-dim">GAP LIMIT PRICE</div>
+            <InfoTip label="Gap limit price" text={CONTROL_HELP.gapPlacement} large />
+          </div>
+          <div className="inline-flex border border-[hsl(var(--beam-ghost))] p-1" role="group" aria-labelledby="gap-placement-label">
+            {GAP_PLACEMENTS.map((value) => (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={gapPlacement === value}
+                disabled={gapPlacementState === "loading"}
+                onClick={() => chooseGapPlacement(value)}
+                className={`whitespace-nowrap px-4 py-2 font-mono text-lg disabled:opacity-40 max-[600px]:px-3 max-[600px]:text-[16px] ${
+                  gapPlacement === value
+                    ? "bg-[hsl(var(--beam-ghost))] text-beam-hot shadow-[inset_0_0_0_1px_hsl(var(--beam-hot)/0.35)]"
+                    : "text-beam-dim hover:text-beam-mid"
+                }`}
+              >
+                {GAP_PLACEMENT_LABEL[value]}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 font-mono text-sm text-beam-dim">Also sets gap prices in the Limit Buy dialog on the charts page</p>
+          <div aria-live="polite" className="mt-4 min-h-5 font-mono text-xs">
+            {gapPlacementError ? (
+              <span className="text-red-400">{gapPlacementError}</span>
+            ) : gapPlacementState === "saving" ? (
+              <span className="text-beam-dim">saving…</span>
+            ) : gapPlacementState === "saved" ? (
+              <span className="text-beam-mid">saved</span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-9 border-t border-[hsl(var(--beam-ghost))] pt-7">
           <div className="flex items-center gap-2">
             <div className="min-w-0">
-              <Toggle checked={weekly.confluenceEnabled} onChange={(checked) => updateWeekly("confluence", { confluenceEnabled: checked })} label="Include Gap × OB levels" large />
+              <Toggle checked={weekly.confluenceEnabled} onChange={(checked) => updateWeekly("confluence", { confluenceEnabled: checked })} label="Include gap + order block levels" large />
             </div>
-            <InfoTip label="Gap × OB levels" text={CONTROL_HELP.confluence} large />
+            <InfoTip label="Gap + order block levels" text={CONTROL_HELP.confluence} large />
           </div>
           <div className="mt-7 grid gap-8 md:grid-cols-2">
-            <NumberField large={true} id="confluence-distance" label="GAP × OB DISTANCE" value={weekly.confluencePct} min={0.1} max={50} step={0.1} unit="%" hint="How far apart the gap and order block can be" tooltip={CONTROL_HELP.confluenceDistance} onChange={(value) => updateWeekly("confluence", { confluencePct: value })} />
-            <NumberField large={true} id="triple-distance" label="TRIPLE DISTANCE" value={weekly.triplePct} min={0.1} max={50} step={0.1} unit="%" hint="How far apart a gap, an order block and a support level can be for a Triple level" tooltip={CONTROL_HELP.tripleDistance} onChange={(value) => updateWeekly("confluence", { triplePct: value })} />
+            <NumberField large={true} id="confluence-distance" label="GAP + ORDER BLOCK DISTANCE" value={weekly.confluencePct} min={0.1} max={50} step={0.1} unit="%" hint="How far apart the gap and order block can be" tooltip={CONTROL_HELP.confluenceDistance} onPending={trackDraft("confluence-distance", "confluence")} onChange={(value) => updateWeekly("confluence", { confluencePct: value })} />
+            <NumberField large={true} id="triple-distance" label="TRIPLE DISTANCE" value={weekly.triplePct} min={0.1} max={50} step={0.1} unit="%" hint="How far apart a gap, an order block and a support level can be for a Triple level" tooltip={CONTROL_HELP.tripleDistance} onPending={trackDraft("triple-distance", "confluence")} onChange={(value) => updateWeekly("confluence", { triplePct: value })} />
           </div>
           {saveStatus("confluence")}
         </div>
@@ -802,8 +912,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             Skip a ticker and level already emailed to you recently, so a level that stays in place is not repeated in every digest
           </p>
           <div className="grid gap-8 md:grid-cols-2">
-            <NumberField large={true} id="dedup-days" label="DON'T REPEAT WITHIN" value={weekly.dedupDays} min={0} max={180} unit="days" hint="Sends it again once this time passes; zero repeats it in every digest" tooltip={CONTROL_HELP.dedupDays} onChange={(value) => updateWeekly("repeat", { dedupDays: value })} />
-            <NumberField large={true} id="dedup-tolerance" label="SAME-LEVEL TOLERANCE" value={weekly.dedupPct} min={0} max={10} step={0.1} unit="%" hint="Levels within this percent count as the same level" tooltip={CONTROL_HELP.dedupTolerance} onChange={(value) => updateWeekly("repeat", { dedupPct: value })} />
+            <NumberField large={true} id="dedup-days" label="DON'T REPEAT WITHIN" value={weekly.dedupDays} min={0} max={180} unit="days" hint="Sends it again once this time passes; zero repeats it in every digest" tooltip={CONTROL_HELP.dedupDays} onPending={trackDraft("dedup-days", "repeat")} onChange={(value) => updateWeekly("repeat", { dedupDays: value })} />
+            <NumberField large={true} id="dedup-tolerance" label="SAME-LEVEL TOLERANCE" value={weekly.dedupPct} min={0} max={10} step={0.1} unit="%" hint="Levels within this percent count as the same level" tooltip={CONTROL_HELP.dedupTolerance} onPending={trackDraft("dedup-tolerance", "repeat")} onChange={(value) => updateWeekly("repeat", { dedupPct: value })} />
           </div>
         </div>
 

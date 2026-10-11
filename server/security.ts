@@ -66,6 +66,15 @@ export const chartGroupsLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Gap limit placement: one load per Limit Buy open or /alerts visit, one save per click.
+export const chartPrefsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many preference changes, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // charts.html "add ticker" search: one lookup per pause in typing, answered
 // from an in-memory cache when the same query repeats.
 export const symbolSearchLimiter = rateLimit({
@@ -275,6 +284,8 @@ export function setupSecurity(app: Express) {
   // charts.html Export ticker groups: a new route, so it takes the site's
   // CSRF token (the page fetches /api/csrf-token before each save).
   app.use('/api/chart-groups', chartGroupsLimiter, csrfProtection);
+  // Gap limit placement (Limit Buy dialog and /alerts): same posture.
+  app.use('/api/chart-prefs', chartPrefsLimiter, csrfProtection);
 
   // charts.html ticker search: read-only GET, signed-in only. Outside /api
   // (like /labels) so typing does not spend the shared API counter.

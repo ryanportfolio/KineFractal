@@ -165,6 +165,10 @@ export const chartPreferences = pgTable("chart_preferences", {
   hiddenTickers: jsonb("hidden_tickers").notNull().default(sql`'[]'::jsonb`),
   // Named ticker groups for the chart Export dialog: [{ id, name, symbols }].
   tickerGroups: jsonb("ticker_groups").notNull().default(sql`'[]'::jsonb`),
+  // Where a support gap's buy limit sits: 'top' | 'middle' | 'fill'; null means
+  // 'top' (shared/gap-placement.ts). The engine's weekly email reads it with
+  // plain SQL, so keep the column name stable.
+  gapLimitPlacement: text("gap_limit_placement"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
