@@ -21,7 +21,7 @@ export default function Alerts() {
   useDocumentMeta({
     title: "Free email alerts",
     description:
-      "Free EOD watchlist emails from the same nightly pipeline that draws the charts. Choose what qualifies; receive nothing when nothing changed.",
+      "Free watchlist emails built after each market close from the same data that draws the charts, arriving the next morning. Alerts stay off until you turn them on, and a quiet day sends nothing.",
   });
 
   useEffect(() => {
@@ -47,11 +47,11 @@ export default function Alerts() {
   const tosAccepted = !!me?.tosAccepted;
   const canEnable = verified && tosAccepted;
   const gateHint = mePending
-    ? "checking account prerequisites…"
+    ? "checking your account…"
     : !verified
-      ? "Verify your email from Account before enabling alerts"
+      ? "Verify your email before turning on alerts"
       : !tosAccepted
-        ? "Accept the current terms from Account before enabling alerts"
+        ? "Accept the current terms before turning on alerts"
         : null;
 
   return (
@@ -61,16 +61,16 @@ export default function Alerts() {
         <div className="mx-auto max-w-6xl">
           <section className="border-b border-[hsl(var(--beam-ghost))] pb-12 md:grid md:grid-cols-[1fr_0.72fr] md:items-start md:gap-16">
             <div>
-              <div className="etched mb-4 text-beam-dim">ALERT TERMINAL · EOD</div>
+              <div className="etched mb-4 text-beam-dim">EMAIL ALERTS · AFTER THE CLOSE</div>
               <div className="max-w-[560px]">
                 <BeamHeading text="ALERTS" as="h1" active instant={false} />
               </div>
               <p className="mt-8 max-w-[58ch] font-mono text-sm leading-relaxed text-beam-mid md:text-base">
-                Free watchlist emails from the same nightly pipeline that draws the charts; choose what qualifies; receive nothing when nothing changed
+                Free watchlist emails built after each market close from the same data that draws the charts and delivered the next morning; you choose what qualifies, and a quiet day sends nothing
               </p>
             </div>
             <div className="mt-12 border-t border-[hsl(var(--beam-ghost))] pt-6 md:mt-0">
-              <div className="grid grid-cols-2 gap-y-6 font-mono text-xs">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-6 font-mono text-[12px] xl:text-xs">
                 <div><Radar className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">WATCHLIST DRIVEN</span></div>
                 <div><MailCheck className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">INBOX DELIVERY</span></div>
                 <div><SlidersHorizontal className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">YOUR FILTERS</span></div>
@@ -85,8 +85,8 @@ export default function Alerts() {
             ) : session?.user ? (
               <>
                 {gateHint && !mePending && (
-                  <Link href="/account" className="mb-8 inline-block font-mono text-xs text-accent underline underline-offset-4">
-                    {gateHint} Open Account →
+                  <Link href="/account?next=%2Falerts" className="mb-8 inline-block font-mono text-xs text-accent underline underline-offset-4">
+                    {gateHint}: open Account →
                   </Link>
                 )}
                 <AlertControlPanel canEnable={canEnable} gateHint={gateHint} />
@@ -94,13 +94,13 @@ export default function Alerts() {
             ) : (
               <div className="grid gap-10 md:grid-cols-[1fr_auto] md:items-end">
                 <p className="max-w-[62ch] font-mono text-sm leading-relaxed text-beam-mid">
-                  Create a free account, then choose tickers and filters here to get limit-buy alerts
+                  Create a free account, then choose tickers and filters here and turn on the alerts you want; nothing is sent until you do
                 </p>
                 <div className="flex flex-wrap gap-3">
-                  <Link href="/account?mode=signup" className="border border-beam-hot bg-[hsl(var(--beam-hot))] px-5 py-3 font-mono text-xs font-semibold tracking-[0.12em] text-[hsl(var(--primary-foreground))]">
+                  <Link href="/account?mode=signup&next=%2Falerts" className="border border-beam-hot bg-[hsl(var(--beam-hot))] px-5 py-3 font-mono text-xs font-semibold tracking-[0.12em] text-[hsl(var(--primary-foreground))]">
                     CREATE FREE ACCOUNT
                   </Link>
-                  <Link href="/account" className="border border-[hsl(var(--beam-ghost))] px-5 py-3 font-mono text-xs font-semibold tracking-[0.12em] text-beam-mid hover:border-beam-hot hover:text-beam-hot">
+                  <Link href="/account?next=%2Falerts" className="border border-[hsl(var(--beam-ghost))] px-5 py-3 font-mono text-xs font-semibold tracking-[0.12em] text-beam-mid hover:border-beam-hot hover:text-beam-hot">
                     SIGN IN
                   </Link>
                 </div>

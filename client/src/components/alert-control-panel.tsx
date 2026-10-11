@@ -35,39 +35,64 @@ function putWatchlist(symbols: string[]): Promise<Response> {
   });
 }
 
+// Where the last settings change was made; the save status shows there, so a
+// phone user sees "saved" or an error next to the control they just touched.
+type StatusZone = "channels" | "daily" | "strength" | "limits" | "confluence" | "repeat";
+
 type Props = {
   canEnable: boolean;
   gateHint?: string | null;
 };
 
 const CONTROL_HELP = {
-  gapEvents: "A gap alerts once each time it advances to or beyond your selected minimum stage",
-  orderBlockEvents: "Alerts the first time the latest close enters a chart order-block zone; re-entry stays quiet unless the zone is new",
-  equilibriumEvents: "Price must fall from the premium half of the recent 300-bar range to or below its midpoint; it rearms only after price returns above",
-  supportGaps: "Includes unfilled gap-up zones below price, acting as potential support or buy areas",
-  resistanceGaps: "Includes unfilled gap-down zones above price, acting as potential resistance or sell areas",
-  gapStage: "Approaching means price is within 1% of the near edge; tagged means price is inside the zone; about to fill means within 1% of the far edge; filled means price crossed, or reached within 0.1% of, the far edge",
-  minStrength: "How many of 2h, 4h, and 1d confirm the same support level; higher values produce fewer, stronger candidates",
-  recency: "Only support the chart traded down to within this many days can qualify for the weekly digest",
-  maxBelow: "Drops levels farther than this percentage below the latest close; set zero to remove the distance cap",
-  resultCap: "Keeps only the strongest N qualifying rows across the watchlist; set zero to keep every qualifying row",
-  confluence: "Adds an extra buy-limit zone when an unfilled gap and a fresh bullish order block sit close together below price",
-  confluenceDistance: "Maximum percentage separation allowed between the unfilled gap and fresh bullish order block",
-  tripleDistance: "Maximum spread among an unfilled gap, fresh bullish order block, and S/R level; their midpoint becomes the major level",
-  dedupDays: "Suppresses a symbol and level already emailed to you within this many days, then lets it back into your inbox once the window passes; set zero to send the standing plan every run",
-  dedupTolerance: "Two levels within this percentage of each other count as the same setup; a level that moves more than this is treated as new and sends again",
+  gapEvents: "Emails once each time an open gap reaches your minimum stage or a later one",
+  orderBlockEvents: "Emails the first time the latest close lands inside an order block, a zone where a strong move started; going back into the same zone stays quiet until a new zone forms",
+  equilibriumEvents: "Emails when price falls from the upper half of its recent range to the middle of the range or below; the middle is halfway between the high and low of the last 300 bars on the 2-hour chart; it can email again only after price climbs back above the middle",
+  supportGaps: "Includes open gaps below the price, left by a gap up; they can act as support, a buy area on the chart, not a FearLab decision",
+  resistanceGaps: "Includes open gaps above the price, left by a gap down; they can act as resistance, a sell area on the chart, not a FearLab decision",
+  gapStage: "Approaching: price is within 1% of the gap's near edge; inside the gap: price has moved into it; about to fill: price is within 1% of the far edge; filled: price crossed the far edge or came within 0.1% of it",
+  minStrength: "How many of the three timeframes (2-hour, 4-hour and daily) show the same support level; a higher number sends fewer, stronger levels",
+  recency: "Only support levels that price traded down to within this many days can make the weekly digest",
+  maxBelow: "Leaves out levels more than this percent below the latest close; zero removes the limit",
+  resultCap: "Keeps only the strongest levels across your whole watchlist, up to this many; zero keeps every level that qualifies",
+  confluence: "Adds Gap × OB (gap and order block) levels: an open gap below the price that sits close to a fresh order block, the zone where a strong move up started; fresh means price has not come back into that zone since it formed",
+  confluenceDistance: "How far apart, in percent, an open gap and a fresh order block (price has not come back into it since it formed) can be and still count as a Gap × OB level",
+  tripleDistance: "How far apart, in percent, an open gap, a fresh order block (price has not come back into it since it formed) and a support level can be and still count as a Triple level; the email uses the price halfway between them",
+  dedupDays: "Skips a ticker and level already emailed to you within this many days, then lets it back in once that time passes; zero sends every standing level in every digest",
+  dedupTolerance: "Two levels within this percent of each other count as the same level; a level that moves farther than this counts as new and sends again",
 } as const;
 
 function InfoTip({ label, text, large = false }: { label: string; text: string; large?: boolean }) {
+  // Hover and keyboard focus open the tip while they last (Radix's own state).
+  // A click or tap pins it open until another click or tap on it, Esc, a press
+  // elsewhere, or focus leaving it. Radix alone closes a tooltip on pointer
+  // down, so it never opened on a touch screen. Radix also closes on any page
+  // scroll; that only ends the hover state, so a pinned tip survives a scroll.
+  const [transient, setTransient] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   return (
-    <Tooltip delayDuration={0}>
+    <Tooltip delayDuration={0} open={transient || pinned} onOpenChange={setTransient}>
       <TooltipTrigger asChild>
         <button
+          ref={triggerRef}
           type="button"
           aria-label={`Explain ${label}`}
-          className={`inline-flex shrink-0 items-center justify-center border border-[hsl(var(--beam-ghost))] font-mono text-beam-dim transition-colors hover:border-beam-hot hover:text-beam-hot focus-visible:border-beam-hot focus-visible:text-beam-hot focus-visible:outline-none ${large ? "h-5 w-5 text-xs" : "h-4 w-4 text-[9px]"}`}
+          aria-expanded={transient || pinned}
+          onClick={(event) => {
+            // skip Radix's close-on-click; toggle the pinned state instead
+            event.preventDefault();
+            setPinned((current) => !current);
+          }}
+          onBlur={() => setPinned(false)}
+          className={`group/tip inline-flex shrink-0 items-center justify-center focus-visible:outline-none ${large ? "h-[44px] w-[44px] min-[600px]:h-[30px] min-[600px]:w-[30px]" : "h-[44px] w-[44px] min-[600px]:h-[26px] min-[600px]:w-[26px]"}`}
         >
-          ?
+          <span
+            aria-hidden="true"
+            className={`inline-flex items-center justify-center border border-[hsl(var(--beam-ghost))] font-mono text-beam-dim transition-colors group-hover/tip:border-beam-hot group-hover/tip:text-beam-hot group-focus-visible/tip:border-beam-hot group-focus-visible/tip:text-beam-hot group-aria-expanded/tip:border-beam-hot group-aria-expanded/tip:text-beam-hot ${large ? "h-5 w-5 text-xs" : "h-4 w-4 text-[9px]"}`}
+          >
+            ?
+          </span>
         </button>
       </TooltipTrigger>
       <TooltipContent
@@ -75,6 +100,11 @@ function InfoTip({ label, text, large = false }: { label: string; text: string; 
         side="top"
         sideOffset={10}
         collisionPadding={12}
+        onEscapeKeyDown={() => setPinned(false)}
+        onPointerDownOutside={(event) => {
+          // a press on the trigger itself is handled by its click
+          if (!triggerRef.current?.contains(event.target as Node)) setPinned(false);
+        }}
         className={`max-w-[min(20rem,calc((100vw_-_24px)_/_var(--pz)))] rounded-none border border-[hsl(var(--beam-dim))] bg-background px-3 py-2 font-mono leading-relaxed text-beam-mid shadow-[0_0_18px_hsl(var(--beam-ghost)/0.55)] ${large ? "text-sm" : "text-[11px]"}`}
       >
         {text}
@@ -104,7 +134,7 @@ function Toggle({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className="group flex w-full items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-45"
+      className="group flex w-full items-center gap-[12px] text-left min-[600px]:gap-3 disabled:cursor-not-allowed disabled:opacity-45"
     >
       <span
         aria-hidden="true"
@@ -114,13 +144,20 @@ function Toggle({
             : "border-[hsl(var(--beam-ghost))] bg-transparent"
         }`}
       >
+        {/* knob: hollow outline at the left end when off, filled at the right end when on */}
         <span
-          className={`absolute top-[3px] h-4 w-4 transition-transform duration-200 ease-[var(--ease-out-expo)] ${
+          className={`absolute top-1/2 h-4 w-4 -translate-y-1/2 border-[1.5px] transition-[left,background-color,border-color,box-shadow] duration-200 ease-[var(--ease-out-expo)] ${
             checked
-              ? "translate-x-[22px] bg-[hsl(var(--beam-hot))] shadow-[0_0_10px_hsl(var(--beam-hot)/0.65)]"
-              : "translate-x-[3px] bg-[hsl(var(--beam-dim))]"
+              ? "left-[calc(100%-1rem-4px)] border-beam-hot bg-[hsl(var(--beam-hot))] shadow-[0_0_10px_hsl(var(--beam-hot)/0.65)]"
+              : "left-[4px] border-beam-dim bg-transparent"
           }`}
         />
+      </span>
+      <span
+        aria-hidden="true"
+        className={`w-[3ch] shrink-0 font-mono text-xs font-semibold tracking-[0.08em] ${checked ? "text-beam-hot" : "text-beam-dim"}`}
+      >
+        {checked ? "ON" : "OFF"}
       </span>
       <span className={`min-w-0 font-mono text-left text-beam-mid group-hover:text-beam-hot ${large ? "text-lg" : "text-sm"}`}>{label}</span>
     </button>
@@ -152,6 +189,17 @@ function NumberField({
   onChange: (value: number) => void;
   large?: boolean;
 }) {
+  // The field edits a draft string so it can sit empty or half-typed; only a
+  // number within [min, max] reaches the settings (and so the autosave).
+  const [draft, setDraft] = useState(String(value));
+  const parse = (raw: string) => {
+    const next = Number(raw);
+    return raw.trim() !== "" && Number.isFinite(next) && next >= min && next <= max ? next : null;
+  };
+  useEffect(() => {
+    // follow outside changes, but keep a draft that already means this value ("4.50")
+    setDraft((current) => (parse(current) === value ? current : String(value)));
+  }, [value]);
   return (
     <div className="block min-w-0">
       <div className="mb-2 flex items-center gap-2">
@@ -165,8 +213,15 @@ function NumberField({
           min={min}
           max={max}
           step={step}
-          value={value}
-          onChange={(event) => onChange(Number(event.target.value))}
+          value={draft}
+          onChange={(event) => {
+            setDraft(event.target.value);
+            const next = parse(event.target.value);
+            if (next !== null && next !== value) onChange(next);
+          }}
+          onBlur={() => {
+            if (parse(draft) === null) setDraft(String(value));
+          }}
           className={`min-w-0 flex-1 bg-transparent px-3 py-2 font-mono tabular-nums text-beam-hot outline-none ${large ? "text-xl" : "text-sm"}`}
         />
         <span className={`flex items-center border-l border-[hsl(var(--beam-ghost))] px-3 py-2 font-mono uppercase tracking-[0.12em] text-beam-dim ${large ? "text-base" : "text-[10px]"}`}>
@@ -202,6 +257,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const failedSnapshot = useRef<string | null>(null);
+  const [statusZone, setStatusZone] = useState<StatusZone>("channels");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -362,7 +418,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     };
   }, []);
 
-  const updateWeekly = (patch: Partial<LevelsWeeklySettings>) => {
+  const updateWeekly = (zone: StatusZone, patch: Partial<LevelsWeeklySettings>) => {
     setPrefs((current) => ({
       ...current,
       levels_weekly: {
@@ -370,6 +426,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         settings: { ...current.levels_weekly.settings, ...patch },
       },
     }));
+    setStatusZone(zone);
     setStatus(null);
   };
 
@@ -381,12 +438,14 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         settings: { ...current.gap_daily.settings, ...patch },
       },
     }));
+    setStatusZone("daily");
     setStatus(null);
   };
 
   const toggleKind = (kind: (typeof ALERT_KINDS)[number], enabled: boolean) => {
+    setStatusZone("channels");
     if (enabled && !canEnable) {
-      setError(gateHint || "complete account setup before enabling alerts");
+      setError(gateHint ? `${gateHint} · use the Account link above` : "Finish account setup on the Account page before turning on alerts");
       return;
     }
     setPrefs((current) => setAlertEnabled(current, kind, enabled, canEnable));
@@ -447,8 +506,24 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const daily = prefs.gap_daily.settings;
   const weekly = prefs.levels_weekly.settings;
 
+  // Every zone keeps an empty live region in the page so screen readers
+  // announce the status when it lands in whichever zone was last changed.
+  const saveStatus = (zone: StatusZone) => (
+    <div aria-live="polite" className="mt-4 min-h-5 font-mono text-xs">
+      {statusZone !== zone ? null : error ? (
+        <span className="text-red-400">{error}</span>
+      ) : saving ? (
+        <span className="text-beam-dim">saving settings…</span>
+      ) : status ? (
+        <span className="text-beam-mid">{status}</span>
+      ) : dirty ? (
+        <span className="text-beam-dim">changes pending…</span>
+      ) : null}
+    </div>
+  );
+
   if (loading) {
-    return <div className="etched py-12 text-beam-dim">loading alert channels…</div>;
+    return <div className="etched py-12 text-beam-dim">loading your alert settings…</div>;
   }
 
   return (
@@ -460,12 +535,12 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             WATCHLIST
           </h2>
           <span className="ml-auto font-mono text-[11px] tabular-nums text-beam-dim">
-            {symbols.length}/{universe.length} ACTIVE
+            {symbols.length} OF {universe.length} SELECTED
           </span>
         </div>
         <div className="mb-5 flex flex-wrap items-baseline gap-x-6 gap-y-3">
           <p className="max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
-            Choose the symbols the nightly pipeline should inspect for your emails
+            Choose the tickers your alert emails cover
           </p>
           {universe.length > 0 && (
             <div className="ml-auto flex gap-2 font-mono text-[11px] tracking-[0.12em]">
@@ -489,7 +564,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
           )}
         </div>
         {universe.length ? (
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Watchlist symbols">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Watchlist tickers">
             {universe.map((symbol) => {
               const on = selected.has(symbol);
               return (
@@ -510,7 +585,10 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             })}
           </div>
         ) : (
-          <p className="font-mono text-xs text-beam-dim">published symbol list unavailable · try again later</p>
+          <p className="font-mono text-xs text-beam-dim">ticker list unavailable · try again later</p>
+        )}
+        {symbols.length === 0 && (
+          <p className="mt-4 font-mono text-xs text-beam-mid">No tickers selected · no emails are sent until you choose at least one</p>
         )}
         <div aria-live="polite" className="mt-4 min-h-5 font-mono text-xs">
           {watchError ? (
@@ -529,12 +607,12 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         <div className="mb-6 flex items-center gap-3">
           <BellRing className="h-4 w-4 text-beam-hot" aria-hidden="true" />
           <h2 id="channels-heading" className="font-mono text-sm font-semibold tracking-[0.14em] text-beam-hot">
-            ALERT CHANNELS
+            ALERT EMAILS
           </h2>
         </div>
 
         <div className="grid gap-px bg-[hsl(var(--beam-ghost))] md:grid-cols-2">
-          <div className="bg-background p-5 md:p-6">
+          <div className="bg-background py-5 md:p-6">
             <Toggle
               checked={prefs.levels_weekly.enabled}
               onChange={(enabled) => toggleKind("levels_weekly", enabled)}
@@ -542,10 +620,10 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
               disabled={!canEnable && !prefs.levels_weekly.enabled}
             />
             <p className="mt-4 font-mono text-xs leading-relaxed text-beam-dim">
-              Monday + Friday: strong recently-tested support and gap/order-block confluence below price
+              Buy-limit levels below the price after the Monday and Friday closes, in your inbox the next morning (Tuesday and Saturday)
             </p>
           </div>
-          <div className="bg-background p-5 md:p-6">
+          <div className="bg-background py-5 md:p-6">
             <Toggle
               checked={prefs.gap_daily.enabled}
               onChange={(enabled) => toggleKind("gap_daily", enabled)}
@@ -553,10 +631,11 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
               disabled={!canEnable && !prefs.gap_daily.enabled}
             />
             <p className="mt-4 font-mono text-xs leading-relaxed text-beam-dim">
-              End of day, only when a selected structure event advances or fires
+              Built after each close and sent the next morning, only when an event you selected happens; a quiet day sends nothing
             </p>
           </div>
         </div>
+        {saveStatus("channels")}
       </section>
 
       <section aria-labelledby="daily-heading" className="border-t border-[hsl(var(--beam-ghost))] pt-6">
@@ -567,14 +646,14 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         <div className="grid gap-8 md:grid-cols-3">
           <fieldset>
             <legend className="etched mb-3 text-beam-dim">EVENT TYPES</legend>
-            <div className="space-y-3 font-mono text-sm text-beam-mid">
+            <div className="space-y-1 font-mono text-sm text-beam-mid min-[600px]:space-y-3">
               {([
-                ["gaps", "Gap stage changes", CONTROL_HELP.gapEvents],
-                ["orderBlocks", "Order-block hits", CONTROL_HELP.orderBlockEvents],
-                ["equilibrium", "EQ midpoint falls", CONTROL_HELP.equilibriumEvents],
+                ["gaps", "Open gap stage changes", CONTROL_HELP.gapEvents],
+                ["orderBlocks", "Price reaches an order block", CONTROL_HELP.orderBlockEvents],
+                ["equilibrium", "Price falls to the middle of the range", CONTROL_HELP.equilibriumEvents],
               ] as const).map(([key, label, help]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <label className="flex cursor-pointer items-center gap-3">
+                  <label className="flex min-h-[44px] cursor-pointer items-center gap-3 min-[600px]:min-h-0">
                     <input
                       type="checkbox"
                       checked={daily.eventTypes[key]}
@@ -593,13 +672,13 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
 
           <fieldset>
             <legend className="etched mb-3 text-beam-dim">GAP DIRECTION</legend>
-            <div className="space-y-3 font-mono text-sm text-beam-mid">
+            <div className="space-y-1 font-mono text-sm text-beam-mid min-[600px]:space-y-3">
               {([
                 ["support", "Below price · buy area", CONTROL_HELP.supportGaps],
                 ["resistance", "Above price · sell area", CONTROL_HELP.resistanceGaps],
               ] as const).map(([key, label, help]) => (
                 <div key={key} className="flex items-center gap-2">
-                  <label className="flex cursor-pointer items-center gap-3">
+                  <label className="flex min-h-[44px] cursor-pointer items-center gap-3 min-[600px]:min-h-0">
                     <input
                       type="checkbox"
                       checked={daily.gapDirections[key]}
@@ -628,23 +707,24 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
               className="w-full border border-[hsl(var(--beam-ghost))] bg-background px-3 py-2 font-mono text-sm text-beam-mid outline-none focus:border-beam-hot"
             >
               <option value="approaching">Approaching</option>
-              <option value="tagged">Tagged</option>
+              <option value="tagged">Inside the gap</option>
               <option value="about">About to fill</option>
               <option value="filled">Filled</option>
             </select>
             <span className="mt-2 block font-mono text-[11px] leading-relaxed text-beam-dim">
-              Higher stages mean fewer, more decisive gap emails
+              A later stage sends fewer gap emails
             </span>
           </div>
         </div>
+        {saveStatus("daily")}
       </section>
 
       <section aria-labelledby="weekly-heading" className="border-y border-[hsl(var(--beam-ghost))] py-6">
         <h2 id="weekly-heading" className="font-mono text-sm font-semibold tracking-[0.14em] text-beam-hot">
-          ADVANCED WEEKLY QUALIFICATION
+          WEEKLY DIGEST FILTERS
         </h2>
         <p className="mt-4 max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
-          Tune what counts as an actionable level; defaults match the established local email pipeline
+          Choose which levels make the weekly digest; the starting values work if you are unsure
         </p>
 
         <div className="mt-8">
@@ -652,67 +732,60 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             <div className="etched text-lg text-beam-dim">MINIMUM STRENGTH</div>
             <InfoTip label="Minimum strength" text={CONTROL_HELP.minStrength} large />
           </div>
-          <div className="inline-flex border border-[hsl(var(--beam-ghost))] p-1" role="group" aria-label="Minimum timeframe strength">
+          <div className="inline-flex border border-[hsl(var(--beam-ghost))] p-1" role="group" aria-label="Minimum timeframes agreeing">
             {[1, 2, 3].map((value) => (
               <button
                 key={value}
                 type="button"
                 aria-pressed={weekly.minTfs === value}
-                onClick={() => updateWeekly({ minTfs: value })}
-                className={`px-4 py-2 font-mono text-lg ${
+                onClick={() => updateWeekly("strength", { minTfs: value })}
+                className={`whitespace-nowrap px-4 py-2 font-mono text-lg max-[600px]:px-3 max-[600px]:text-[16px] ${
                   weekly.minTfs === value
                     ? "bg-[hsl(var(--beam-ghost))] text-beam-hot shadow-[inset_0_0_0_1px_hsl(var(--beam-hot)/0.35)]"
                     : "text-beam-dim hover:text-beam-mid"
                 }`}
               >
-                {"━".repeat(value)} {value} TF
+                {value} of 3
               </button>
             ))}
           </div>
-          <p className="mt-2 font-mono text-sm text-beam-dim">Timeframes agreeing: 2h · 4h · 1d</p>
+          <p className="mt-2 font-mono text-sm text-beam-dim">Timeframes agreeing: 2-hour · 4-hour · daily</p>
+          {saveStatus("strength")}
         </div>
 
         <div className="mt-8 grid gap-8 md:grid-cols-3">
-          <NumberField large={true} id="lookback-days" label="RECENCY WINDOW" value={weekly.lookbackDays} min={1} max={3650} unit="days" hint="Only levels traded within this window qualify" tooltip={CONTROL_HELP.recency} onChange={(value) => updateWeekly({ lookbackDays: value })} />
-          <NumberField large={true} id="max-below" label="MAX DISTANCE BELOW" value={weekly.maxBelowPct} min={0} max={100} step={0.5} unit="%" hint="Skip support deeper than this; zero removes the limit" tooltip={CONTROL_HELP.maxBelow} onChange={(value) => updateWeekly({ maxBelowPct: value })} />
-          <NumberField large={true} id="max-setups" label="RESULT CAP" value={weekly.maxSetups} min={0} max={1000} unit="rows" hint="Keep only the strongest N setups; zero sends all" tooltip={CONTROL_HELP.resultCap} onChange={(value) => updateWeekly({ maxSetups: value })} />
+          <NumberField large={true} id="lookback-days" label="LAST TESTED WITHIN" value={weekly.lookbackDays} min={1} max={3650} unit="days" hint="Only support price touched within this many days counts" tooltip={CONTROL_HELP.recency} onChange={(value) => updateWeekly("limits", { lookbackDays: value })} />
+          <NumberField large={true} id="max-below" label="MAX DISTANCE BELOW" value={weekly.maxBelowPct} min={0} max={100} step={0.5} unit="%" hint="Skips levels farther below the close than this; zero removes the limit" tooltip={CONTROL_HELP.maxBelow} onChange={(value) => updateWeekly("limits", { maxBelowPct: value })} />
+          <NumberField large={true} id="max-setups" label="LEVELS PER EMAIL" value={weekly.maxSetups} min={0} max={1000} unit="levels" hint="Keeps the strongest levels up to this number; zero sends them all" tooltip={CONTROL_HELP.resultCap} onChange={(value) => updateWeekly("limits", { maxSetups: value })} />
         </div>
+        {saveStatus("limits")}
 
         <div className="mt-9 border-t border-[hsl(var(--beam-ghost))] pt-7">
           <div className="flex items-center gap-2">
-            <div className="min-w-0 flex-1">
-              <Toggle checked={weekly.confluenceEnabled} onChange={(checked) => updateWeekly({ confluenceEnabled: checked })} label="Highlight gap × order-block confluence" large />
+            <div className="min-w-0">
+              <Toggle checked={weekly.confluenceEnabled} onChange={(checked) => updateWeekly("confluence", { confluenceEnabled: checked })} label="Include Gap × OB levels" large />
             </div>
-            <InfoTip label="Gap × order-block confluence" text={CONTROL_HELP.confluence} large />
+            <InfoTip label="Gap × OB levels" text={CONTROL_HELP.confluence} large />
           </div>
           <div className="mt-7 grid gap-8 md:grid-cols-2">
-            <NumberField large={true} id="confluence-distance" label="CONFLUENCE DISTANCE" value={weekly.confluencePct} min={0.1} max={50} step={0.1} unit="%" hint="Maximum distance between a gap and bullish order block" tooltip={CONTROL_HELP.confluenceDistance} onChange={(value) => updateWeekly({ confluencePct: value })} />
-            <NumberField large={true} id="triple-distance" label="TRIPLE DISTANCE" value={weekly.triplePct} min={0.1} max={50} step={0.1} unit="%" hint="Maximum spread for gap + order block + S/R major zones" tooltip={CONTROL_HELP.tripleDistance} onChange={(value) => updateWeekly({ triplePct: value })} />
+            <NumberField large={true} id="confluence-distance" label="GAP × OB DISTANCE" value={weekly.confluencePct} min={0.1} max={50} step={0.1} unit="%" hint="How far apart the gap and order block can be" tooltip={CONTROL_HELP.confluenceDistance} onChange={(value) => updateWeekly("confluence", { confluencePct: value })} />
+            <NumberField large={true} id="triple-distance" label="TRIPLE DISTANCE" value={weekly.triplePct} min={0.1} max={50} step={0.1} unit="%" hint="How far apart a gap, an order block and a support level can be for a Triple level" tooltip={CONTROL_HELP.tripleDistance} onChange={(value) => updateWeekly("confluence", { triplePct: value })} />
           </div>
+          {saveStatus("confluence")}
         </div>
 
         <div className="mt-9 border-t border-[hsl(var(--beam-ghost))] pt-7">
-          <div className="etched mb-3 text-beam-dim">REPEAT SUPPRESSION</div>
+          <div className="etched mb-3 text-beam-dim">SKIP REPEATS</div>
           <p className="mb-6 max-w-[68ch] font-mono text-xs leading-relaxed text-beam-dim">
-            Skip a symbol and level already emailed to you recently, so a standing level does not repeat every Monday and Friday
+            Skip a ticker and level already emailed to you recently, so a level that stays in place is not repeated in every digest
           </p>
           <div className="grid gap-8 md:grid-cols-2">
-            <NumberField large={true} id="dedup-days" label="DON'T REPEAT WITHIN" value={weekly.dedupDays} min={0} max={3650} unit="days" hint="Re-sends once the window passes; zero repeats every run" tooltip={CONTROL_HELP.dedupDays} onChange={(value) => updateWeekly({ dedupDays: value })} />
-            <NumberField large={true} id="dedup-tolerance" label="SAME-LEVEL TOLERANCE" value={weekly.dedupPct} min={0} max={10} step={0.1} unit="%" hint="Levels within this percent count as the same setup" tooltip={CONTROL_HELP.dedupTolerance} onChange={(value) => updateWeekly({ dedupPct: value })} />
+            <NumberField large={true} id="dedup-days" label="DON'T REPEAT WITHIN" value={weekly.dedupDays} min={0} max={180} unit="days" hint="Sends it again once this time passes; zero repeats it in every digest" tooltip={CONTROL_HELP.dedupDays} onChange={(value) => updateWeekly("repeat", { dedupDays: value })} />
+            <NumberField large={true} id="dedup-tolerance" label="SAME-LEVEL TOLERANCE" value={weekly.dedupPct} min={0} max={10} step={0.1} unit="%" hint="Levels within this percent count as the same level" tooltip={CONTROL_HELP.dedupTolerance} onChange={(value) => updateWeekly("repeat", { dedupPct: value })} />
           </div>
         </div>
 
-        <div aria-live="polite" className="mt-6 min-h-5 font-mono text-xs">
-          {error ? (
-            <span className="text-red-400">{error}</span>
-          ) : saving ? (
-            <span className="text-beam-dim">saving settings…</span>
-          ) : status ? (
-            <span className="text-beam-mid">{status}</span>
-          ) : dirty ? (
-            <span className="text-beam-dim">changes pending…</span>
-          ) : null}
-        </div>
+        {saveStatus("repeat")}
       </section>
     </div>
   );

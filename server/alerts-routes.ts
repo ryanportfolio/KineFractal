@@ -145,19 +145,6 @@ function verifySvix(req: Request): boolean {
   });
 }
 
-async function ensureDefaultAlertPrefs(userId: string): Promise<void> {
-  const database = db;
-  if (!database) throw new Error("database unavailable");
-  await Promise.all(
-    ALERT_KINDS.map((kind) =>
-      database
-        .insert(alertPrefs)
-        .values({ userId, kind, enabled: true })
-        .onConflictDoNothing(),
-    ),
-  );
-}
-
 // Last applied watchlist save per browser tab (PUT /api/watchlist), keyed
 // `${userId}:${tab}`. A tab numbers its saves 1, 2, 3...; a save numbered at
 // or below the last applied one from the same tab arrived out of order and is
@@ -299,13 +286,13 @@ export function registerAlertsRoutes(app: Express): void {
     try {
       if (!db) return res.status(503).json({ error: "database unavailable" });
       const u = (req as any).kfUser as SessionUser;
-      const eligibleForDefaults = u.emailVerified && await hasAcceptedCurrentTos(u.id);
-      if (eligibleForDefaults) await ensureDefaultAlertPrefs(u.id);
+      // Alerts are opt-in: a kind with no stored row reports off, and visiting
+      // this page never creates a row. Only the PUT below turns an alert on.
       const rows = await db.select().from(alertPrefs).where(eq(alertPrefs.userId, u.id));
       const prefs = Object.fromEntries(
         ALERT_KINDS.map((kind) => [
           kind,
-          { enabled: eligibleForDefaults, settings: normalizeAlertSettings(kind, {}) },
+          { enabled: false, settings: normalizeAlertSettings(kind, {}) },
         ]),
       ) as Record<AlertKind, { enabled: boolean; settings: unknown }>;
       for (const row of rows) {

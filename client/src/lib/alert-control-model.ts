@@ -15,11 +15,11 @@ export type AlertPrefsState = {
 export function createDefaultAlertPrefs(): AlertPrefsState {
   return {
     levels_weekly: {
-      enabled: true,
+      enabled: false,
       settings: { ...LEVELS_WEEKLY_DEFAULTS },
     },
     gap_daily: {
-      enabled: true,
+      enabled: false,
       settings: {
         ...GAP_DAILY_DEFAULTS,
         eventTypes: { ...GAP_DAILY_DEFAULTS.eventTypes },
