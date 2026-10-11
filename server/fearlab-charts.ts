@@ -38,6 +38,7 @@
 // Failure model matches the /api/fearlab/* routes: bucket env unset or
 // pointer unreachable => 503; object missing in the run => 404.
 
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import express, { type Express, type Request, type Response } from "express";
@@ -69,11 +70,37 @@ let localChartsHtml: string | null | undefined;
 async function readLocalChartsHtml(): Promise<string | null> {
   if (localChartsHtml !== undefined) return localChartsHtml;
   try {
-    localChartsHtml = await readFile(LOCAL_CHARTS_HTML_PATH, "utf8");
+    const html = await readFile(LOCAL_CHARTS_HTML_PATH, "utf8");
+    // The page asks for legend-scenes.js?v=<content hash>; that URL changes whenever the file
+    // does, so the route can mark a matching request immutable.
+    const scenes = await readLocalLegendScenes();
+    localChartsHtml = scenes == null ? html : html.split(LEGEND_SCENES_TOKEN).join(legendScenesVersion(scenes));
   } catch {
     localChartsHtml = null; // absent -> 503
   }
   return localChartsHtml;
+}
+
+const LEGEND_SCENES_TOKEN = "__LG2_SCENES_VERSION__";
+let legendScenesHash: { body: string; version: string } | null = null;
+function legendScenesVersion(body: string): string {
+  if (legendScenesHash?.body !== body) {
+    legendScenesHash = { body, version: createHash("sha256").update(body).digest("hex").slice(0, 16) };
+  }
+  return legendScenesHash.version;
+}
+// The legend's replay data, bundled next to the page document. charts.html fetches it only
+// when a legend replay is first built, so /charts visitors who never open the legend skip it.
+const LOCAL_LEGEND_SCENES_PATH = path.resolve(process.cwd(), "server/charts-app/legend-scenes.js");
+let localLegendScenes: string | null | undefined;
+async function readLocalLegendScenes(): Promise<string | null> {
+  if (localLegendScenes !== undefined) return localLegendScenes;
+  try {
+    localLegendScenes = await readFile(LOCAL_LEGEND_SCENES_PATH, "utf8");
+  } catch {
+    localLegendScenes = null; // absent -> 404
+  }
+  return localLegendScenes;
 }
 
 // charts.html is one big inline <script> app, so the helmet production CSP
@@ -187,6 +214,28 @@ export function registerFearlabChartsRoutes(app: Express): void {
     } catch (error: any) {
       console.error("[FearLab charts] page route error:", error?.message ?? error);
       res.status(500).json({ error: "Failed to load charts" });
+    }
+  });
+
+  // Legend replay data (see readLocalLegendScenes). The page requests it as ?v=<content hash>:
+  // that exact version never changes, so it is cached for a year; any other URL (no or an old
+  // version) revalidates on every use.
+  app.get("/charts/legend-scenes.js", async (req: Request, res: Response) => {
+    try {
+      const body = await readLocalLegendScenes();
+      if (body == null) {
+        res.set("Cache-Control", "no-store");
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      res.set("Content-Type", "text/javascript; charset=utf-8");
+      res.set("Cache-Control", req.query.v === legendScenesVersion(body)
+        ? "public, max-age=31536000, immutable"
+        : CHARTS_DOCUMENT_CACHE);
+      res.send(body);
+    } catch (error: any) {
+      console.error("[FearLab charts] legend data route error:", error?.message ?? error);
+      res.status(500).json({ error: "Failed to load legend data" });
     }
   });
 
