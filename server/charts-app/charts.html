@@ -4013,8 +4013,8 @@ function renderExportPicks() {
       ? 'No tickers on your chart row yet.'
       : 'None of this group’s tickers are on your chart row.') + '</p>';
   }
-  // Only the checkbox picks a ticker; the symbol and name are a button that
-  // jumps to that ticker's prices (user, 2026-10-10).
+  // Only the checkbox unticks a ticker; the symbol and name are a button that
+  // jumps to that ticker's prices, ticking it first if needed (user, 2026-10-10/11).
   syms.forEach(function (sym) {
     var row = document.createElement('div');
     row.className = 'xp-pick';
@@ -4062,6 +4062,8 @@ function updateExportPickCount() {
   var on = document.querySelectorAll('#exportPicks input:checked').length;
   document.getElementById('exportPickCount').textContent = total ? on + ' of ' + total + ' selected' : '';
   document.getElementById('exportSaveGroup').disabled = !on || _exportGroupsLocked;
+  // a group tab is already a saved group; its own edit button changes it (user, 2026-10-11)
+  document.getElementById('exportSaveGroup').hidden = _exportActive !== 'all';
 }
 
 // --- live build -----------------------------------------------------------------
@@ -4279,14 +4281,15 @@ function renderExportTable(sections) {
 var _exportGoPending = null;   // a ticker to jump to once the next build renders
 function goToExportTicker(sym) {
   var box = document.querySelector('#exportPicks input[value="' + sym + '"]');
-  var msg = document.getElementById('exportAddMsg');
   if (box && !box.checked) {
-    msg.classList.remove('error');
-    msg.textContent = sym + ' is not selected. Tick its box to see its prices.';
+    // an unticked ticker gets ticked, then the jump waits for its prices (user, 2026-10-11)
+    box.checked = true;
+    updateExportPickCount();
+    _exportGoPending = sym;
+    scheduleExportBuild(0);
     return;
   }
   if (!document.querySelector('#exportResult [data-sec="' + sym + '"]')) { _exportGoPending = sym; return; }
-  if (/ is not selected\./.test(msg.textContent)) msg.textContent = '';
   openFirstPrice(sym, true);
 }
 function openFirstPrice(sym, scroll) {
@@ -4798,9 +4801,8 @@ function wireExportDialog() {
   document.getElementById('exportClose').onclick = closeExportDialog;
   document.getElementById('exportAll').onclick = function () { setAllExportPicks(true); };
   document.getElementById('exportNone').onclick = function () { setAllExportPicks(false); };
-  document.getElementById('exportPicks').addEventListener('change', function () {
-    var addMsg = document.getElementById('exportAddMsg');
-    if (/ is not selected\./.test(addMsg.textContent)) addMsg.textContent = '';
+  document.getElementById('exportPicks').addEventListener('change', function (e) {
+    if (e.target.checked) _exportGoPending = e.target.value;   // ticking a ticker brings up its prices
     updateExportPickCount();
     scheduleExportBuild();
   });
