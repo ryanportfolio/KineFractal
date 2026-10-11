@@ -127,6 +127,18 @@
   #cmpList .sym { font-weight:bold; }
   #cmpList .nm { overflow:hidden; color:var(--mut); font-size:14px; white-space:nowrap; text-overflow:ellipsis; }
   #cmpList .note { margin:4px; color:var(--mut); font-size:14px; }
+  /* ticker search under an add box: "netflix" or "NF" lists the tickers it could be */
+  .tkfind { position:fixed; z-index:95; width:360px; max-width:calc(100vw - 8px); overflow:auto; padding:4px 0; background:var(--panel);
+            border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5); font:14px monospace; }
+  .tkfind[hidden] { display:none; }
+  .tkfind .tkopt { display:grid; grid-template-columns:72px minmax(0,1fr) auto; align-items:baseline; gap:8px;
+                   padding:6px 10px; color:var(--fg); cursor:pointer; }
+  .tkfind .tkopt:hover, .tkfind .tkopt.active { background:rgba(38,198,218,.14); }
+  .tkfind .tkopt.active { box-shadow:inset 2px 0 0 var(--sup); }
+  .tkfind .sym { font:bold 14px Verdana,Geneva,sans-serif; }
+  .tkfind .nm { overflow:hidden; color:var(--mut); white-space:nowrap; text-overflow:ellipsis; }
+  .tkfind .tag { color:var(--sup); font-size:12px; white-space:nowrap; }
+  .tkfind .note { margin:0; padding:6px 10px; color:var(--mut); }
   label:has(#tLog:disabled), #drawBtn:disabled { opacity:.4; cursor:not-allowed; }
   /* ---- guided layer tour: a card pinned in the FUTURE_BARS whitespace, explaining one overlay at a time ---- */
   .tour-card { position:absolute; z-index:6; pointer-events:auto; width:calc(460px * var(--ts,1)); max-width:92%;
@@ -378,8 +390,9 @@
      is over that scroll area (user, 2026-10-08: blended in and on brand) */
   * { scrollbar-width:thin; scrollbar-color:#333 transparent; }
   *:hover { scrollbar-color:rgba(38,198,218,.6) transparent; }
-  /* export dialog: limit-buy levels. Left column picks tickers (group tabs on
-     top), right column shows the levels live, the footer holds Download CSV. */
+  /* export dialog: limit-buy levels. The banner holds the range and strength
+     filters and Download CSV; the left column picks tickers (group tabs on top),
+     the right column shows the levels live. */
   #exportDialog { display:none; position:fixed; inset:0; z-index:75; padding:0;
                   background:rgba(0,0,0,.76); align-items:stretch; justify-content:stretch; }
   #exportDialog.open { display:flex; }
@@ -387,13 +400,14 @@
   #exportDialog .box { display:flex; flex-direction:column; width:100%; height:100%; max-height:none;
                        background:var(--panel); border:1px solid var(--sup); box-shadow:0 14px 44px rgba(0,0,0,.78); }
   #exportDialog button { font:15px monospace; padding:6px 12px; }
-  /* banner: title left, the one primary action in the middle, Close right */
-  #exportDialog .xp-head { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:16px;
-                           padding:14px 20px 12px; border-bottom:1px solid var(--grid); }
-  #exportDialog .xp-headact { display:flex; flex-direction:column; align-items:center; gap:4px; }
+  /* banner: title left, filters in the middle, Download CSV and Close right */
+  #exportDialog .xp-head { display:grid; grid-template-columns:auto 1fr auto auto; grid-template-areas:"copy filters act close";
+                           align-items:center; gap:12px 24px; padding:14px 20px 12px; border-bottom:1px solid var(--grid); }
+  #exportDialog .xp-head .copy { grid-area:copy; }
+  #exportDialog .xp-head .xp-filters { grid-area:filters; justify-self:center; }
+  #exportDialog .xp-headact { grid-area:act; display:flex; flex-direction:column; align-items:center; gap:4px; }
   #exportDialog .xp-head h2 { margin:2px 0 4px; font-size:20px; letter-spacing:.02em; }
-  #exportDialog .xp-lede { margin:0; color:var(--mut); font:14px monospace; }
-  #exportClose { justify-self:end; align-self:start; }
+  #exportClose { grid-area:close; justify-self:end; align-self:start; }
   /* group tabs */
   #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid);
                      flex-shrink:0; max-height:118px; overflow-y:auto; }
@@ -426,9 +440,8 @@
   #exportDialog .xp-side .xp-count { font-size:14px; }
   #exportDialog .xp-side .xp-link { font-size:15px; }
   #exportDialog .xp-side #exportSearch { padding:7px 9px; font-size:15px; }
-  #exportDialog .xp-side .xp-field { font-size:14px; }
-  #exportDialog .xp-side .xp-field input { width:50px; font-size:16px; }
-  #exportDialog .xp-side #exportStrengthWrap button { padding:5px 14px; font-size:15px; }
+  #exportDialog .xp-filters .xp-field input { width:50px; font-size:16px; }
+  #exportDialog #exportStrengthWrap button { padding:5px 14px; font-size:15px; }
   /* loading: the build animation used when a ticker is added to the chart */
   #exportLoading { display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 0 24px; text-align:center; }
   #exportLoading[hidden] { display:none; }
@@ -450,22 +463,33 @@
   #exportSearch { width:100%; box-sizing:border-box; }
   /* ticker list: symbol, full name */
   #exportPicks { display:flex; flex-direction:column; flex:1 1 auto; min-height:160px; overflow:auto; border:1px solid var(--grid); }
-  #exportPicks .xp-pick { display:grid; grid-template-columns:18px 66px minmax(0,1fr); align-items:center; gap:8px;
-                          padding:7px 10px; border-bottom:1px solid var(--grid); cursor:pointer; }
+  /* a row: the checkbox (and the strip around it) picks the ticker, the rest
+     of the row jumps to its prices */
+  #exportPicks .xp-pick { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:stretch;
+                          border-bottom:1px solid var(--grid); }
+  #exportPicks .xp-chk { display:flex; align-items:center; padding:0 6px 0 10px; cursor:pointer; }
   #exportPicks .xp-pick input { width:15px; height:15px; }
+  #exportDialog #exportPicks .xp-go { display:grid; grid-template-columns:66px minmax(0,1fr); align-items:center; gap:8px;
+                                      min-width:0; padding:7px 10px 7px 4px; border:0; background:none; color:var(--fg); text-align:left; cursor:pointer; }
   #exportDialog #exportPicks .xp-sym { font-size:15px; }
   #exportDialog #exportPicks .xp-name { font-size:14px; }
   #exportPicks .xp-pick:last-child { border-bottom:0; }
   #exportPicks .xp-pick:hover, #exportPicks .xp-pick:focus-within { background:rgba(38,198,218,.08); }
   #exportPicks .xp-pick input { margin:0; accent-color:var(--sup); }
   #exportPicks .xp-empty { padding:10px; color:var(--mut); font:14px monospace; }
+  /* add a ticker without leaving the dialog */
+  #exportDialog .xp-addrow { display:flex; gap:8px; }
+  #exportDialog #exportAddSym { flex:1 1 auto; min-width:0; padding:7px 9px; font-size:15px; }
+  #exportAddMsg { margin:-6px 0 0; min-height:0; color:var(--mut); font:14px monospace; }
+  #exportAddMsg:empty { display:none; }
+  #exportAddMsg.error { color:var(--csell); }
   #exportDialog .xp-sym { font:bold 13px Verdana,Geneva,sans-serif; letter-spacing:.03em; }
   #exportDialog .xp-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--mut); font:14px monospace; }
   #exportDialog .xp-type { padding:1px 5px; border:1px solid var(--grid); color:var(--mut); font:12px monospace;
                            letter-spacing:.08em; text-transform:uppercase; }
   #exportDialog .xp-type.etf { border-color:rgba(38,198,218,.55); color:var(--sup); }
   /* filters */
-  #exportDialog .xp-filters { display:flex; flex-direction:column; gap:10px; padding-top:12px; border-top:1px solid var(--grid); }
+  #exportDialog .xp-filters { display:flex; flex-wrap:wrap; align-items:flex-end; gap:10px 24px; }
   #exportDialog .xp-filters label { display:inline-flex; align-items:center; gap:6px; color:var(--mut); font:14px monospace; }
   #exportDialog .xp-field-group { display:flex; flex-direction:column; gap:6px; }
   #exportDialog .xp-fields { display:flex; gap:8px; }
@@ -517,17 +541,9 @@
   #exportDialog .xp-hero { display:block; width:100%; padding:12px 14px; border:0; background:none; text-align:left; cursor:pointer; }
   .xp-herolabel { display:block; color:var(--mut); font:14px monospace; letter-spacing:.04em; }
   .xp-heromain { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 16px; margin-top:2px; }
-  .xp-heromain .xp-strength { align-self:center; }
   .xp-heropx { font:bold 36px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
   .xp-heropct { font:18px Verdana,Geneva,sans-serif; color:var(--fg); }
   .xp-lmeta { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; }
-  .xp-strength { display:inline-flex; align-items:center; gap:6px; }
-  .xp-meter { display:inline-flex; align-items:flex-end; gap:2px; height:13px; }
-  .xp-meter i { display:block; width:4px; background:var(--grid); }
-  .xp-meter i:nth-child(1) { height:5px; } .xp-meter i:nth-child(2) { height:9px; } .xp-meter i:nth-child(3) { height:13px; }
-  .xp-meter.strong i.on { background:var(--cbuy); } .xp-meter.mid i.on { background:var(--fg); } .xp-meter.light i.on { background:var(--mut); }
-  .xp-sword { font:bold 12px monospace; }
-  .tier-strong .xp-sword { color:var(--cbuy); } .tier-mid .xp-sword { color:var(--fg); } .tier-light .xp-sword { color:var(--mut); }
   .xp-reason { color:var(--fg); }
   .xp-comb { color:var(--mut); font:14px monospace; }
   .xp-why { font-size:14px; }
@@ -541,8 +557,8 @@
   #exportDialog .xp-more::after { content:" ›"; }
   #exportDialog .xp-more[aria-expanded="true"]::after { content:" ‹"; }
   #exportDialog .xp-more:hover { background:rgba(38,198,218,.06); }
-  /* other prices: price | % below | strength, one aligned row each */
-  #exportDialog .xp-rrow { display:grid; grid-template-columns:minmax(100px,max-content) minmax(110px,max-content) auto; align-items:center; gap:4px 18px; width:100%;
+  /* other prices: price | % below, one aligned row each */
+  #exportDialog .xp-rrow { display:grid; grid-template-columns:minmax(100px,max-content) minmax(110px,max-content); align-items:center; gap:4px 18px; width:100%;
                            padding:8px 14px; border:0; border-top:1px solid var(--grid); background:none; text-align:left; cursor:pointer; }
   #exportDialog .xp-hero:hover, #exportDialog .xp-rrow:hover { background:rgba(38,198,218,.06); }
   #exportDialog .xp-hero:focus-visible, #exportDialog .xp-rrow:focus-visible { outline:2px solid var(--sup); outline-offset:-2px; }
@@ -558,6 +574,8 @@
   .xp-table { width:100%; max-width:820px; border-collapse:collapse; }
   .xp-table thead th { padding:0 12px 8px; color:var(--mut); font:13px monospace; letter-spacing:.08em; text-transform:uppercase; text-align:left; font-weight:normal; }
   .xp-tgroup th { padding:14px 12px 6px; border-top:1px solid var(--grid); text-align:left; font-weight:normal; }
+  #exportResult [data-first] { cursor:pointer; }
+  .xp-tgroup:hover th { background:rgba(38,198,218,.04); }
   #exportResult .xp-tgroup .xp-sym { font-size:39px; margin-right:12px;
                                      text-decoration:underline 3px; text-underline-offset:7px; }   /* in the ticker's own colour */
   .xp-tgroup .xp-name { color:var(--fg); font:14px monospace; }
@@ -592,7 +610,6 @@
   .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
   .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; line-height:1.55; }
   .xp-whylist li { margin-bottom:6px; }
-  .xp-whynote { margin:0; color:var(--mut); font:14px monospace; line-height:1.5; }
   @media (max-width:900px) {
     #exportWhy { position:fixed; inset:0; z-index:79; border-left:0; }
   }
@@ -647,6 +664,12 @@
   #exportTip .ln { display:block; white-space:nowrap; }
   #exportDialog button:focus-visible, #exportDialog .xp-pick:focus-within, #exportDialog input:focus-visible {
     outline:2px solid var(--sup); outline-offset:-2px; }
+  #exportDialog #exportPicks .xp-go:focus-visible, #exportDialog #exportPicks input:focus-visible { outline:none; }   /* the row's outline shows */
+  /* filters move under the title once the banner runs out of room */
+  @media (max-width:1400px) {
+    #exportDialog .xp-head { grid-template-columns:1fr auto auto; grid-template-areas:"copy act close" "filters filters filters"; }
+    #exportDialog .xp-head .xp-filters { justify-self:start; }
+  }
   @media (max-width:900px) {
     #exportDialog .xp-body { display:block; overflow:auto; }
     #exportDialog .xp-side { border-right:0; border-bottom:1px solid var(--grid); overflow:visible; }
@@ -657,9 +680,8 @@
   }
   @media (max-width:600px) {
     #exportDialog .xp-head, #exportGroupTabs { padding-left:12px; padding-right:12px; }
-    /* phones: title and Close share the top line, Download spans the next */
-    #exportDialog .xp-head { grid-template-columns:1fr auto; }
-    #exportDialog .xp-headact { grid-column:1 / -1; grid-row:2; }
+    /* phones: title and Close share the top line, then the filters, then Download */
+    #exportDialog .xp-head { grid-template-columns:1fr auto; grid-template-areas:"copy close" "filters filters" "act act"; }
     #exportDialog .xp-headact .xp-primary { width:100%; }
     #exportDialog button, #exportPicks .xp-pick, #exportEditor .xp-edrow { min-height:44px; }
     .xp-px, .xp-pct { font-size:18px; }
@@ -691,7 +713,7 @@
   <span class="kf-brand" title="KineFractal">KINEFRACTAL</span>
   <span id="topActions"><span id="topUtil"><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
   <span id="tickerStrip"><span id="superBtns" title="super (MTF) charts"></span></span>
-  <input id="addSym" placeholder="add ticker" maxlength="12" style="width:88px" title="add a chart-only watchlist ticker (live build)"><button id="addBtn">+ Add</button><span id="addMsg" class="addmsg"></span>
+  <input id="addSym" placeholder="add ticker" maxlength="40" autocomplete="off" spellcheck="false" style="width:88px" aria-label="Add a ticker, by name or symbol" title="add a ticker by name or symbol (live build)"><button id="addBtn">+ Add</button><span id="addMsg" class="addmsg"></span>
   <button id="cmpBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cmpMenu" title="compare other tickers as % change">+ Compare</button>
   <select id="combo" title="per-timeframe board combos"></select>
   <span id="tfBtns" title="super chart candle timeframe — same multi-TF levels, candles + line fits per timeframe"></span>
@@ -794,7 +816,23 @@
       <div class="copy">
         <div class="ticker-reorder-eyebrow">chart watchlist</div>
         <h2 id="exportTitle">Limit-buy levels</h2>
-        <p class="xp-lede">Price levels below the latest close, for limit orders you place in your own broker.</p>
+      </div>
+      <div class="xp-filters">
+        <div class="xp-field-group">
+          <span class="xp-count">Below latest close</span>
+          <div class="xp-fields">
+            <label id="exportMinWrap" class="xp-field"><span>Min</span><input id="exportMin" type="number" min="0" max="98" step="1" value="2" aria-label="Minimum percent below the latest close"><span class="u">%</span></label>
+            <label id="exportDepthWrap" class="xp-field"><span>Max</span><input id="exportDepth" type="number" min="1" max="99" step="1" value="25" aria-label="Maximum percent below the latest close"><span class="u">%</span></label>
+          </div>
+        </div>
+        <div class="xp-field-group">
+          <span class="xp-count">Strength</span>
+          <span id="exportStrengthWrap" role="group" aria-label="Minimum support strength">
+            <button id="strengthAny" type="button" data-strength="any">any</button>
+            <button id="strengthSolid" type="button" data-strength="solid" class="active">solid</button>
+            <button id="strengthStrong" type="button" data-strength="strong">strong</button>
+          </span>
+        </div>
       </div>
       <div class="xp-headact">
         <button id="exportCsv" class="xp-primary" type="button" disabled>Download CSV</button>
@@ -815,24 +853,12 @@
         </div>
         <input id="exportSearch" type="search" placeholder="Find ticker or name" aria-label="Find ticker or name" autocomplete="off">
         <div id="exportPicks" role="group" aria-labelledby="exportPicksTitle"></div>
-        <button id="exportSaveGroup" class="xp-link" type="button" style="align-self:flex-start">Save selection as group</button>
-        <div class="xp-filters">
-          <div class="xp-field-group">
-            <span class="xp-count">Below latest close</span>
-            <div class="xp-fields">
-              <label id="exportMinWrap" class="xp-field"><span>Min</span><input id="exportMin" type="number" min="0" max="98" step="1" value="2" aria-label="Minimum percent below the latest close"><span class="u">%</span></label>
-              <label id="exportDepthWrap" class="xp-field"><span>Max</span><input id="exportDepth" type="number" min="1" max="99" step="1" value="25" aria-label="Maximum percent below the latest close"><span class="u">%</span></label>
-            </div>
-          </div>
-          <div class="xp-field-group">
-            <span class="xp-count">Strength</span>
-            <span id="exportStrengthWrap" role="group" aria-label="Minimum support strength">
-              <button id="strengthAny" type="button" data-strength="any">any</button>
-              <button id="strengthSolid" type="button" data-strength="solid" class="active">solid</button>
-              <button id="strengthStrong" type="button" data-strength="strong">strong</button>
-            </span>
-          </div>
+        <div class="xp-addrow">
+          <input id="exportAddSym" type="text" maxlength="40" autocomplete="off" spellcheck="false" placeholder="Add a ticker or company" aria-label="Add a ticker to your chart row, by name or symbol">
+          <button id="exportAddBtn" type="button">+ Add</button>
         </div>
+        <p id="exportAddMsg" role="status" aria-live="polite"></p>
+        <button id="exportSaveGroup" class="xp-link" type="button" style="align-self:flex-start">Save selection as group</button>
         <div class="xp-combine" role="group" aria-labelledby="exportCombineTitle">
           <div class="xp-row">
             <span class="xp-count" id="exportCombineTitle">Combine nearby levels</span>
@@ -3159,6 +3185,32 @@ function applyTickerOrder(saved) {
   SUPER_SYMS = ordered.concat(SUPER_SYMS.filter(function (symbol) { return !inOrder[symbol]; }));
   return ordered;
 }
+// A newly added ticker joins the row where it falls alphabetically, and the
+// rest of the row keeps its order (user, 2026-10-11): the first gap whose
+// neighbours sort on either side of it (NFLX between MSFT and NVDA), else the
+// spot that leaves the fewest tickers out of alphabetical order around it.
+function tickerSlot(order, sym) {
+  for (var i = 1; i < order.length; i++) {
+    if (order[i - 1] < sym && sym < order[i]) return i;
+  }
+  var best = 0, bestCost = Infinity;
+  for (var at = 0; at <= order.length; at++) {
+    var cost = 0;
+    for (var j = 0; j < order.length; j++) {
+      if (j < at ? order[j] > sym : order[j] < sym) cost++;
+    }
+    if (cost < bestCost) { best = at; bestCost = cost; }
+  }
+  return best;
+}
+function withTickerSlotted(sym) {
+  var order = visibleTickerSymbols().filter(function (s) { return s !== sym; });
+  order.splice(tickerSlot(order, sym), 0, sym);
+  // the row is redrawn from the saved order (applyTickerAccess); keep the slot
+  // there too while the save is in flight
+  if (SITE && _chartAccess && _chartAccess.account) _chartAccess.order = order.slice();
+  return order;
+}
 function preferredTickerOrder() {
   if (SITE && _chartAccess && _chartAccess.account) return _chartAccess.order || _tickerDefaultOrder;
   return readLocalTickerOrder();
@@ -3916,19 +3968,30 @@ function renderExportPicks() {
       ? 'No tickers on your chart row yet.'
       : 'None of this group’s tickers are on your chart row.') + '</p>';
   }
+  // Only the checkbox picks a ticker; the symbol and name are a button that
+  // jumps to that ticker's prices (user, 2026-10-10).
   syms.forEach(function (sym) {
-    var label = document.createElement('label');
-    label.className = 'xp-pick';
-    label.setAttribute('data-sym', sym);
-    label.setAttribute('data-tip', tickerTip(sym));
+    var row = document.createElement('div');
+    row.className = 'xp-pick';
+    row.setAttribute('data-sym', sym);
+    row.setAttribute('data-tip', tickerTip(sym));
+    var chk = document.createElement('label');
+    chk.className = 'xp-chk';
     var box = document.createElement('input');
     box.type = 'checkbox'; box.value = sym;
     box.checked = remembered ? remembered.indexOf(sym) >= 0 : true;
-    label.appendChild(box);
-    label.insertAdjacentHTML('beforeend',
-      '<span class="xp-sym">' + escHtml(sym) + '</span>'
-      + '<span class="xp-name">' + escHtml(tickerName(sym)) + '</span>');
-    wrap.appendChild(label);
+    box.setAttribute('aria-label', 'Include ' + sym + (tickerName(sym) ? ', ' + tickerName(sym) : ''));
+    chk.appendChild(box);
+    row.appendChild(chk);
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'xp-go';
+    go.setAttribute('data-go', sym);
+    go.setAttribute('aria-label', 'Go to ' + sym + ' prices');
+    go.innerHTML = '<span class="xp-sym">' + escHtml(sym) + '</span>'
+      + '<span class="xp-name">' + escHtml(tickerName(sym)) + '</span>';
+    row.appendChild(go);
+    wrap.appendChild(row);
   });
   document.getElementById('exportSearch').value = '';
   updateExportPickCount();
@@ -4091,7 +4154,6 @@ function pctBelow(row) { return ((row.close - row.limit) / row.close) * 100; }
 // its strength as a word and a 3-bar meter, and "why?" opens a side panel with
 // a price chart of the last six months and the reasons in full.
 var STRENGTH_WORD = { strong: 'Strong', mid: 'Medium', light: 'Weaker' };
-var STRENGTH_BARS = { strong: 3, mid: 2, light: 1 };
 var _exportSecs = {};          // sym -> section of the last build (rows, candles, close), for the why panel
 var _exportExpanded = {};      // sym -> true while that card shows all its prices
 // A combined (stacked) limit is rated Strong: several signals agree on one price,
@@ -4117,13 +4179,9 @@ function strengthReason(lim) {
   if ((r.touches || 0) >= 10) return 'price bounced here ' + r.touches + ' times';
   return 'only a few touches on one timeframe';
 }
-function meterHtml(tier) {
-  var n = STRENGTH_BARS[tier] || 1, h = '';
-  for (var i = 1; i <= 3; i++) h += '<i class="' + (i <= n ? 'on' : '') + '"></i>';
-  return '<span class="xp-meter ' + tier + '" aria-hidden="true">' + h + '</span><span class="xp-sword">' + STRENGTH_WORD[tier] + '</span>';
-}
 // The reason a price is there lives in its tooltip, so the rows stay just
-// price, % below and strength; clicking the price opens the why panel.
+// price and % below, with the price's colour giving its strength (no strength
+// label on the cards, user 2026-10-11); clicking the price opens the why panel.
 function limitTip(lim) {
   var t = reasonText(lim.row);
   if (lim.members.length) t += ' · combines ' + lim.members.length + ' nearby price' + (lim.members.length === 1 ? '' : 's');
@@ -4168,6 +4226,32 @@ function renderExportTable(sections) {
   wrap.innerHTML = _exportView === 'table' ? exportTableHtml(sections) : exportCardsHtml(sections);
   renderCombineExample(sections);
   if (_whyOpen) refreshWhyPanel();
+  if (_exportGoPending) { var go = _exportGoPending; _exportGoPending = null; if (_exportSecs[go]) goToExportTicker(go); }
+}
+// A ticker-list row (or adding a ticker here) brings up that ticker's prices
+// with its first price selected, the same as clicking the ticker's heading:
+// the top row in the table, the lead price on a card.
+var _exportGoPending = null;   // a ticker to jump to once the next build renders
+function goToExportTicker(sym) {
+  var box = document.querySelector('#exportPicks input[value="' + sym + '"]');
+  var msg = document.getElementById('exportAddMsg');
+  if (box && !box.checked) {
+    msg.classList.remove('error');
+    msg.textContent = sym + ' is not selected. Tick its box to see its prices.';
+    return;
+  }
+  if (!document.querySelector('#exportResult [data-sec="' + sym + '"]')) { _exportGoPending = sym; return; }
+  if (/ is not selected\./.test(msg.textContent)) msg.textContent = '';
+  openFirstPrice(sym, true);
+}
+function openFirstPrice(sym, scroll) {
+  var sec = _exportSecs[sym], limits = sec ? exportLimits(sec.rows) : [];
+  if (limits.length) {
+    var idx = _exportView === 'table' ? 0 : nearestStrongIndex(limits);
+    openWhyPanel(sym, idx, document.querySelector('#exportResult [data-why="' + sym + '|' + idx + '"]'));
+  }
+  var head = document.querySelector('#exportResult [data-sec="' + sym + '"]');
+  if (scroll && head) head.scrollIntoView({ block: 'start' });
 }
 function nearestStrongIndex(limits) {
   for (var i = 0; i < limits.length; i++) if (limitStrength(limits[i]) === 'strong') return i;
@@ -4180,7 +4264,7 @@ function exportTableHtml(sections) {
   sections.forEach(function (sec, idx) {
     var hue = Math.round((idx * 137.508) % 360);
     var limits = exportLimits(sec.rows);
-    html += '<tbody><tr class="xp-tgroup"><th colspan="2" scope="rowgroup">'
+    html += '<tbody data-sec="' + escHtml(sec.sym) + '"><tr class="xp-tgroup" data-first="' + escHtml(sec.sym) + '"><th colspan="2" scope="rowgroup">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
       + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
@@ -4205,8 +4289,8 @@ function exportCardsHtml(sections) {
   sections.forEach(function (sec, idx) {
     var hue = Math.round((idx * 137.508) % 360);
     var limits = exportLimits(sec.rows);
-    html += '<section class="xp-card" aria-label="' + escHtml(sec.sym) + ' buy prices">'
-      + '<div class="xp-cardhead">'
+    html += '<section class="xp-card" data-sec="' + escHtml(sec.sym) + '" aria-label="' + escHtml(sec.sym) + ' buy prices">'
+      + '<div class="xp-cardhead" data-first="' + escHtml(sec.sym) + '">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
       + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
@@ -4220,8 +4304,7 @@ function exportCardsHtml(sections) {
       html += '<button class="xp-hero tier-' + tier + '"' + limitButtonAttrs(sec.sym, top, lead) + '>'
         + '<span class="xp-herolabel">' + (tier === 'strong' ? 'Nearest strong price' : 'Nearest price') + '</span>'
         + '<span class="xp-heromain"><span class="xp-heropx">' + px2(top.row.limit) + '</span>'
-        + '<span class="xp-heropct">' + pctBelowText(top.row) + '</span>'
-        + '<span class="xp-strength">' + meterHtml(tier) + '</span></span>'
+        + '<span class="xp-heropct">' + pctBelowText(top.row) + '</span></span>'
         + '</button>';
       var rest = limits.map(function (l, k) { return { lim: l, k: k }; }).filter(function (x) { return x.k !== lead; });
       if (rest.length) {
@@ -4234,7 +4317,6 @@ function exportCardsHtml(sections) {
           html += '<button class="xp-rrow tier-' + t + '"' + limitButtonAttrs(sec.sym, x.lim, x.k) + '>'
             + '<span class="xp-rpx">' + px2(x.lim.row.limit) + '</span>'
             + '<span class="xp-rpct">' + pctBelowText(x.lim.row) + '</span>'
-            + '<span class="xp-strength">' + meterHtml(t) + '</span>'
             + '</button>';
         });
         html += '</div>';
@@ -4323,8 +4405,7 @@ function refreshWhyPanel() {
     + '<div class="xp-whypx tier-' + tier + '">' + px2(lim.row.limit) + '</div>'
     + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' the ' + closeLabel(sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(sec.close) + '</div>'
     + whyChartSvg(sec, lim)
-    + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>'
-    + '<p class="xp-whynote">Chart signals are clues, not guarantees; prices can keep falling. You place any order in your own broker.</p>';
+    + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>';
   panel.hidden = false;
   document.getElementById('exportBody').classList.add('why-open');
   markWhySelection();
@@ -4595,6 +4676,10 @@ function openExportDialog() {
   try { savedStrength = localStorage.getItem('kf-export-strength'); } catch (e) {}
   setExportStrength(STRENGTH_HINTS[savedStrength] ? savedStrength : _exportStrength, false);
   document.getElementById('exportMsg').textContent = '';
+  if (!document.getElementById('exportAddBtn').disabled) {   // a build still running keeps its status line
+    document.getElementById('exportAddMsg').textContent = '';
+    document.getElementById('exportAddMsg').classList.remove('error');
+  }
   document.getElementById('exportResult').innerHTML = '';
   document.getElementById('exportPicks').innerHTML = '';
   document.getElementById('exportGroupTabs').innerHTML = '';
@@ -4625,6 +4710,7 @@ function closeExportDialog() {
   var dialog = document.getElementById('exportDialog');
   rememberExportPicks();
   closeWhyPanel(false);
+  _exportGoPending = null;
   _exportOpenGen++;
   clearTimeout(_exportTimer);
   _exportGen++;
@@ -4668,6 +4754,8 @@ function wireExportDialog() {
   document.getElementById('exportAll').onclick = function () { setAllExportPicks(true); };
   document.getElementById('exportNone').onclick = function () { setAllExportPicks(false); };
   document.getElementById('exportPicks').addEventListener('change', function () {
+    var addMsg = document.getElementById('exportAddMsg');
+    if (/ is not selected\./.test(addMsg.textContent)) addMsg.textContent = '';
     updateExportPickCount();
     scheduleExportBuild();
   });
@@ -4695,9 +4783,27 @@ function wireExportDialog() {
     if (why) {
       var parts = why.getAttribute('data-why').split('|');
       openWhyPanel(parts[0], Number(parts[1]), why);
+      return;
     }
+    var head = e.target.closest && e.target.closest('[data-first]');
+    if (head) openFirstPrice(head.getAttribute('data-first'), false);
+  });
+  document.getElementById('exportPicks').addEventListener('click', function (e) {
+    var go = e.target.closest && e.target.closest('[data-go]');
+    if (go) goToExportTicker(go.getAttribute('data-go'));
   });
   document.getElementById('exportCsv').onclick = downloadExportCsv;
+  // add a ticker from here: one already on the chart row is just brought up, a new one builds
+  var exportAddSearch = wireTickerSearch(document.getElementById('exportAddSym'), document.querySelector('#exportDialog .box'), function (sym) {
+    var SYM = String(sym).toUpperCase();
+    if (visibleTickerSymbols().indexOf(SYM) >= 0) {
+      document.getElementById('exportAddSym').value = '';
+      exportTickerAdded(SYM);
+      return;
+    }
+    doAddTicker('export');
+  });
+  document.getElementById('exportAddBtn').onclick = exportAddSearch.submit;
   document.getElementById('exportWhyClose').onclick = function () { closeWhyPanel(true); };
   window.addEventListener('resize', function () { if (_whyOpen) setWhyInert(); });
   Array.prototype.forEach.call(document.querySelectorAll('#exportViewSwitch button'), function (b) {
@@ -4871,10 +4977,8 @@ function buildDropdown() {
   tickerReorderDialog.onclick = function (e) { if (e.target === tickerReorderDialog) closeTickerReorder(); };
   wireExportDialog();
   wireCompare();
-  document.getElementById('addBtn').onclick = doAddTicker;
-  document.getElementById('addSym').onkeydown = function (e) {
-    if (e.key === 'Enter') { e.preventDefault(); doAddTicker(); }
-  };
+  var addSearch = wireTickerSearch(document.getElementById('addSym'), document.body, function () { doAddTicker(); });
+  document.getElementById('addBtn').onclick = addSearch.submit;
   PREF_IDS.forEach(function (id) {
     document.getElementById(id).onchange = function () {
       savePrefs();
@@ -5004,17 +5108,46 @@ function buildDropdown() {
 //     so the new data-<key>.js / overlays-<key>.js fetch fresh. On the SITE the
 //     build takes ~1 min — the build overlay (ignition beam) covers the wait;
 //     signed-out visitors get the signup CTA instead.
-function doAddTicker() {
-  var addSym = document.getElementById('addSym');
-  var addMsg = document.getElementById('addMsg');
-  var addBtn = document.getElementById('addBtn');
+//     The Limit Buy dialog has its own add box (from='export'): the build runs
+//     the same way, but its progress and errors show in the dialog's status
+//     line (the overlay and result card sit under the dialog), the chart stays
+//     on its ticker, and the new ticker joins the dialog's list, ticked.
+function doAddTicker(from) {
+  var inDialog = from === 'export';
+  var addSym = document.getElementById(inDialog ? 'exportAddSym' : 'addSym');
+  var addMsg = document.getElementById(inDialog ? 'exportAddMsg' : 'addMsg');
+  var addBtn = document.getElementById(inDialog ? 'exportAddBtn' : 'addBtn');
   var sym = (addSym.value || '').trim();
   if (!sym) return;
-  if (SITE && siteUser === false) { showAddCta(); return; }
+  if (SITE && siteUser === false) {
+    if (inDialog) closeExportDialog();   // the sign-in prompt sits under the dialog
+    showAddCta(); return;
+  }
+  addMsg.classList.remove('error');
   addMsg.textContent = 'adding ' + sym + ' …';
   addBtn.disabled = true;
-  if (SITE) showBuildOvl(sym);
-  function reenable() { addBtn.disabled = false; hideBuildOvl(); }
+  if (SITE && !inDialog) showBuildOvl(sym);
+  var started = Date.now(), tick = null;
+  if (SITE && inDialog) {
+    tick = setInterval(function () {
+      var s = Math.round((Date.now() - started) / 1000);
+      addMsg.textContent = 'building ' + sym.toUpperCase() + ' … ' + s + 's'
+        + (s >= 75 ? ', deep price history can take a few minutes' : ', usually under a minute');
+    }, 1000);
+  }
+  function stopTick() { if (tick) { clearInterval(tick); tick = null; } }
+  function reenable() { addBtn.disabled = false; stopTick(); if (!inDialog) hideBuildOvl(); }
+  // SITE: the toolbar keeps the build card up with the reason; the dialog says it in its status line
+  function showFailure(title, why) {
+    addBtn.disabled = false; stopTick();
+    if (inDialog) { addMsg.textContent = title + '. ' + why; addMsg.classList.add('error'); return; }
+    addMsg.textContent = '';   // the card says it; a long status line re-wraps the toolbar
+    showBuildResult(title, why);
+  }
+  function landed(e) {
+    if (inDialog) exportTickerAdded(e.sym);
+    else showSuper(e, null, true);
+  }
   // SITE: a deep-history build can outlive the server's builder wait — the add
   // then answers 202 {pending:true} while the build keeps running server-side.
   // Keep the overlay up and re-POST until the entry lands (a re-POST while the
@@ -5034,16 +5167,18 @@ function doAddTicker() {
     .then(function (res) {
       if (!res.ok) {
         if (res.pending && SITE && pollN < MAX_POLLS) {
-          addMsg.textContent = 'still building ' + sym + ' …';
+          if (!tick) addMsg.textContent = 'still building ' + sym + ' …';
           setTimeout(function () { attempt(pollN + 1); }, POLL_MS);
           return;
         }
-        if (SITE && res.httpStatus === 401) { reenable(); addMsg.textContent = ''; showAddCta(); return; }
+        if (SITE && res.httpStatus === 401) {
+          reenable(); addMsg.textContent = '';
+          if (inDialog) closeExportDialog();
+          showAddCta(); return;
+        }
         var SYM = sym.toUpperCase(), why = res.error || 'add failed';
-        addBtn.disabled = false;
-        if (!SITE) { addMsg.textContent = why; hideBuildOvl(); return; }
-        addMsg.textContent = '';   // the card says it; a long status line re-wraps the toolbar
-        showBuildResult(res.reason === 'insufficient_history' ? 'Not enough history to chart ' + SYM
+        if (!SITE) { addBtn.disabled = false; addMsg.textContent = why; hideBuildOvl(); return; }
+        showFailure(res.reason === 'insufficient_history' ? 'Not enough history to chart ' + SYM
           : res.reason === 'no_data' ? 'No data for ' + SYM
           : res.pending ? SYM + ' is still building'
           : 'Could not add ' + SYM, why);
@@ -5065,13 +5200,15 @@ function doAddTicker() {
               (_chartAccess.mine || []).indexOf(relow) < 0) {
             (_chartAccess.mine = _chartAccess.mine || []).push(relow);
             applyTickerAccess();
-            applyTickerOrder(preferredTickerOrder());
+            applyTickerOrder(withTickerSlotted(e.sym));
             persistTickerOrder();
             restored = true;
           }
         }
         addMsg.textContent = restored ? 'added ' + e.sym : e.sym + ' already added';
-        showSuper(superMap[e.sym] || e); return;
+        if (inDialog) exportTickerAdded(e.sym);
+        else showSuper(superMap[e.sym] || e);
+        return;
       }
       inject(DATA + 'data-' + e.key + '.js', function () {
         inject(DATA + 'overlays-' + e.key + '.js', function () {
@@ -5101,12 +5238,12 @@ function doAddTicker() {
             }
             applyTickerAccess();
           }
-          applyTickerOrder(preferredTickerOrder());
+          applyTickerOrder(withTickerSlotted(e.sym));
           persistTickerOrder();
           addSym.value = '';
           addMsg.textContent = 'added ' + e.sym;
           reenable();
-          showSuper(e, null, true);
+          landed(e);
         }, function () { addMsg.textContent = 'overlays load failed'; reenable(); });
       }, function () { addMsg.textContent = 'data load failed'; reenable(); });
     })
@@ -5116,14 +5253,200 @@ function doAddTicker() {
         setTimeout(function () { attempt(pollN + 1); }, POLL_MS);
         return;
       }
-      addMsg.textContent = SITE
-        ? 'connection dropped, the build may still be running. Refresh in a minute or two.'
-        : 'Chart server not reachable — open Charts from the KineFractalLab launcher, or run: py fearlab/label_server.py';
+      if (SITE) {
+        showFailure('Lost the connection while building ' + sym.toUpperCase(),
+          'connection dropped, the build may still be running. Refresh in a minute or two.');
+        return;
+      }
+      addMsg.textContent = 'Chart server not reachable — open Charts from the KineFractalLab launcher, or run: py fearlab/label_server.py';
       addBtn.disabled = false;
-      if (SITE) { showBuildResult('Lost the connection while building ' + sym.toUpperCase(), addMsg.textContent); addMsg.textContent = ''; }
-      else hideBuildOvl();
+      hideBuildOvl();
     });
   }
+}
+// The dialog's add landed: show the ticker in the dialog's list, ticked, and
+// jump to its prices once they build. A group tab that lacks it switches to
+// All tickers so the new row is visible.
+function exportTickerAdded(sym) {
+  if (!document.getElementById('exportDialog').classList.contains('open')) return;
+  if (exportTabSymbols(_exportActive).indexOf(sym) < 0 && _exportActive !== 'all') selectExportTab('all');
+  else { rememberExportPicks(); renderExportPicks(); }
+  var box = document.querySelector('#exportPicks input[value="' + sym + '"]');
+  if (box && !box.checked) { box.checked = true; rememberExportPicks(); }
+  updateExportPickCount();
+  _exportGoPending = sym;
+  scheduleExportBuild(0);
+}
+
+// --- ticker search under the add boxes (toolbar and Limit Buy dialog):
+//     "netflix" finds NFLX, "NF" lists the tickers it could be. Charts that
+//     already exist match here, instantly, for everyone; signed-in visitors
+//     also search every US stock and ETF through /charts/symbol-search
+//     (server/symbol-search.ts). Arrow keys move, Enter adds the highlighted
+//     ticker (the top one when none is), Esc closes the list.
+var TICKER_INPUT_RE = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,10}[A-Za-z0-9])?$/;
+var _symSearchCache = {};
+function symbolMatchScore(q, sym, name) {
+  var Q = q.toUpperCase(), N = String(name || '').toUpperCase();
+  if (sym === Q) return 0;
+  if (sym.indexOf(Q) === 0) return 1;
+  if (N.indexOf(Q) === 0 || N.split(/[^A-Z0-9]+/).some(function (w) { return w && w.indexOf(Q) === 0; })) return 2;
+  return 3;
+}
+function rankSymbolHits(q, hits) {
+  var seen = {};
+  return hits.filter(function (h) { if (seen[h.sym]) return false; seen[h.sym] = 1; return true; })
+    .map(function (h, i) { return { h: h, i: i, sc: symbolMatchScore(q, h.sym, h.name) }; })
+    .sort(function (a, b) { return a.sc - b.sc || a.i - b.i; })
+    .slice(0, 8)
+    .map(function (x) { return x.h; });
+}
+function symbolHitTag(sym, type) {
+  var onRow = visibleTickerSymbols().indexOf(sym) >= 0;
+  return [type === 'etf' ? 'ETF' : '', onRow ? 'on your chart' : ''].filter(Boolean).join(' · ');
+}
+function localSymbolHits(q) {
+  return SUPER_SYMS.filter(function (sym) { return symbolMatchScore(q, sym, tickerName(sym)) <= 2; })
+    .map(function (sym) { return { sym: sym, name: tickerName(sym), tag: symbolHitTag(sym, tickerType(sym)) }; });
+}
+function wireTickerSearch(input, host, onPick) {
+  var list = document.createElement('div');
+  list.className = 'tkfind';
+  list.id = input.id + 'List';
+  list.setAttribute('role', 'listbox');
+  list.setAttribute('aria-label', 'Matching tickers');
+  list.hidden = true;
+  host.appendChild(list);
+  input.setAttribute('role', 'combobox');
+  input.setAttribute('aria-autocomplete', 'list');
+  input.setAttribute('aria-expanded', 'false');
+  input.setAttribute('aria-controls', list.id);
+  var hits = [], active = -1, note = '', timer = null, gen = 0, waiting = false, submitWhenReady = false;
+  function place() {
+    var r = input.getBoundingClientRect();
+    list.style.left = Math.max(4, Math.min(window.innerWidth - 364, r.left)) + 'px';
+    list.style.top = (r.bottom + 2) + 'px';
+    list.style.maxHeight = Math.max(140, Math.min(360, window.innerHeight - r.bottom - 12)) + 'px';
+  }
+  function close() {
+    list.hidden = true;
+    input.setAttribute('aria-expanded', 'false');
+    input.removeAttribute('aria-activedescendant');
+    active = -1;
+  }
+  function render() {
+    list.innerHTML = '';
+    if (!hits.length && !note) { close(); return; }
+    hits.forEach(function (h, i) {
+      var o = document.createElement('div');
+      o.id = list.id + '-' + i;
+      o.className = 'tkopt' + (i === active ? ' active' : '');
+      o.setAttribute('role', 'option');
+      o.setAttribute('aria-selected', i === active ? 'true' : 'false');
+      o.innerHTML = '<span class="sym">' + escHtml(h.sym) + '</span><span class="nm">' + escHtml(h.name || '') + '</span>'
+        + '<span class="tag">' + escHtml(h.tag || '') + '</span>';
+      o.onmousedown = function (e) { e.preventDefault(); pick(i); };   // keep focus in the box
+      list.appendChild(o);
+    });
+    if (note) {
+      var p = document.createElement('p');
+      p.className = 'note';
+      p.textContent = note;
+      list.appendChild(p);
+    }
+    place();
+    list.hidden = false;
+    input.setAttribute('aria-expanded', 'true');
+    if (active >= 0) {
+      input.setAttribute('aria-activedescendant', list.id + '-' + active);
+      var el = document.getElementById(list.id + '-' + active);
+      if (el) el.scrollIntoView({ block: 'nearest' });
+    } else input.removeAttribute('aria-activedescendant');
+  }
+  function settle() { gen++; clearTimeout(timer); waiting = false; submitWhenReady = false; close(); }   // a late answer must not reopen the list
+  function pick(i) {
+    var h = hits[i];
+    if (!h) return;
+    input.value = h.sym;
+    settle();
+    onPick(h.sym);
+  }
+  function rawNote(q) {
+    return TICKER_INPUT_RE.test(q) ? 'No match found. Press Enter to try ' + q.toUpperCase() + ' as a ticker.' : 'No ticker matches "' + q + '".';
+  }
+  function update() {
+    var q = input.value.trim(), my = ++gen;
+    clearTimeout(timer);
+    waiting = false; submitWhenReady = false; active = -1;
+    if (!q) { hits = []; note = ''; close(); return; }
+    var local = localSymbolHits(q);
+    hits = rankSymbolHits(q, local);
+    if (!(SITE && siteUser === true)) {
+      note = hits.length ? '' : rawNote(q);
+      if (SITE && siteUser === false) note = (note ? note + ' ' : '') + 'Sign in to search every US stock and ETF.';
+      render();
+      return;
+    }
+    var cached = _symSearchCache[q.toLowerCase()];
+    function withRemote(results) {
+      var remote = results.map(function (r) { return { sym: String(r.sym || '').toUpperCase(), name: r.name || '', tag: symbolHitTag(String(r.sym || '').toUpperCase(), r.type) }; })
+        .filter(function (r) { return r.sym; });
+      hits = rankSymbolHits(q, local.concat(remote));
+      note = hits.length ? '' : rawNote(q);
+    }
+    if (cached) { withRemote(cached); render(); return; }
+    waiting = true;
+    note = 'Searching…';
+    render();
+    timer = setTimeout(function () {
+      fetch(SAVE_ORIGIN + '/charts/symbol-search?q=' + encodeURIComponent(q), { credentials: 'same-origin', cache: 'no-store' })
+        .then(function (r) { if (!r.ok) throw new Error('search ' + r.status); return r.json(); })
+        .then(function (j) {
+          var results = Array.isArray(j && j.results) ? j.results : [];
+          _symSearchCache[q.toLowerCase()] = results;
+          if (my !== gen) return;
+          withRemote(results);
+        })
+        .catch(function () {
+          if (my !== gen) return;
+          note = hits.length ? '' : 'Search is unavailable right now. Type the exact ticker and press Enter.';
+        })
+        .then(function () {
+          if (my !== gen) return;
+          waiting = false;
+          if (submitWhenReady) { submitWhenReady = false; submit(); return; }
+          render();
+        });
+    }, 200);
+  }
+  // Enter or "+ Add": the highlighted ticker, else the top match, else what was typed
+  function submit() {
+    if (waiting && !hits.length) { submitWhenReady = true; return; }
+    if (hits.length) { pick(active >= 0 ? active : 0); return; }
+    settle();
+    if (input.value.trim()) onPick(input.value.trim());
+  }
+  input.addEventListener('input', update);
+  input.addEventListener('blur', function () { setTimeout(function () { if (document.activeElement !== input) settle(); }, 0); });
+  input.addEventListener('keydown', function (e) {
+    var open = !list.hidden;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      if (!hits.length) return;
+      e.preventDefault();
+      active = e.key === 'ArrowDown' ? (active + 1) % hits.length : (active <= 0 ? hits.length - 1 : active - 1);
+      render();
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      submit();
+    } else if (e.key === 'Escape' && open) {
+      e.preventDefault();
+      e.stopPropagation();   // close the list, not the dialog behind it
+      settle();
+    }
+  });
+  window.addEventListener('resize', function () { if (!list.hidden) place(); });
+  document.addEventListener('scroll', function () { if (!list.hidden) place(); }, true);
+  return { submit: submit };
 }
 
 var current = null;  // {candles, overlays}
