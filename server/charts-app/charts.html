@@ -605,6 +605,12 @@
   .xp-whychart .now { fill:var(--fg); }
   .xp-whychart text { font:13px monospace; fill:var(--mut); }
   .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
+  .xp-whychart .spy { fill:none; stroke:#f5a623; stroke-width:1.3; } .xp-whychart circle.spy { fill:#f5a623; stroke:none; }
+  .xp-whychart text.spy { fill:#f5a623; stroke:none; } .xp-whychart .zero { stroke:var(--grid); stroke-width:1; }
+  .xp-whycmp { display:inline-flex; align-items:center; gap:8px; color:var(--fg); font:14px Verdana,Geneva,sans-serif; cursor:pointer; }
+  .xp-whycmp input { margin:0; accent-color:var(--sup); }
+  .xp-whylegend { color:var(--mut); font:13px Verdana,Geneva,sans-serif; margin:-6px 0 12px; }
+  .xp-whylegend b { font-weight:normal; color:var(--fg); } .xp-whylegend b.spy { color:#f5a623; }
   .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; line-height:1.55; }
   .xp-whylist li { margin-bottom:6px; }
   @media (max-width:900px) {
@@ -4357,7 +4363,10 @@ var _whyReturnFocus = null;
 // the last candle of each calendar day.
 function dailyCloses(candles) {
   if (!candles || !candles.length) return [];
-  var end = candles[candles.length - 1].time, start = end - 183 * 86400, out = [], lastDay = null;
+  return dailyClosesSince(candles, candles[candles.length - 1].time - 183 * 86400);
+}
+function dailyClosesSince(candles, start) {
+  var out = [], lastDay = null;
   for (var i = 0; i < candles.length; i++) {
     var c = candles[i];
     if (c.time < start) continue;
@@ -4367,20 +4376,52 @@ function dailyCloses(candles) {
   }
   return out;
 }
-function whyChartSvg(sec, lim) {
-  var pts = dailyCloses(sec.candles);
+// Compare to S&P 500 (user, 2026-10-11): both lines as % change from the
+// first day shown, the way the chart's Compare draws them. SPY stands in for
+// the index. pct(v) turns a price of this ticker into its % from that day.
+var WHY_CMP_KEY = 'kf-why-compare';
+var _whyCompare = (function () { try { return localStorage.getItem(WHY_CMP_KEY) === '1'; } catch (e) { return false; } })();
+var _whySpyFailed = false;
+function whySpyCandles() {
+  var e = superMap.SPY, payload = e && window.FEARLAB_REG[e.key];
+  return payload ? payload.candles || [] : null;
+}
+// SPY's latest daily close at or before each of the ticker's days
+function whySpyPoints(pts, spyCandles) {
+  var spy = dailyClosesSince(spyCandles, pts[0].t), out = [], j = 0, last = null;
+  pts.forEach(function (p) {
+    while (j < spy.length && spy[j].t <= p.t) { last = spy[j].v; j++; }
+    if (last != null) out.push({ t: p.t, v: last });
+  });
+  return out;
+}
+function whyComparison(sec) {
+  var pts = dailyCloses(sec.candles), spyCandles = whySpyCandles();
+  if (pts.length < 2 || !spyCandles) return null;
+  var spy = whySpyPoints(pts, spyCandles);
+  if (spy.length < 2) return null;
+  function rebase(list) { var b = list[0].v; return list.map(function (p) { return { t: p.t, v: (p.v / b - 1) * 100 }; }); }
+  return { base: pts[0].v, tk: rebase(pts), spy: rebase(spy) };
+}
+function whyChartSvg(sec, lim, cmp) {
+  var pts = cmp ? cmp.tk : dailyCloses(sec.candles);
   if (pts.length < 2) return '';
   var W = 340, H = 180, padL = 4, padR = 66, padT = 10, padB = 22;
-  var levels = [lim.row].concat(lim.members).map(function (r) { return r.limit; });
-  var lo = Math.min.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
-  var hi = Math.max.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
+  function lv(price) { return cmp ? (price / cmp.base - 1) * 100 : price; }
+  var levels = [lim.row].concat(lim.members).map(function (r) { return lv(r.limit); });
+  var vals = pts.concat(cmp ? cmp.spy : []).map(function (p) { return p.v; }).concat(levels);
+  var lo = Math.min.apply(null, vals);
+  var hi = Math.max.apply(null, vals);
   var span = hi - lo || 1; lo -= span * 0.05; hi += span * 0.05;
   var t0 = pts[0].t, t1 = pts[pts.length - 1].t;
   function x(t) { return padL + (t - t0) / (t1 - t0) * (W - padL - padR); }
   function y(v) { return padT + (hi - v) / (hi - lo) * (H - padT - padB); }
-  var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' ');
+  function path(list) { return list.map(function (p, i) { return (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' '); }
+  var line = path(pts);
   var svg = '<svg class="xp-whychart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="'
-    + escHtml(sec.sym) + ' daily closes for the last six months, with the buy price ' + px2(lim.row.limit) + ' drawn across">';
+    + escHtml(sec.sym) + (cmp ? ' and the S&amp;P 500 (SPY) as % change over' : ' daily closes for') + ' the last six months, with the buy price '
+    + px2(lim.row.limit) + ' drawn across">';
+  if (cmp) svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" class="zero"/>';
   // month ticks
   var seen = {};
   pts.forEach(function (p) {
@@ -4390,16 +4431,44 @@ function whyChartSvg(sec, lim) {
     svg += '<text x="' + x(p.t).toFixed(1) + '" y="' + (H - 6) + '" class="ax">' + d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }) + '</text>';
   });
   lim.members.forEach(function (m) {
-    svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(m.limit).toFixed(1) + '" y2="' + y(m.limit).toFixed(1) + '" class="mem"/>';
+    var ym = y(lv(m.limit)).toFixed(1);
+    svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + ym + '" y2="' + ym + '" class="mem"/>';
   });
-  var yl = y(lim.row.limit).toFixed(1), last = pts[pts.length - 1];
+  var yl = y(lv(lim.row.limit)).toFixed(1), last = pts[pts.length - 1];
+  // right-edge labels, nudged apart so none print over another
+  var labels = [{ y: y(last.v), text: cmp ? fmtPctChange(last.v) : px2(last.v), cls: 'now' },
+                { y: Number(yl), text: px2(lim.row.limit), cls: 'lvl' }];
+  if (cmp) {
+    var spyLast = cmp.spy[cmp.spy.length - 1];
+    svg += '<path d="' + path(cmp.spy) + '" class="spy"/>'
+      + '<circle cx="' + x(spyLast.t).toFixed(1) + '" cy="' + y(spyLast.v).toFixed(1) + '" r="3" class="spy"/>';
+    labels.push({ y: y(spyLast.v), text: fmtPctChange(spyLast.v), cls: 'spy' });
+  }
+  labels.sort(function (a, b) { return a.y - b.y; });
+  for (var k = 1; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, labels[k - 1].y + 14);
   svg += '<path d="' + line + '" class="px"/>'
     + '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yl + '" y2="' + yl + '" class="lvl"/>'
     + '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3" class="now"/>'
-    + '<text x="' + (W - padR + 6) + '" y="' + (y(last.v) + 4).toFixed(1) + '" class="lbl now">' + px2(last.v) + '</text>'
-    + '<text x="' + (W - padR + 6) + '" y="' + (Number(yl) + 4).toFixed(1) + '" class="lbl lvl">' + px2(lim.row.limit) + '</text>'
+    + labels.map(function (l) {
+        return '<text x="' + (W - padR + 6) + '" y="' + (l.y + 4).toFixed(1) + '" class="lbl ' + l.cls + '">' + l.text + '</text>';
+      }).join('')
     + '</svg>';
   return svg;
+}
+// The checkbox above the chart, and under it the change of each line since the first day shown.
+function whyCompareHtml(sec, cmp) {
+  if (sec.sym === 'SPY' || !superMap.SPY) return { box: '', legend: '' };
+  var box = '<label class="xp-whycmp"><input type="checkbox" id="exportWhyCmp"' + (_whyCompare ? ' checked' : '')
+    + '> Compare to S&amp;P 500 (SPY)</label>';
+  if (!_whyCompare) return { box: box, legend: '' };
+  if (!cmp) {
+    return { box: box, legend: '<p class="xp-whylegend">'
+      + (_whySpyFailed ? 'S&amp;P 500 prices did not load. Try again in a minute.' : 'Loading S&amp;P 500 prices…') + '</p>' };
+  }
+  var tk = cmp.tk[cmp.tk.length - 1].v, spy = cmp.spy[cmp.spy.length - 1].v;
+  var since = new Date(cmp.tk[0].t * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return { box: box, legend: '<p class="xp-whylegend">Since ' + since + ': <b>' + escHtml(sec.sym) + ' ' + fmtPctChange(tk)
+    + '</b> · <b class="spy">S&amp;P 500 ' + fmtPctChange(spy) + '</b></p>' };
 }
 function refreshWhyPanel() {
   var panel = document.getElementById('exportWhy');
@@ -4419,11 +4488,21 @@ function refreshWhyPanel() {
     bullets.push('One order at ' + px2(lim.row.limit) + ' covers ' + (count === 2 ? 'both' : 'all ' + count) + ', because a drop reaches it first.');
   }
   bullets.push('Strength: ' + STRENGTH_WORD[tier] + ', because ' + strengthReason(lim) + '.');
+  var showCmp = _whyCompare && sec.sym !== 'SPY' && !!superMap.SPY;
+  var cmp = showCmp ? whyComparison(sec) : null;
+  if (showCmp && !cmp && !whySpyCandles() && !_whySpyFailed) {
+    loadOnce(window.FEARLAB_REG, 'data-', superMap.SPY.key,
+      function () { if (_whyOpen) refreshWhyPanel(); },
+      function () { _whySpyFailed = true; if (_whyOpen) refreshWhyPanel(); });
+  }
+  var cmpHtml = whyCompareHtml(sec, cmp);
   document.getElementById('exportWhyBody').innerHTML =
       '<div class="xp-whyhead"><span class="xp-sym">' + escHtml(sec.sym) + '</span><span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span></div>'
     + '<div class="xp-whypx tier-' + tier + '">' + px2(lim.row.limit) + '</div>'
     + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' the ' + closeLabel(sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(sec.close) + '</div>'
-    + whyChartSvg(sec, lim)
+    + cmpHtml.box
+    + whyChartSvg(sec, lim, cmp)
+    + cmpHtml.legend
     + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>';
   panel.hidden = false;
   document.getElementById('exportBody').classList.add('why-open');
@@ -4824,6 +4903,15 @@ function wireExportDialog() {
   });
   document.getElementById('exportAddBtn').onclick = exportAddSearch.submit;
   document.getElementById('exportWhyClose').onclick = function () { closeWhyPanel(true); };
+  document.getElementById('exportWhyBody').addEventListener('change', function (e) {
+    if (e.target.id !== 'exportWhyCmp') return;
+    _whyCompare = e.target.checked;
+    _whySpyFailed = false;   // a fresh tick tries the S&P prices again
+    try { localStorage.setItem(WHY_CMP_KEY, _whyCompare ? '1' : '0'); } catch (err) {}
+    refreshWhyPanel();
+    var box = document.getElementById('exportWhyCmp');
+    if (box) box.focus();
+  });
   window.addEventListener('resize', function () { if (_whyOpen) setWhyInert(); });
   Array.prototype.forEach.call(document.querySelectorAll('#exportViewSwitch button'), function (b) {
     b.onclick = function () { setExportView(b.getAttribute('data-view')); };
