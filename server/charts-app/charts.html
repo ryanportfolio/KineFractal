@@ -6626,7 +6626,9 @@ function lg2LoadScenes(done) {
   if (lg2Data.loading) return;
   lg2Data.loading = true;
   var el = document.createElement('script');
-  el.src = 'legend-scenes.js';
+  // the server swaps the token below for the data file's content hash, so a changed file gets a
+  // new URL and the browser may keep each version (served as immutable)
+  el.src = 'legend-scenes.js?v=__LG2_SCENES_VERSION__';
   el.onload = el.onerror = function () {
     lg2Data.loading = false;
     var ok = !!window.LG2_SCENES_DATA, waiting = lg2Data.waiting;
