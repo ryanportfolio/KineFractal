@@ -294,12 +294,14 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [statusZone, setStatusZone] = useState<StatusZone>("channels");
   // Gap limit placement lives with the chart preferences (/api/chart-prefs),
   // not in alert_prefs: the Limit Buy dialog uses it whether or not alerts are
-  // on. It saves on click; only the latest click's answer is shown.
+  // on. A click saves it; one save is in flight at a time and clicks made
+  // meanwhile collapse into the latest, so the stored value is the last choice.
   const [gapPlacement, setGapPlacement] = useState<GapPlacement>("top");
   const [gapPlacementState, setGapPlacementState] = useState<"loading" | "idle" | "saving" | "saved">("loading");
   const [gapPlacementError, setGapPlacementError] = useState<string | null>(null);
   const savedGapPlacement = useRef<GapPlacement>("top");
-  const gapPlacementSeq = useRef(0);
+  const gapPlacementSaving = useRef(false);
+  const gapPlacementQueued = useRef<GapPlacement | null>(null);
   useEffect(() => {
     const controller = new AbortController();
     fetch("/api/chart-prefs", { credentials: "include", cache: "no-store", signal: controller.signal })
@@ -318,23 +320,35 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       });
     return () => controller.abort();
   }, []);
-  const chooseGapPlacement = async (value: GapPlacement) => {
-    const seq = ++gapPlacementSeq.current;
-    setGapPlacement(value);
-    setGapPlacementError(null);
-    setGapPlacementState("saving");
+  const saveGapPlacement = async (value: GapPlacement) => {
+    gapPlacementSaving.current = true;
+    let failure: string | null = null;
     try {
       const response = await csrfFetch("/api/chart-prefs", { method: "PUT", body: JSON.stringify({ gapPlacement: value }) });
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
       savedGapPlacement.current = value;
-      if (seq === gapPlacementSeq.current) setGapPlacementState("saved");
     } catch (reason: any) {
-      if (seq !== gapPlacementSeq.current) return;
+      failure = reason?.message || "failed to save";
+    }
+    gapPlacementSaving.current = false;
+    const next = gapPlacementQueued.current;
+    gapPlacementQueued.current = null;
+    if (next !== null && next !== savedGapPlacement.current) return saveGapPlacement(next);
+    if (failure && next === null) {
       setGapPlacement(savedGapPlacement.current);
       setGapPlacementState("idle");
-      setGapPlacementError(`${reason?.message || "failed to save"} · gap limit price restored to the last saved choice`);
+      setGapPlacementError(`${failure} · gap limit price restored to the last saved choice`);
+      return;
     }
+    setGapPlacementState("saved");
+  };
+  const chooseGapPlacement = (value: GapPlacement) => {
+    setGapPlacement(value);
+    setGapPlacementError(null);
+    setGapPlacementState("saving");
+    if (gapPlacementSaving.current) gapPlacementQueued.current = value;
+    else void saveGapPlacement(value);
   };
   // number boxes whose typed value has not reached the settings yet
   const [pendingDrafts, setPendingDrafts] = useState<ReadonlySet<string>>(() => new Set());

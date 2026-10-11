@@ -628,6 +628,8 @@
   .export-badge.pd { border-color:var(--cbuy); color:var(--cbuy); }
   #exportMsg { min-height:15px; color:var(--mut); font:14px monospace; text-align:center; }
   #exportMsg.error { color:var(--csell); }
+  #exportGapMsg { display:block; max-width:260px; margin-top:4px; color:var(--csell); font:13px monospace; }
+  #exportGapMsg[hidden] { display:none; }
   #exportDialog .xp-primary { padding:9px 22px; border-color:var(--sup); background:var(--sup);
                               color:var(--bg); font-weight:bold; font-size:14px; }
   #exportDialog .xp-primary:hover { background:#5fd8e6; }
@@ -848,6 +850,7 @@
             <button type="button" data-gap="middle" aria-pressed="false">middle</button>
             <button type="button" data-gap="fill" aria-pressed="false">full fill</button>
           </span>
+          <span id="exportGapMsg" role="status" aria-live="polite" hidden></span>
         </div>
       </div>
       <div class="xp-headact">
@@ -4603,7 +4606,36 @@ function renderGapPlacement() {
   });
 }
 // A click saves to the account when signed in (and so the emails follow it),
-// and always to this browser.
+// and always to this browser. One save is in flight at a time; clicks made
+// meanwhile collapse into the latest, so the account ends on the last choice.
+// A click made before the account answers is saved once it does.
+var _gapSaved = 'top';          // what the account holds
+var _gapSaving = false;
+var _gapQueued = null;
+var _gapClickedEarly = false;   // clicked while the account was still loading
+function setGapMsg(text) {
+  var el = document.getElementById('exportGapMsg');
+  el.textContent = text;
+  el.hidden = !text;
+}
+function saveGapPlacement(p) {
+  if (_gapSaving) { _gapQueued = p; return; }
+  _gapSaving = true;
+  var failed = false;
+  putExportGroups(JSON.stringify({ gapPlacement: p }), false, '/api/chart-prefs')
+    .then(function () { _gapSaved = p; }, function () { failed = true; })
+    .then(function () {
+      _gapSaving = false;
+      var next = _gapQueued;
+      _gapQueued = null;
+      if (next !== null && next !== _gapSaved) return saveGapPlacement(next);
+      if (failed && next === null) {
+        setGapPlacement(_gapSaved, false);
+        scheduleExportBuild(0);
+        setGapMsg('Could not save the gap setting to your account, so it is back to ' + (_gapSaved === 'fill' ? 'full fill' : _gapSaved) + '. Try again in a minute.');
+      }
+    });
+}
 function setGapPlacement(p, byUser) {
   if (!GAP_PLACEMENT_HINTS[p]) return;
   var changed = p !== _gapPlacement;
@@ -4611,17 +4643,17 @@ function setGapPlacement(p, byUser) {
   renderGapPlacement();
   try { localStorage.setItem(GAP_PLACEMENT_KEY, p); } catch (e) {}
   if (!byUser) return;
+  setGapMsg('');
   if (changed) scheduleExportBuild(0);
-  if (_gapPlacementAccount) {
-    putExportGroups(JSON.stringify({ gapPlacement: p }), false, '/api/chart-prefs')
-      .then(function () { document.getElementById('exportMsg').textContent = ''; })
-      .catch(function () { document.getElementById('exportMsg').textContent = 'Could not save the gap setting to your account. Try again in a minute.'; });
-  }
+  if (_gapPlacementAccount) saveGapPlacement(p);
+  else _gapClickedEarly = true;
 }
 function loadGapPlacement(openGen) {
   var local = null;
   try { local = localStorage.getItem(GAP_PLACEMENT_KEY); } catch (e) {}
   _gapPlacementAccount = false;
+  _gapClickedEarly = false;
+  setGapMsg('');
   setGapPlacement(GAP_PLACEMENT_HINTS[local] ? local : 'top', false);
   if (!(SITE && siteUser !== false)) return;
   fetch('/api/chart-prefs', { credentials: 'same-origin', cache: 'no-store' })
@@ -4629,8 +4661,15 @@ function loadGapPlacement(openGen) {
     .then(function (j) {
       if (openGen !== _exportOpenGen || !j.account || !j.stored) return;
       _gapPlacementAccount = true;
+      _gapSaved = GAP_PLACEMENT_HINTS[j.gapPlacement] ? j.gapPlacement : 'top';
+      renderGapPlacement();
+      // a choice made while this loaded wins over the stored one
+      if (_gapClickedEarly) {
+        if (_gapPlacement !== _gapSaved) saveGapPlacement(_gapPlacement);
+        return;
+      }
       var was = _gapPlacement;
-      setGapPlacement(GAP_PLACEMENT_HINTS[j.gapPlacement] ? j.gapPlacement : 'top', false);
+      setGapPlacement(_gapSaved, false);
       if (_gapPlacement !== was) scheduleExportBuild(0);
     })
     .catch(function () {});   // the browser's copy stands in until the next open
