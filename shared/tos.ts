@@ -2,6 +2,9 @@
 // Bump TOS_VERSION whenever the terms/disclaimer content changes materially —
 // every user must re-accept before their alerts resume (server-enforced in
 // /api/alerts/prefs; the worker fan-out also filters on the CURRENT version).
+// The engine keeps its own copy: DEFAULT_TOS_VERSION in ryanportfolio/range
+// worker/alerts.py (or the worker's KF_TOS_VERSION variable). Bump both
+// together, or the worker stops emailing everyone who accepted the new terms.
 
 export const TOS_VERSION = "2026-07-11";
 
