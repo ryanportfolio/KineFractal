@@ -717,7 +717,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
               disabled={!canEnable && !prefs.levels_weekly.enabled}
             />
             <p className="mt-4 font-mono text-xs leading-relaxed text-beam-dim">
-              Buy-limit levels below the price after the Monday and Friday closes, in your inbox the next morning (Tuesday and Saturday)
+              Buy-limit levels below the price after the first and last trading days of each week, usually Monday and Friday, in your inbox the next morning
             </p>
           </div>
           <div className="bg-background py-5 md:p-6">
