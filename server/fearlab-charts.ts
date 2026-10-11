@@ -75,6 +75,20 @@ async function readLocalChartsHtml(): Promise<string | null> {
   return localChartsHtml;
 }
 
+// The legend's replay data, bundled next to the page document. charts.html fetches it only
+// when a legend replay is first built, so /charts visitors who never open the legend skip it.
+const LOCAL_LEGEND_SCENES_PATH = path.resolve(process.cwd(), "server/charts-app/legend-scenes.js");
+let localLegendScenes: string | null | undefined;
+async function readLocalLegendScenes(): Promise<string | null> {
+  if (localLegendScenes !== undefined) return localLegendScenes;
+  try {
+    localLegendScenes = await readFile(LOCAL_LEGEND_SCENES_PATH, "utf8");
+  } catch {
+    localLegendScenes = null; // absent -> 404
+  }
+  return localLegendScenes;
+}
+
 // charts.html is one big inline <script> app, so the helmet production CSP
 // (script-src 'self', server/security.ts) would blank the page. Override on
 // the DOCUMENT response only; the unpkg.com entry covers the page's CDN
@@ -186,6 +200,24 @@ export function registerFearlabChartsRoutes(app: Express): void {
     } catch (error: any) {
       console.error("[FearLab charts] page route error:", error?.message ?? error);
       res.status(500).json({ error: "Failed to load charts" });
+    }
+  });
+
+  // Legend replay data (see readLocalLegendScenes). Ships with the deploy like the page
+  // document, so it revalidates the same way.
+  app.get("/charts/legend-scenes.js", async (_req: Request, res: Response) => {
+    try {
+      const body = await readLocalLegendScenes();
+      if (body == null) {
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      res.set("Content-Type", "text/javascript; charset=utf-8");
+      res.set("Cache-Control", CHARTS_DOCUMENT_CACHE);
+      res.send(body);
+    } catch (error: any) {
+      console.error("[FearLab charts] legend data route error:", error?.message ?? error);
+      res.status(500).json({ error: "Failed to load legend data" });
     }
   });
 
