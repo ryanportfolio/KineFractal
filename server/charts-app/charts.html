@@ -605,6 +605,12 @@
   .xp-whychart .now { fill:var(--fg); }
   .xp-whychart text { font:13px monospace; fill:var(--mut); }
   .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
+  .xp-whychart .spy { fill:none; stroke:#f5a623; stroke-width:1.3; } .xp-whychart circle.spy { fill:#f5a623; stroke:none; }
+  .xp-whychart text.spy { fill:#f5a623; stroke:none; } .xp-whychart .zero { stroke:var(--grid); stroke-width:1; }
+  .xp-whycmp { display:inline-flex; align-items:center; gap:8px; color:var(--fg); font:14px Verdana,Geneva,sans-serif; cursor:pointer; }
+  .xp-whycmp input { margin:0; accent-color:var(--sup); }
+  .xp-whylegend { color:var(--mut); font:13px Verdana,Geneva,sans-serif; margin:-6px 0 12px; }
+  .xp-whylegend b { font-weight:normal; color:var(--fg); } .xp-whylegend b.spy { color:#f5a623; }
   .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; line-height:1.55; }
   .xp-whylist li { margin-bottom:6px; }
   @media (max-width:900px) {
@@ -3717,7 +3723,7 @@ function hideExportTip() { document.getElementById('exportTip').hidden = true; }
 // --- groups: storage ------------------------------------------------------------
 var EXPORT_GROUPS_KEY = 'kf-export-groups-v1';
 var EXPORT_ACTIVE_KEY = 'kf-export-active-group';
-var _exportGroups = [];     // [{ id, name, syms: ['AAPL', ...] }]
+var _exportGroups = [];     // [{ id, name, syms: ['AAPL', ...], onlyHere?: ['XYZ'] }]
 var _exportGroupsAccount = false;
 var _exportActive = 'all';  // 'all' or a group id
 var _exportPickMemory = {}; // tab id -> checked symbols, for this page view
@@ -3736,7 +3742,12 @@ function normalizeExportGroups(list) {
     });
     if (!/^[a-z0-9]{1,24}$/.test(id) || ids[id] || !name || names[name.toLowerCase()] || !syms.length) return;
     ids[id] = 1; names[name.toLowerCase()] = 1;
-    out.push({ id: id, name: name, syms: syms.slice(0, 100) });
+    syms = syms.slice(0, 100);
+    var onlyHere = (Array.isArray(g.onlyHere) ? g.onlyHere : []).map(function (s) { return String(s || '').toUpperCase().trim(); })
+      .filter(function (s, i, a) { return syms.indexOf(s) >= 0 && a.indexOf(s) === i; });
+    var group = { id: id, name: name, syms: syms };
+    if (onlyHere.length) group.onlyHere = onlyHere;
+    out.push(group);
   });
   return out;
 }
@@ -3852,13 +3863,18 @@ function saveExportGroups() {
     try { localStorage.setItem(EXPORT_GROUPS_KEY, JSON.stringify(_exportGroups)); } catch (e) {}
     return Promise.resolve(true);
   }
-  var body = JSON.stringify({ groups: _exportGroups.map(function (g) { return { id: g.id, name: g.name, symbols: g.syms }; }) });
+  var body = JSON.stringify({ groups: _exportGroups.map(function (g) { return { id: g.id, name: g.name, symbols: g.syms, onlyHere: g.onlyHere || [] }; }) });
   return putExportGroups(body, false)
     .then(function () { setGroupsNote(''); markGroupsSynced(); return true; })
     .catch(function () {
       setGroupsNote('Could not save groups to your account. Try again in a minute.', true);
       return false;
     });
+}
+function cloneExportGroup(g) {
+  var c = { id: g.id, name: g.name, syms: g.syms.slice() };
+  if (g.onlyHere) c.onlyHere = g.onlyHere.slice();
+  return c;
 }
 function exportGroupById(id) {
   for (var i = 0; i < _exportGroups.length; i++) if (_exportGroups[i].id === id) return _exportGroups[i];
@@ -3869,12 +3885,16 @@ function newExportGroupId() {
 }
 
 // --- tabs + ticker list ---------------------------------------------------------
-// Symbols a tab offers: every visible ticker, or a group's members that are
-// still on this visitor's chart row (a hidden or retired ticker stays stored
-// but is not offered).
+// Symbols a tab offers: every visible ticker except those added from inside a
+// group (user, 2026-10-11), or a group's members that are still on this
+// visitor's chart row (a hidden or retired ticker stays stored but is not offered).
 function exportTabSymbols(tabId) {
   var visible = visibleTickerSymbols().slice().sort();
-  if (tabId === 'all') return visible;
+  if (tabId === 'all') {
+    var onlyHere = {};
+    _exportGroups.forEach(function (g) { (g.onlyHere || []).forEach(function (s) { onlyHere[s] = 1; }); });
+    return visible.filter(function (s) { return !onlyHere[s]; });
+  }
   var g = exportGroupById(tabId);
   if (!g) return visible;
   return g.syms.filter(function (s) { return visible.indexOf(s) >= 0; }).sort();
@@ -4343,7 +4363,10 @@ var _whyReturnFocus = null;
 // the last candle of each calendar day.
 function dailyCloses(candles) {
   if (!candles || !candles.length) return [];
-  var end = candles[candles.length - 1].time, start = end - 183 * 86400, out = [], lastDay = null;
+  return dailyClosesSince(candles, candles[candles.length - 1].time - 183 * 86400);
+}
+function dailyClosesSince(candles, start) {
+  var out = [], lastDay = null;
   for (var i = 0; i < candles.length; i++) {
     var c = candles[i];
     if (c.time < start) continue;
@@ -4353,20 +4376,52 @@ function dailyCloses(candles) {
   }
   return out;
 }
-function whyChartSvg(sec, lim) {
-  var pts = dailyCloses(sec.candles);
+// Compare to S&P 500 (user, 2026-10-11): both lines as % change from the
+// first day shown, the way the chart's Compare draws them. SPY stands in for
+// the index. pct(v) turns a price of this ticker into its % from that day.
+var WHY_CMP_KEY = 'kf-why-compare';
+var _whyCompare = (function () { try { return localStorage.getItem(WHY_CMP_KEY) === '1'; } catch (e) { return false; } })();
+var _whySpyFailed = false;
+function whySpyCandles() {
+  var e = superMap.SPY, payload = e && window.FEARLAB_REG[e.key];
+  return payload ? payload.candles || [] : null;
+}
+// SPY's latest daily close at or before each of the ticker's days
+function whySpyPoints(pts, spyCandles) {
+  var spy = dailyClosesSince(spyCandles, pts[0].t), out = [], j = 0, last = null;
+  pts.forEach(function (p) {
+    while (j < spy.length && spy[j].t <= p.t) { last = spy[j].v; j++; }
+    if (last != null) out.push({ t: p.t, v: last });
+  });
+  return out;
+}
+function whyComparison(sec) {
+  var pts = dailyCloses(sec.candles), spyCandles = whySpyCandles();
+  if (pts.length < 2 || !spyCandles) return null;
+  var spy = whySpyPoints(pts, spyCandles);
+  if (spy.length < 2) return null;
+  function rebase(list) { var b = list[0].v; return list.map(function (p) { return { t: p.t, v: (p.v / b - 1) * 100 }; }); }
+  return { base: pts[0].v, tk: rebase(pts), spy: rebase(spy) };
+}
+function whyChartSvg(sec, lim, cmp) {
+  var pts = cmp ? cmp.tk : dailyCloses(sec.candles);
   if (pts.length < 2) return '';
   var W = 340, H = 180, padL = 4, padR = 66, padT = 10, padB = 22;
-  var levels = [lim.row].concat(lim.members).map(function (r) { return r.limit; });
-  var lo = Math.min.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
-  var hi = Math.max.apply(null, pts.map(function (p) { return p.v; }).concat(levels));
+  function lv(price) { return cmp ? (price / cmp.base - 1) * 100 : price; }
+  var levels = [lim.row].concat(lim.members).map(function (r) { return lv(r.limit); });
+  var vals = pts.concat(cmp ? cmp.spy : []).map(function (p) { return p.v; }).concat(levels);
+  var lo = Math.min.apply(null, vals);
+  var hi = Math.max.apply(null, vals);
   var span = hi - lo || 1; lo -= span * 0.05; hi += span * 0.05;
   var t0 = pts[0].t, t1 = pts[pts.length - 1].t;
   function x(t) { return padL + (t - t0) / (t1 - t0) * (W - padL - padR); }
   function y(v) { return padT + (hi - v) / (hi - lo) * (H - padT - padB); }
-  var line = pts.map(function (p, i) { return (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' ');
+  function path(list) { return list.map(function (p, i) { return (i ? 'L' : 'M') + x(p.t).toFixed(1) + ' ' + y(p.v).toFixed(1); }).join(' '); }
+  var line = path(pts);
   var svg = '<svg class="xp-whychart" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="'
-    + escHtml(sec.sym) + ' daily closes for the last six months, with the buy price ' + px2(lim.row.limit) + ' drawn across">';
+    + escHtml(sec.sym) + (cmp ? ' and the S&amp;P 500 (SPY) as % change over' : ' daily closes for') + ' the last six months, with the buy price '
+    + px2(lim.row.limit) + ' drawn across">';
+  if (cmp) svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(0).toFixed(1) + '" y2="' + y(0).toFixed(1) + '" class="zero"/>';
   // month ticks
   var seen = {};
   pts.forEach(function (p) {
@@ -4376,16 +4431,44 @@ function whyChartSvg(sec, lim) {
     svg += '<text x="' + x(p.t).toFixed(1) + '" y="' + (H - 6) + '" class="ax">' + d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }) + '</text>';
   });
   lim.members.forEach(function (m) {
-    svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + y(m.limit).toFixed(1) + '" y2="' + y(m.limit).toFixed(1) + '" class="mem"/>';
+    var ym = y(lv(m.limit)).toFixed(1);
+    svg += '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + ym + '" y2="' + ym + '" class="mem"/>';
   });
-  var yl = y(lim.row.limit).toFixed(1), last = pts[pts.length - 1];
+  var yl = y(lv(lim.row.limit)).toFixed(1), last = pts[pts.length - 1];
+  // right-edge labels, nudged apart so none print over another
+  var labels = [{ y: y(last.v), text: cmp ? fmtPctChange(last.v) : px2(last.v), cls: 'now' },
+                { y: Number(yl), text: px2(lim.row.limit), cls: 'lvl' }];
+  if (cmp) {
+    var spyLast = cmp.spy[cmp.spy.length - 1];
+    svg += '<path d="' + path(cmp.spy) + '" class="spy"/>'
+      + '<circle cx="' + x(spyLast.t).toFixed(1) + '" cy="' + y(spyLast.v).toFixed(1) + '" r="3" class="spy"/>';
+    labels.push({ y: y(spyLast.v), text: fmtPctChange(spyLast.v), cls: 'spy' });
+  }
+  labels.sort(function (a, b) { return a.y - b.y; });
+  for (var k = 1; k < labels.length; k++) labels[k].y = Math.max(labels[k].y, labels[k - 1].y + 14);
   svg += '<path d="' + line + '" class="px"/>'
     + '<line x1="' + padL + '" x2="' + (W - padR) + '" y1="' + yl + '" y2="' + yl + '" class="lvl"/>'
     + '<circle cx="' + x(last.t).toFixed(1) + '" cy="' + y(last.v).toFixed(1) + '" r="3" class="now"/>'
-    + '<text x="' + (W - padR + 6) + '" y="' + (y(last.v) + 4).toFixed(1) + '" class="lbl now">' + px2(last.v) + '</text>'
-    + '<text x="' + (W - padR + 6) + '" y="' + (Number(yl) + 4).toFixed(1) + '" class="lbl lvl">' + px2(lim.row.limit) + '</text>'
+    + labels.map(function (l) {
+        return '<text x="' + (W - padR + 6) + '" y="' + (l.y + 4).toFixed(1) + '" class="lbl ' + l.cls + '">' + l.text + '</text>';
+      }).join('')
     + '</svg>';
   return svg;
+}
+// The checkbox above the chart, and under it the change of each line since the first day shown.
+function whyCompareHtml(sec, cmp) {
+  if (sec.sym === 'SPY' || !superMap.SPY) return { box: '', legend: '' };
+  var box = '<label class="xp-whycmp"><input type="checkbox" id="exportWhyCmp"' + (_whyCompare ? ' checked' : '')
+    + '> Compare to S&amp;P 500 (SPY)</label>';
+  if (!_whyCompare) return { box: box, legend: '' };
+  if (!cmp) {
+    return { box: box, legend: '<p class="xp-whylegend">'
+      + (_whySpyFailed ? 'S&amp;P 500 prices did not load. Try again in a minute.' : 'Loading S&amp;P 500 prices…') + '</p>' };
+  }
+  var tk = cmp.tk[cmp.tk.length - 1].v, spy = cmp.spy[cmp.spy.length - 1].v;
+  var since = new Date(cmp.tk[0].t * 1000).toLocaleString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return { box: box, legend: '<p class="xp-whylegend">Since ' + since + ': <b>' + escHtml(sec.sym) + ' ' + fmtPctChange(tk)
+    + '</b> · <b class="spy">S&amp;P 500 ' + fmtPctChange(spy) + '</b></p>' };
 }
 function refreshWhyPanel() {
   var panel = document.getElementById('exportWhy');
@@ -4405,11 +4488,21 @@ function refreshWhyPanel() {
     bullets.push('One order at ' + px2(lim.row.limit) + ' covers ' + (count === 2 ? 'both' : 'all ' + count) + ', because a drop reaches it first.');
   }
   bullets.push('Strength: ' + STRENGTH_WORD[tier] + ', because ' + strengthReason(lim) + '.');
+  var showCmp = _whyCompare && sec.sym !== 'SPY' && !!superMap.SPY;
+  var cmp = showCmp ? whyComparison(sec) : null;
+  if (showCmp && !cmp && !whySpyCandles() && !_whySpyFailed) {
+    loadOnce(window.FEARLAB_REG, 'data-', superMap.SPY.key,
+      function () { if (_whyOpen) refreshWhyPanel(); },
+      function () { _whySpyFailed = true; if (_whyOpen) refreshWhyPanel(); });
+  }
+  var cmpHtml = whyCompareHtml(sec, cmp);
   document.getElementById('exportWhyBody').innerHTML =
       '<div class="xp-whyhead"><span class="xp-sym">' + escHtml(sec.sym) + '</span><span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span></div>'
     + '<div class="xp-whypx tier-' + tier + '">' + px2(lim.row.limit) + '</div>'
     + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' the ' + closeLabel(sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(sec.close) + '</div>'
-    + whyChartSvg(sec, lim)
+    + cmpHtml.box
+    + whyChartSvg(sec, lim, cmp)
+    + cmpHtml.legend
     + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>';
   panel.hidden = false;
   document.getElementById('exportBody').classList.add('why-open');
@@ -4597,11 +4690,13 @@ function saveExportEditor() {
   var clash = _exportGroups.filter(function (g) { return g.id !== _edGroupId && g.name.toLowerCase() === name.toLowerCase(); })[0];
   if (clash) { setEditorMsg('You already have a group named ' + clash.name + '.', true); return; }
   if (!_edGroupId && _exportGroups.length >= 30) { setEditorMsg('You can keep up to 30 groups.', true); return; }
-  var before = _exportGroups.map(function (g) { return { id: g.id, name: g.name, syms: g.syms.slice() }; });
+  var before = _exportGroups.map(cloneExportGroup);
   var id = _edGroupId;
   if (id) {
     var g = exportGroupById(id);
     g.name = name; g.syms = _edSyms.slice();
+    if (g.onlyHere) g.onlyHere = g.onlyHere.filter(function (s) { return g.syms.indexOf(s) >= 0; });
+    if (g.onlyHere && !g.onlyHere.length) delete g.onlyHere;
   } else {
     id = newExportGroupId();
     _exportGroups.push({ id: id, name: name, syms: _edSyms.slice() });
@@ -4798,7 +4893,8 @@ function wireExportDialog() {
   // add a ticker from here: one already on the chart row is just brought up, a new one builds
   var exportAddSearch = wireTickerSearch(document.getElementById('exportAddSym'), document.querySelector('#exportDialog .box'), function (sym) {
     var SYM = String(sym).toUpperCase();
-    if (visibleTickerSymbols().indexOf(SYM) >= 0) {
+    _exportAddTarget = { tab: _exportActive, wasShown: visibleTickerSymbols().indexOf(SYM) >= 0 };
+    if (_exportAddTarget.wasShown) {
       document.getElementById('exportAddSym').value = '';
       exportTickerAdded(SYM);
       return;
@@ -4807,6 +4903,15 @@ function wireExportDialog() {
   });
   document.getElementById('exportAddBtn').onclick = exportAddSearch.submit;
   document.getElementById('exportWhyClose').onclick = function () { closeWhyPanel(true); };
+  document.getElementById('exportWhyBody').addEventListener('change', function (e) {
+    if (e.target.id !== 'exportWhyCmp') return;
+    _whyCompare = e.target.checked;
+    _whySpyFailed = false;   // a fresh tick tries the S&P prices again
+    try { localStorage.setItem(WHY_CMP_KEY, _whyCompare ? '1' : '0'); } catch (err) {}
+    refreshWhyPanel();
+    var box = document.getElementById('exportWhyCmp');
+    if (box) box.focus();
+  });
   window.addEventListener('resize', function () { if (_whyOpen) setWhyInert(); });
   Array.prototype.forEach.call(document.querySelectorAll('#exportViewSwitch button'), function (b) {
     b.onclick = function () { setExportView(b.getAttribute('data-view')); };
@@ -5266,18 +5371,67 @@ function doAddTicker(from) {
     });
   }
 }
-// The dialog's add landed: show the ticker in the dialog's list, ticked, and
-// jump to its prices once they build. A group tab that lacks it switches to
-// All tickers so the new row is visible.
+// The dialog's add landed: file the ticker under the tab it was added on, show
+// it in the dialog's list, ticked, and jump to its prices once they build.
+var _exportAddTarget = null;   // { tab, wasShown } as the dialog's add started
 function exportTickerAdded(sym) {
+  var target = _exportAddTarget || { tab: 'all', wasShown: true };
+  _exportAddTarget = null;
+  fileAddedTicker(sym, target);
   if (!document.getElementById('exportDialog').classList.contains('open')) return;
-  if (exportTabSymbols(_exportActive).indexOf(sym) < 0 && _exportActive !== 'all') selectExportTab('all');
+  var show = exportTabSymbols(_exportActive).indexOf(sym) >= 0 ? _exportActive
+    : exportGroupById(target.tab) && exportTabSymbols(target.tab).indexOf(sym) >= 0 ? target.tab : 'all';
+  if (show !== _exportActive) selectExportTab(show);
   else { rememberExportPicks(); renderExportPicks(); }
   var box = document.querySelector('#exportPicks input[value="' + sym + '"]');
   if (box && !box.checked) { box.checked = true; rememberExportPicks(); }
   updateExportPickCount();
   _exportGoPending = sym;
   scheduleExportBuild(0);
+}
+
+// Added on a group tab, the ticker joins that group, and one new to the chart
+// row stays off All tickers (user, 2026-10-11). Added on All tickers, a ticker
+// kept off it joins it again. A failed save puts the groups back.
+function fileAddedTicker(sym, target) {
+  if (_exportGroupsLocked) return;
+  var before = _exportGroups.map(cloneExportGroup), changed = false;
+  if (target.tab === 'all') {
+    _exportGroups.forEach(function (g) {
+      if (!g.onlyHere || g.onlyHere.indexOf(sym) < 0) return;
+      g.onlyHere = g.onlyHere.filter(function (s) { return s !== sym; });
+      if (!g.onlyHere.length) delete g.onlyHere;
+      changed = true;
+    });
+  } else {
+    var g = exportGroupById(target.tab);
+    if (!g) return;
+    if (g.syms.indexOf(sym) < 0) {
+      if (g.syms.length >= 100) {
+        var msg = document.getElementById('exportAddMsg');
+        msg.textContent = g.name + ' already holds 100 tickers, so ' + sym + ' went to All tickers.';
+        msg.classList.add('error');
+        return;
+      }
+      g.syms.push(sym);
+      changed = true;
+    }
+    if (!target.wasShown && (g.onlyHere || []).indexOf(sym) < 0) {
+      g.onlyHere = (g.onlyHere || []).concat(sym);
+      changed = true;
+    }
+  }
+  if (!changed) return;
+  var openGen = _exportOpenGen;
+  _groupSaving = true;
+  saveExportGroups().then(function (ok) {
+    _groupSaving = false;
+    if (ok || openGen !== _exportOpenGen) return;   // a reopen reloads the groups from their store
+    _exportGroups = before;
+    if (!document.getElementById('exportDialog').classList.contains('open')) return;
+    renderExportTabs();
+    selectExportTab(_exportActive);
+  });
 }
 
 // --- ticker search under the add boxes (toolbar and Limit Buy dialog):

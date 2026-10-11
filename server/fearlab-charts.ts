@@ -452,7 +452,9 @@ const MAX_GROUP_NAME = 40;
 const MAX_GROUP_SYMBOLS = 100;
 const GROUP_ID_RE = /^[a-z0-9]{1,24}$/;
 
-export type TickerGroup = { id: string; name: string; symbols: string[] };
+// onlyHere: members added from inside this group, which the dialog keeps off
+// its All tickers tab. Always a subset of symbols; omitted when empty.
+export type TickerGroup = { id: string; name: string; symbols: string[]; onlyHere?: string[] };
 
 /** Drop malformed groups, trim names, dedupe ids and names, cap every list. */
 // inputSanitizer runs on every request body and HTML-encodes text ("S&P 500"
@@ -479,9 +481,10 @@ export function normalizeTickerGroups(value: unknown): TickerGroup[] {
     if (!GROUP_ID_RE.test(id) || ids.has(id) || !name || names.has(name.toLowerCase())) continue;
     const symbols = normalizeTickerOrder((raw as any).symbols).slice(0, MAX_GROUP_SYMBOLS);
     if (!symbols.length) continue;
+    const onlyHere = normalizeTickerOrder((raw as any).onlyHere).filter((s) => symbols.includes(s));
     ids.add(id);
     names.add(name.toLowerCase());
-    groups.push({ id, name, symbols });
+    groups.push(onlyHere.length ? { id, name, symbols, onlyHere } : { id, name, symbols });
     if (groups.length >= MAX_TICKER_GROUPS) break;
   }
   return groups;
