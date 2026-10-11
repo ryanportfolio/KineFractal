@@ -23,6 +23,8 @@ export interface FundFear {
   power: number;
   minPct: number;
   maxPct: number;
+  // the engine's confluence boost can raise this fund's fear buy above the plain rule
+  confluence: boolean;
 }
 
 export interface FearState {
@@ -53,6 +55,7 @@ export function useFearState(): FearState {
           power: f.power,
           minPct: f.minPct,
           maxPct: f.maxPct,
+          confluence: f.confluence,
         };
       }),
     ).then((results) => {
