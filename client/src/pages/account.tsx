@@ -406,7 +406,7 @@ export default function Account() {
             href={next}
             className="mb-6 flex items-center justify-between gap-4 border border-primary/60 rounded-lg px-5 py-4 font-mono text-sm text-primary hover:bg-primary/5"
           >
-            <span>Signed in. Your account is ready to use on {nextLabel(next)}.</span>
+            <span>You're signed in.</span>
             <span className="uppercase tracking-widest text-xs">Back to {nextLabel(next)} →</span>
           </a>
         )}

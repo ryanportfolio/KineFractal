@@ -3,6 +3,7 @@
 
 const NEXT_LABELS: Record<string, string> = {
   "/charts/": "charts",
+  "/alerts": "alerts",
 };
 
 /** The `next` value if it is a safe same-origin path, else null. */

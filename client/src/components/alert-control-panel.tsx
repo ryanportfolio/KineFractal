@@ -190,11 +190,22 @@ function NumberField({
   large?: boolean;
 }) {
   // The field edits a draft string so it can sit empty or half-typed; only a
-  // number within [min, max] reaches the settings (and so the autosave).
+  // number within [min, max] reaches the settings (and so the autosave). A
+  // whole-number step means a whole-number setting, so decimals stay a draft.
+  // A valid draft goes out after a short pause (or on blur), so typing "2.5"
+  // never sends the "2" on its way to an invalid value.
   const [draft, setDraft] = useState(String(value));
+  const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cancelPush = () => {
+    if (pushTimer.current) clearTimeout(pushTimer.current);
+    pushTimer.current = null;
+  };
+  useEffect(() => cancelPush, []);
   const parse = (raw: string) => {
     const next = Number(raw);
-    return raw.trim() !== "" && Number.isFinite(next) && next >= min && next <= max ? next : null;
+    if (raw.trim() === "" || !Number.isFinite(next) || next < min || next > max) return null;
+    if (Number.isInteger(step) && !Number.isInteger(next)) return null;
+    return next;
   };
   useEffect(() => {
     // follow outside changes, but keep a draft that already means this value ("4.50")
@@ -216,11 +227,18 @@ function NumberField({
           value={draft}
           onChange={(event) => {
             setDraft(event.target.value);
+            cancelPush();
             const next = parse(event.target.value);
-            if (next !== null && next !== value) onChange(next);
+            if (next !== null && next !== value) pushTimer.current = setTimeout(() => {
+              pushTimer.current = null;
+              onChange(next);
+            }, 400);
           }}
           onBlur={() => {
-            if (parse(draft) === null) setDraft(String(value));
+            cancelPush();
+            const next = parse(draft);
+            if (next === null) setDraft(String(value));
+            else if (next !== value) onChange(next);
           }}
           className={`min-w-0 flex-1 bg-transparent px-3 py-2 font-mono tabular-nums text-beam-hot outline-none ${large ? "text-xl" : "text-sm"}`}
         />
@@ -428,6 +446,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     }));
     setStatusZone(zone);
     setStatus(null);
+    setError(null);
   };
 
   const updateDaily = (patch: Partial<GapDailySettings>) => {
@@ -440,6 +459,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     }));
     setStatusZone("daily");
     setStatus(null);
+    setError(null);
   };
 
   const toggleKind = (kind: (typeof ALERT_KINDS)[number], enabled: boolean) => {
@@ -450,6 +470,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
     }
     setPrefs((current) => setAlertEnabled(current, kind, enabled, canEnable));
     setStatus(null);
+    setError(null);
   };
 
   const persist = useCallback(async (snapshot: AlertPrefsState, snapshotKey: string) => {
@@ -508,16 +529,17 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
 
   // Every zone keeps an empty live region in the page so screen readers
   // announce the status when it lands in whichever zone was last changed.
+  // An edit still waiting to go out outranks "saved" from an earlier save.
   const saveStatus = (zone: StatusZone) => (
     <div aria-live="polite" className="mt-4 min-h-5 font-mono text-xs">
       {statusZone !== zone ? null : error ? (
         <span className="text-red-400">{error}</span>
       ) : saving ? (
         <span className="text-beam-dim">saving settings…</span>
-      ) : status ? (
-        <span className="text-beam-mid">{status}</span>
       ) : dirty ? (
         <span className="text-beam-dim">changes pending…</span>
+      ) : status ? (
+        <span className="text-beam-mid">{status}</span>
       ) : null}
     </div>
   );
