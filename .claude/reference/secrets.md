@@ -14,7 +14,7 @@ All are Railway variables on the `web` service. Unset locally, the matching feat
 | `FEARLAB_S3_BUCKET`, `FEARLAB_S3_PREFIX` | Worker's artifact bucket and key prefix | `server/fearlab-live.ts` |
 | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `AWS_ENDPOINT_URL_S3` (or `AWS_ENDPOINT_URL`) | S3-compatible bucket access (SDK default credential chain) | `server/fearlab-live.ts` |
 | `CHART_BUILDER_URL`, `CHART_BUILDER_SECRET` | Engine `chart-builder` service for per-account tickers | `server/fearlab-charts.ts` |
-| `TIINGO_API_KEY` (legacy name `VITE_T`) | Tiingo market data | `server/routes.ts` |
+| `TIINGO_API_KEY` (legacy name `VITE_T`) | Tiingo market data and ticker search | `server/routes.ts`, `server/symbol-search.ts` |
 | `OPENROUTER_API` | Ratio Relevance analysis via OpenRouter | `server/openrouter-ratio.ts` |
 | `PORT` | Listen port (default 5000) | `server/app.ts` |
 

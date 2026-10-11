@@ -30,6 +30,8 @@ Two related traps: `canvas.clientWidth` reports unzoomed CSS px, so a WebGL canv
 
 Radix tooltips (Floating UI) hit the same zoom: the popper writes on-screen px as a CSS translate, the root zoom multiplies it again, and at 1440px and up the box landed right of and below its trigger, cut off at the viewport edge (Alerts panel `?` help, 2026-10-09). `index.css` now unzooms `[data-radix-popper-content-wrapper]` and rezooms its child; keep that rule if a new Radix popover, menu or select is added.
 
+Firefox 140 ESR also reports ResizeObserver's `contentRect` in zoomed px (Firefox 157 and Chrome report layout px). Recharts' `ResponsiveContainer` sizes from it, so the chart was drawn in screen px while Recharts divided the mouse position by the zoom, and the hovered point landed at 1/1.4 of the cursor (ratio page, 2026-10-10). Recharts charts use `LayoutSizedChart` (`client/src/components/layout-sized-chart.tsx`), which sizes from `offsetWidth`/`offsetHeight`; a ResizeObserver that sizes anything should read those, not `contentRect`. Chrome alone will not show this: reproduce in Firefox ESR (`npx @puppeteer/browsers install firefox@esr_140.0esr`, driven with puppeteer-core).
+
 ### 2026-09-28: A Playwright locator call skews frame-time measurements
 
 Any `page.locator(...)` call (even `.count()`) injects Playwright's helper script into the page, and from then on requestAnimationFrame intervals in headed Chrome can sit at 30-40 ms instead of the panel's 10 ms. It hit the untouched home page as well as the About film, so it is the harness, not the site. A frame-time check that called `locator().count()` before measuring failed at 30 ms; the same sweep without it measured 10 ms.

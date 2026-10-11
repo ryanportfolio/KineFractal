@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
+import { LayoutSizedChart } from '@/components/layout-sized-chart';
 import { Link } from 'wouter';
 import { AlertTriangle, ArrowLeft, Play, Clock, RefreshCw, Menu, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -877,7 +878,7 @@ export default function SectorRotation() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="h-[500px]">
-                        <ResponsiveContainer width="100%" height="100%">
+                        <LayoutSizedChart>
                             <LineChart data={chartData}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#333" />
                                 <XAxis 
@@ -907,7 +908,7 @@ export default function SectorRotation() {
                                     );
                                 })}
                             </LineChart>
-                        </ResponsiveContainer>
+                        </LayoutSizedChart>
                     </CardContent>
                 </Card>
             )}

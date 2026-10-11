@@ -5,7 +5,8 @@ import { Navbar } from '@/components/navbar';
 import { SectorToolsMenu } from '@/components/sector-tools-menu';
 import { useDocumentMeta } from '@/hooks/use-document-meta';
 import { RatioRelevanceTerminal, type ModuleSignals } from '@/components/ratio-relevance-terminal';
-import { LineChart, Line, XAxis, YAxis, ReferenceLine, ResponsiveContainer, Tooltip, Area, AreaChart } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, ReferenceLine, Tooltip, Area, AreaChart } from 'recharts';
+import { LayoutSizedChart } from '@/components/layout-sized-chart';
 import type { MarketDataFreshness } from '@shared/market-data';
 
 interface TimeSeriesPoint {
@@ -435,7 +436,7 @@ function RatioWaveChart({
         </div>
       </div>
       <div className="h-24">
-        <ResponsiveContainer width="100%" height="100%">
+        <LayoutSizedChart>
           <AreaChart data={data} margin={{ top: 2, right: 5, left: 0, bottom: 2 }}>
             <defs>
               <linearGradient id={`${gradientId}-stroke`} x1="0" y1="0" x2="0" y2="1">
@@ -490,7 +491,7 @@ function RatioWaveChart({
               activeDot={{ r: 3, fill: strokeColor, stroke: '#000' }}
             />
           </AreaChart>
-        </ResponsiveContainer>
+        </LayoutSizedChart>
       </div>
       <div className="flex justify-between mt-1 font-mono text-[9px] text-white/30">
         <span>3 Years Ago</span>
