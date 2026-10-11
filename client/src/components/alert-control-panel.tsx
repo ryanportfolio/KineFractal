@@ -895,7 +895,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         <div className="mt-9 border-t border-[hsl(var(--beam-ghost))] pt-7">
           <div className="flex items-center gap-2">
             <div className="min-w-0">
-              <Toggle checked={weekly.confluenceEnabled} onChange={(checked) => updateWeekly("confluence", { confluenceEnabled: checked })} label="Include gap + order block levels" large />
+              <Toggle checked={weekly.confluenceEnabled} onChange={(checked) => updateWeekly("confluence", { confluenceEnabled: checked })} label="Gap + order block levels" large />
             </div>
             <InfoTip label="Gap + order block levels" text={CONTROL_HELP.confluence} large />
           </div>
