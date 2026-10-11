@@ -75,3 +75,13 @@ A failed Drizzle query throws an error whose `message` is only `Failed query: <s
 Several tests read source files as text instead of rendering them: `scripts/alerts-ux.test.mjs` (the on-by-default insert in `server/alerts-routes.ts`, the `InfoTip` structure in `alert-control-panel.tsx`, and a ban on sentence-ending full stops in visible prose of `alerts.tsx` and `alert-control-panel.tsx`), `client/src/pages/alerts-copy.test.tsx` (exact hero and signed-out sentences) and `client/src/components/alert-control-panel.test.tsx` (exact class strings). Changing the opt-in default or the page copy failed `npm test` in two rounds whose write scope left these files out. Before changing alerts behavior or wording, grep the tests for the strings you are changing and update only the assertions the change overturns.
 
 Related: the site's root font size is 22px at some widths, so Tailwind rem classes (`h-11`, `gap-3`, `text-xs`) render larger than their nominal pixel sizes. Use px values (`h-[44px]`) where an exact size matters, such as 44px touch targets.
+
+### 2026-10-11: Local server checks: charts.html is read once, test sign-ups can email, and repeated runs hit the API limit
+
+Three things cost reruns while checking the Limit Buy dialog and /alerts against a local server:
+
+- The server reads `server/charts-app/charts.html` once and serves it from memory (`readLocalChartsHtml` in `server/fearlab-charts.ts`). After editing the page, restart the dev server; a browser check otherwise runs the old page while the React pages already show the new code.
+- On this machine the shell can carry a real `RESEND_API_KEY`. A local sign-up then tries to send the verification email through Resend (it refused `example.com` addresses with 422). Start the dev server with `RESEND_API_KEY=` for local checks.
+- Several browser-check runs in a row exhaust the in-memory `/api/` rate limit and every API call returns 429 ("Too many API requests"). Restarting the server resets it.
+
+For a throwaway database without Docker or a Postgres install, PGlite works: `@electric-sql/pglite` plus `@electric-sql/pglite-socket` in a scratch folder, apply `migrations/*.sql` with `--> statement-breakpoint` removed, serve on a local port, and point `DATABASE_URL` at it with `?sslmode=disable` (`server/db.ts` asks for TLS on any non-`railway.internal` host).
