@@ -352,8 +352,12 @@ export function registerAlertsRoutes(app: Express): void {
           return res.status(403).json({ error: "accept the current terms before enabling alerts", code: "TOS_REQUIRED" });
         }
         // Re-enabling clears a prior unsubscribe-all suppression for this address —
-        // an explicit signed-in opt-in outranks the old opt-out.
-        await db.delete(emailSuppression).where(eq(emailSuppression.email, u.email.toLowerCase()));
+        // an explicit signed-in opt-in outranks the old opt-out. A bounce or spam
+        // complaint suppression stays: the mailbox or its owner refused our mail.
+        await db.delete(emailSuppression).where(and(
+          eq(emailSuppression.email, u.email.toLowerCase()),
+          eq(emailSuppression.reason, "unsubscribe_all"),
+        ));
       }
       await db
         .insert(alertPrefs)
@@ -388,16 +392,23 @@ export function registerAlertsRoutes(app: Express): void {
   // (mail clients POST with no body) AND the landing page's confirm action.
   app.get("/api/alerts/unsubscribe", (req: Request, res: Response) => {
     const parsed = verifyUnsubToken(String(req.query.token || ""));
-    if (!parsed) return res.status(400).send(unsubPage("Invalid or expired unsubscribe link.", null));
+    if (!parsed) return res.status(400).send(unsubPage("This unsubscribe link is not valid.", null));
     res.send(unsubPage(null, String(req.query.token)));
   });
 
   app.post("/api/alerts/unsubscribe", async (req: Request, res: Response) => {
     try {
+      // The landing page's form sends from=page and gets a page back; a mail
+      // client's one-click POST gets JSON, which it ignores.
+      const fromPage = req.body?.from === "page";
       const parsed = verifyUnsubToken(String(req.query.token || ""));
-      if (!parsed) return res.status(400).json({ error: "invalid token" });
+      if (!parsed) {
+        return fromPage
+          ? res.status(400).send(unsubPage("This unsubscribe link is not valid.", null))
+          : res.status(400).json({ error: "invalid token" });
+      }
       await applyUnsubscribe(parsed.userId, parsed.kind);
-      // One-click callers ignore the body; the landing page reads ok.
+      if (fromPage) return res.send(unsubPage(null, null, true));
       res.json({ ok: true });
     } catch (e: any) {
       console.error("[alerts] unsubscribe failed:", e?.message ?? e);
@@ -433,11 +444,15 @@ export function registerAlertsRoutes(app: Express): void {
   });
 }
 
-function unsubPage(error: string | null, token: string | null): string {
+function unsubPage(error: string | null, token: string | null, done = false): string {
   const body = error
     ? `<p class="err">${error}</p>`
+    : done
+    ? `<p>You're unsubscribed. These alert emails will stop.</p>
+       <p class="mut">You can turn alerts back on any time from your account page.</p>`
     : `<p>Stop receiving these alert emails?</p>
        <form method="POST" action="/api/alerts/unsubscribe?token=${encodeURIComponent(token || "")}">
+         <input type="hidden" name="from" value="page">
          <button type="submit">Unsubscribe</button>
        </form>
        <p class="mut">You can re-enable alerts any time from your account page.</p>`;
