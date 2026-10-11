@@ -66,6 +66,16 @@ export const chartGroupsLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// charts.html "add ticker" search: one lookup per pause in typing, answered
+// from an in-memory cache when the same query repeats.
+export const symbolSearchLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 150,
+  message: { error: 'Too many ticker searches, please wait a few minutes and try again' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // /labels (charts.html hand-lines sync): outside /api so the general limiter
 // skips it, and drawing fires one small POST per edit — generous but bounded.
 export const linesLimiter = rateLimit({
@@ -265,6 +275,10 @@ export function setupSecurity(app: Express) {
   // charts.html Export ticker groups: a new route, so it takes the site's
   // CSRF token (the page fetches /api/csrf-token before each save).
   app.use('/api/chart-groups', chartGroupsLimiter, csrfProtection);
+
+  // charts.html ticker search: read-only GET, signed-in only. Outside /api
+  // (like /labels) so typing does not spend the shared API counter.
+  app.use('/charts/symbol-search', symbolSearchLimiter);
   
   console.log('[Security] Security middleware initialized with enhanced protections');
 }

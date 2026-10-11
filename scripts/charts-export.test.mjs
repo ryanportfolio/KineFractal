@@ -17,7 +17,7 @@ test("tickers show full names and an instant tooltip on hover and keyboard focus
   assert.match(html, /<div id="exportTip" role="tooltip" hidden><\/div>/);
   assert.match(html, /dialog\.addEventListener\('mouseover'/);
   assert.match(html, /dialog\.addEventListener\('focusin'/);
-  assert.match(html, /label\.setAttribute\('data-tip', tickerTip\(sym\)\)/);
+  assert.match(html, /row\.setAttribute\('data-tip', tickerTip\(sym\)\)/);
 });
 
 test("ticker groups save to the account with a CSRF token, else to this browser", () => {

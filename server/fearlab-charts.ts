@@ -45,6 +45,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { chartLines, chartPreferences, chartSymbols, symbolRequests } from "@shared/schema";
 import { sessionUser } from "./account-routes";
+import { registerSymbolSearchRoute } from "./symbol-search";
 import {
   getLatestPointer,
   getRunArtifactBytes,
@@ -262,6 +263,7 @@ export function registerFearlabChartsRoutes(app: Express): void {
   // browsers preflight it and there are no CORS headers) and the Better Auth
   // cookie is SameSite=Lax, so cross-site forgery can't reach it.
   registerChartSymbolRoutes(app);
+  registerSymbolSearchRoute(app);
 }
 
 // --- hand-lines storage ------------------------------------------------------
