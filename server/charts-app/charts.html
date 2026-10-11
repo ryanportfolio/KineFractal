@@ -4613,6 +4613,7 @@ var _gapSaved = 'top';          // what the account holds
 var _gapSaving = false;
 var _gapQueued = null;
 var _gapClickedEarly = false;   // clicked while the account was still loading
+var _gapEdits = 0;              // bumps on every click; a failed save rolls back only if none came after it
 function setGapMsg(text) {
   var el = document.getElementById('exportGapMsg');
   el.textContent = text;
@@ -4621,7 +4622,7 @@ function setGapMsg(text) {
 function saveGapPlacement(p) {
   if (_gapSaving) { _gapQueued = p; return; }
   _gapSaving = true;
-  var failed = false;
+  var failed = false, editsAtStart = _gapEdits;
   putExportGroups(JSON.stringify({ gapPlacement: p }), false, '/api/chart-prefs')
     .then(function () { _gapSaved = p; }, function () { failed = true; })
     .then(function () {
@@ -4629,7 +4630,7 @@ function saveGapPlacement(p) {
       var next = _gapQueued;
       _gapQueued = null;
       if (next !== null && next !== _gapSaved) return saveGapPlacement(next);
-      if (failed && next === null) {
+      if (failed && next === null && _gapEdits === editsAtStart) {
         setGapPlacement(_gapSaved, false);
         scheduleExportBuild(0);
         setGapMsg('Could not save the gap setting to your account, so it is back to ' + (_gapSaved === 'fill' ? 'full fill' : _gapSaved) + '. Try again in a minute.');
@@ -4643,6 +4644,7 @@ function setGapPlacement(p, byUser) {
   renderGapPlacement();
   try { localStorage.setItem(GAP_PLACEMENT_KEY, p); } catch (e) {}
   if (!byUser) return;
+  _gapEdits++;
   setGapMsg('');
   if (changed) scheduleExportBuild(0);
   if (_gapPlacementAccount) saveGapPlacement(p);
