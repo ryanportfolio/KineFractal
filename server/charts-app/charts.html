@@ -4459,7 +4459,7 @@ function whyChartSvg(sec, lim, cmp) {
 function whyCompareHtml(sec, cmp) {
   if (sec.sym === 'SPY' || !superMap.SPY) return { box: '', legend: '' };
   var box = '<label class="xp-whycmp"><input type="checkbox" id="exportWhyCmp"' + (_whyCompare ? ' checked' : '')
-    + '> Compare to S&amp;P 500 (SPY)</label>';
+    + '> Compare to S&amp;P 500</label>';
   if (!_whyCompare) return { box: box, legend: '' };
   if (!cmp) {
     return { box: box, legend: '<p class="xp-whylegend">'
