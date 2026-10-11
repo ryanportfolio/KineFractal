@@ -55,7 +55,6 @@ test("each card leads with the nearest strong price, in plain words, with a why 
   assert.match(html, /if \(row\.type === 'gap'\) return 'A price gap from earlier has not been filled yet';/);
   assert.match(html, /<aside id="exportWhy" aria-labelledby="exportWhyTitle" hidden>/);
   assert.match(html, /if \(_whyOpen\) closeWhyPanel\(true\);/);
-  assert.match(html, /Chart signals are clues, not guarantees; prices can keep falling\./);
 });
 
 test("results switch between cards and one table, reasons stay in tooltips", () => {

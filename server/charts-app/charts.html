@@ -431,7 +431,6 @@
   #exportDialog .xp-head .xp-filters { grid-area:filters; justify-self:center; }
   #exportDialog .xp-headact { grid-area:act; display:flex; flex-direction:column; align-items:center; gap:4px; }
   #exportDialog .xp-head h2 { margin:2px 0 4px; font-size:20px; letter-spacing:.02em; }
-  #exportDialog .xp-lede { margin:0; color:var(--mut); font:14px monospace; }
   #exportClose { grid-area:close; justify-self:end; align-self:start; }
   /* group tabs */
   #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid);
@@ -566,17 +565,9 @@
   #exportDialog .xp-hero { display:block; width:100%; padding:12px 14px; border:0; background:none; text-align:left; cursor:pointer; }
   .xp-herolabel { display:block; color:var(--mut); font:14px monospace; letter-spacing:.04em; }
   .xp-heromain { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 16px; margin-top:2px; }
-  .xp-heromain .xp-strength { align-self:center; }
   .xp-heropx { font:bold 36px Verdana,Geneva,sans-serif; letter-spacing:-.01em; }
   .xp-heropct { font:18px Verdana,Geneva,sans-serif; color:var(--fg); }
   .xp-lmeta { display:flex; align-items:center; flex-wrap:wrap; gap:4px 12px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; }
-  .xp-strength { display:inline-flex; align-items:center; gap:6px; }
-  .xp-meter { display:inline-flex; align-items:flex-end; gap:2px; height:13px; }
-  .xp-meter i { display:block; width:4px; background:var(--grid); }
-  .xp-meter i:nth-child(1) { height:5px; } .xp-meter i:nth-child(2) { height:9px; } .xp-meter i:nth-child(3) { height:13px; }
-  .xp-meter.strong i.on { background:var(--cbuy); } .xp-meter.mid i.on { background:var(--fg); } .xp-meter.light i.on { background:var(--mut); }
-  .xp-sword { font:bold 12px monospace; }
-  .tier-strong .xp-sword { color:var(--cbuy); } .tier-mid .xp-sword { color:var(--fg); } .tier-light .xp-sword { color:var(--mut); }
   .xp-reason { color:var(--fg); }
   .xp-comb { color:var(--mut); font:14px monospace; }
   .xp-why { font-size:14px; }
@@ -590,8 +581,8 @@
   #exportDialog .xp-more::after { content:" ›"; }
   #exportDialog .xp-more[aria-expanded="true"]::after { content:" ‹"; }
   #exportDialog .xp-more:hover { background:rgba(38,198,218,.06); }
-  /* other prices: price | % below | strength, one aligned row each */
-  #exportDialog .xp-rrow { display:grid; grid-template-columns:minmax(100px,max-content) minmax(110px,max-content) auto; align-items:center; gap:4px 18px; width:100%;
+  /* other prices: price | % below, one aligned row each */
+  #exportDialog .xp-rrow { display:grid; grid-template-columns:minmax(100px,max-content) minmax(110px,max-content); align-items:center; gap:4px 18px; width:100%;
                            padding:8px 14px; border:0; border-top:1px solid var(--grid); background:none; text-align:left; cursor:pointer; }
   #exportDialog .xp-hero:hover, #exportDialog .xp-rrow:hover { background:rgba(38,198,218,.06); }
   #exportDialog .xp-hero:focus-visible, #exportDialog .xp-rrow:focus-visible { outline:2px solid var(--sup); outline-offset:-2px; }
@@ -643,7 +634,6 @@
   .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
   .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; line-height:1.55; }
   .xp-whylist li { margin-bottom:6px; }
-  .xp-whynote { margin:0; color:var(--mut); font:14px monospace; line-height:1.5; }
   @media (max-width:900px) {
     #exportWhy { position:fixed; inset:0; z-index:79; border-left:0; }
   }
@@ -854,7 +844,6 @@
       <div class="copy">
         <div class="ticker-reorder-eyebrow">chart watchlist</div>
         <h2 id="exportTitle">Limit-buy levels</h2>
-        <p class="xp-lede">Price levels below the latest close, for limit orders you place in your own broker.</p>
       </div>
       <div class="xp-filters">
         <div class="xp-field-group">
@@ -3241,6 +3230,32 @@ function applyTickerOrder(saved) {
   SUPER_SYMS = ordered.concat(SUPER_SYMS.filter(function (symbol) { return !inOrder[symbol]; }));
   return ordered;
 }
+// A newly added ticker joins the row where it falls alphabetically, and the
+// rest of the row keeps its order (user, 2026-10-11): the first gap whose
+// neighbours sort on either side of it (NFLX between MSFT and NVDA), else the
+// spot that leaves the fewest tickers out of alphabetical order around it.
+function tickerSlot(order, sym) {
+  for (var i = 1; i < order.length; i++) {
+    if (order[i - 1] < sym && sym < order[i]) return i;
+  }
+  var best = 0, bestCost = Infinity;
+  for (var at = 0; at <= order.length; at++) {
+    var cost = 0;
+    for (var j = 0; j < order.length; j++) {
+      if (j < at ? order[j] > sym : order[j] < sym) cost++;
+    }
+    if (cost < bestCost) { best = at; bestCost = cost; }
+  }
+  return best;
+}
+function withTickerSlotted(sym) {
+  var order = visibleTickerSymbols().filter(function (s) { return s !== sym; });
+  order.splice(tickerSlot(order, sym), 0, sym);
+  // the row is redrawn from the saved order (applyTickerAccess); keep the slot
+  // there too while the save is in flight
+  if (SITE && _chartAccess && _chartAccess.account) _chartAccess.order = order.slice();
+  return order;
+}
 function preferredTickerOrder() {
   if (SITE && _chartAccess && _chartAccess.account) return _chartAccess.order || _tickerDefaultOrder;
   return readLocalTickerOrder();
@@ -4184,7 +4199,6 @@ function pctBelow(row) { return ((row.close - row.limit) / row.close) * 100; }
 // its strength as a word and a 3-bar meter, and "why?" opens a side panel with
 // a price chart of the last six months and the reasons in full.
 var STRENGTH_WORD = { strong: 'Strong', mid: 'Medium', light: 'Weaker' };
-var STRENGTH_BARS = { strong: 3, mid: 2, light: 1 };
 var _exportSecs = {};          // sym -> section of the last build (rows, candles, close), for the why panel
 var _exportExpanded = {};      // sym -> true while that card shows all its prices
 // A combined (stacked) limit is rated Strong: several signals agree on one price,
@@ -4210,13 +4224,9 @@ function strengthReason(lim) {
   if ((r.touches || 0) >= 10) return 'price bounced here ' + r.touches + ' times';
   return 'only a few touches on one timeframe';
 }
-function meterHtml(tier) {
-  var n = STRENGTH_BARS[tier] || 1, h = '';
-  for (var i = 1; i <= 3; i++) h += '<i class="' + (i <= n ? 'on' : '') + '"></i>';
-  return '<span class="xp-meter ' + tier + '" aria-hidden="true">' + h + '</span><span class="xp-sword">' + STRENGTH_WORD[tier] + '</span>';
-}
 // The reason a price is there lives in its tooltip, so the rows stay just
-// price, % below and strength; clicking the price opens the why panel.
+// price and % below, with the price's colour giving its strength (no strength
+// label on the cards, user 2026-10-11); clicking the price opens the why panel.
 function limitTip(lim) {
   var t = reasonText(lim.row);
   if (lim.members.length) t += ' · combines ' + lim.members.length + ' nearby price' + (lim.members.length === 1 ? '' : 's');
@@ -4339,8 +4349,7 @@ function exportCardsHtml(sections) {
       html += '<button class="xp-hero tier-' + tier + '"' + limitButtonAttrs(sec.sym, top, lead) + '>'
         + '<span class="xp-herolabel">' + (tier === 'strong' ? 'Nearest strong price' : 'Nearest price') + '</span>'
         + '<span class="xp-heromain"><span class="xp-heropx">' + px2(top.row.limit) + '</span>'
-        + '<span class="xp-heropct">' + pctBelowText(top.row) + '</span>'
-        + '<span class="xp-strength">' + meterHtml(tier) + '</span></span>'
+        + '<span class="xp-heropct">' + pctBelowText(top.row) + '</span></span>'
         + '</button>';
       var rest = limits.map(function (l, k) { return { lim: l, k: k }; }).filter(function (x) { return x.k !== lead; });
       if (rest.length) {
@@ -4353,7 +4362,6 @@ function exportCardsHtml(sections) {
           html += '<button class="xp-rrow tier-' + t + '"' + limitButtonAttrs(sec.sym, x.lim, x.k) + '>'
             + '<span class="xp-rpx">' + px2(x.lim.row.limit) + '</span>'
             + '<span class="xp-rpct">' + pctBelowText(x.lim.row) + '</span>'
-            + '<span class="xp-strength">' + meterHtml(t) + '</span>'
             + '</button>';
         });
         html += '</div>';
@@ -4442,8 +4450,7 @@ function refreshWhyPanel() {
     + '<div class="xp-whypx tier-' + tier + '">' + px2(lim.row.limit) + '</div>'
     + '<div class="xp-whypct">' + pctBelowText(lim.row) + ' the ' + closeLabel(sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(sec.close) + '</div>'
     + whyChartSvg(sec, lim)
-    + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>'
-    + '<p class="xp-whynote">Chart signals are clues, not guarantees; prices can keep falling. You place any order in your own broker.</p>';
+    + '<ul class="xp-whylist">' + bullets.map(function (b) { return '<li>' + escHtml(b) + '</li>'; }).join('') + '</ul>';
   panel.hidden = false;
   document.getElementById('exportBody').classList.add('why-open');
   markWhySelection();
@@ -5238,7 +5245,7 @@ function doAddTicker(from) {
               (_chartAccess.mine || []).indexOf(relow) < 0) {
             (_chartAccess.mine = _chartAccess.mine || []).push(relow);
             applyTickerAccess();
-            applyTickerOrder(preferredTickerOrder());
+            applyTickerOrder(withTickerSlotted(e.sym));
             persistTickerOrder();
             restored = true;
           }
@@ -5276,7 +5283,7 @@ function doAddTicker(from) {
             }
             applyTickerAccess();
           }
-          applyTickerOrder(preferredTickerOrder());
+          applyTickerOrder(withTickerSlotted(e.sym));
           persistTickerOrder();
           addSym.value = '';
           addMsg.textContent = 'added ' + e.sym;
