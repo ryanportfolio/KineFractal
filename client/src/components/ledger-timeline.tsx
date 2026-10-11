@@ -27,7 +27,9 @@ export function LedgerTimeline({ rows, drawn, instant }: { rows: RecentRow[]; dr
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const ro = new ResizeObserver(([entry]) => setWidth(Math.round(entry.contentRect.width)));
+    // offsetWidth, not contentRect: Firefox 140 ESR reports contentRect in zoomed
+    // px under the desktop root zoom (index.css, --pz)
+    const ro = new ResizeObserver(() => setWidth(el.offsetWidth));
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
