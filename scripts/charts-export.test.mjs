@@ -24,9 +24,18 @@ test("ticker groups save to the account with a CSRF token, else to this browser"
   assert.match(html, /var EXPORT_GROUPS_KEY = 'kf-export-groups-v1';/);
   assert.match(html, /fetch\('\/api\/chart-groups', \{ credentials: 'same-origin', cache: 'no-store' \}\)/);
   assert.match(html, /'X-CSRF-Token': token/);
-  assert.match(html, /if \(csrf\) return putExportGroups\(body, true\);/);
+  assert.match(html, /if \(csrf\) return putExportGroups\(body, true, url\);/);
   assert.match(html, /!remote\.length && guest\.length && siteEmail && !groupsSynced\(\)/);
   assert.match(html, /_exportGroupsLocked = maybeAccount;/);
+});
+
+test("gap limit placement prices gaps and saves to the account the emails read", () => {
+  assert.match(html, /<span id="exportGapWrap" class="xp-seg" role="group" aria-labelledby="exportGapLabel">/);
+  assert.match(html, /if \(_gapPlacement === 'fill'\) return g\.bottom;/);
+  assert.match(html, /if \(_gapPlacement === 'middle'\) return \(g\.top \+ g\.bottom\) \/ 2;/);
+  assert.match(html, /limit: r2\(gapLimit\(g\)\), type: 'gap'/);
+  assert.match(html, /fetch\('\/api\/chart-prefs', \{ credentials: 'same-origin', cache: 'no-store' \}\)/);
+  assert.match(html, /putExportGroups\(JSON\.stringify\(\{ gapPlacement: p \}\), false, '\/api\/chart-prefs'\)/);
 });
 
 test("Download never hands out rows from before the latest change, and bad ranges are shown, not replaced", () => {
@@ -67,7 +76,7 @@ test("results switch between cards and one table, reasons stay in tooltips", () 
 });
 
 test("the CSV columns and the stacked-level rule are unchanged", () => {
-  assert.match(html, /'Ticker,Limit price,Signal,Touches,Timeframes,Gap zone,Below close %,Last close'/);
+  assert.match(html, /'Ticker,Limit price,Signal,Times tested,Timeframe relevance,Gap zone,Below close %,Last close'/);
   assert.match(html, /var CLUSTER_PCT = 2;/);
   assert.match(html, /localStorage\.setItem\('kf-export-strength', mode\)/);
 });

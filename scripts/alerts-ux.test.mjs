@@ -55,9 +55,16 @@ test("alert preference autosave has a dedicated bounded rate limit", () => {
   assert.doesNotMatch(security, /app\.use\('\/api\/alerts\/prefs', strictLimiter, csrfProtection\);/);
 });
 
-test("eligible users get enabled defaults without overwriting explicit opt-outs", () => {
-  assert.match(routes, /u\.emailVerified && await hasAcceptedCurrentTos\(u\.id\)/);
-  assert.match(routes, /values\(\{ userId, kind, enabled: true \}\)/);
-  assert.match(routes, /onConflictDoNothing\(\)/);
-  assert.match(routes, /enabled: eligibleForDefaults/);
+test("alerts are opt-in: loading prefs creates nothing and enabling still needs a verified email and current terms", () => {
+  const getStart = routes.indexOf('app.get("/api/alerts/prefs"');
+  const putStart = routes.indexOf('app.put("/api/alerts/prefs"', getStart);
+  assert.ok(getStart >= 0 && putStart > getStart, "prefs GET and PUT handlers must be present");
+  const getHandler = routes.slice(getStart, putStart);
+  const putHandler = routes.slice(putStart);
+  assert.doesNotMatch(routes, /ensureDefaultAlertPrefs/);
+  assert.doesNotMatch(routes, /enabled: true/);
+  assert.doesNotMatch(getHandler, /\.insert\(/);
+  assert.match(getHandler, /\{ enabled: false, settings: normalizeAlertSettings\(kind, \{\}\) \}/);
+  assert.match(putHandler, /if \(enabled\) \{\s*if \(!u\.emailVerified\) \{\s*return res\.status\(403\)/);
+  assert.match(putHandler, /if \(!\(await hasAcceptedCurrentTos\(u\.id\)\)\) \{\s*return res\.status\(403\)/);
 });

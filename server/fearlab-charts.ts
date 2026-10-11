@@ -45,6 +45,7 @@ import express, { type Express, type Request, type Response } from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "./db";
 import { chartLines, chartPreferences, chartSymbols, symbolRequests } from "@shared/schema";
+import { DEFAULT_GAP_PLACEMENT, isGapPlacement, normalizeGapPlacement } from "@shared/gap-placement";
 import { sessionUser } from "./account-routes";
 import { registerSymbolSearchRoute } from "./symbol-search";
 import {
@@ -798,6 +799,57 @@ function registerChartSymbolRoutes(app: Express): void {
     } catch (e: any) {
       console.error("[FearLab charts] chart-groups save failed:", e?.message ?? e);
       res.status(500).json({ ok: false, error: "failed to save ticker groups" });
+    }
+  });
+
+  // GET /api/chart-prefs — this account's gap limit placement, shared by the
+  // Limit Buy dialog, the /alerts page and the weekly email. Same answer shape
+  // as /api/chart-groups: account:false for visitors, stored:false while the
+  // gap_limit_placement column is not there yet.
+  app.get("/api/chart-prefs", async (req: Request, res: Response) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      const u = db ? await sessionUser(req) : null;
+      if (!db || !u) {
+        return res.json({ gapPlacement: DEFAULT_GAP_PLACEMENT, account: false, stored: false });
+      }
+      const rows = await db
+        .select({ gapLimitPlacement: chartPreferences.gapLimitPlacement })
+        .from(chartPreferences)
+        .where(eq(chartPreferences.userId, u.id))
+        .limit(1)
+        .catch(() => null);
+      if (rows === null) {
+        return res.json({ gapPlacement: DEFAULT_GAP_PLACEMENT, account: true, stored: false });
+      }
+      res.json({ gapPlacement: normalizeGapPlacement(rows[0]?.gapLimitPlacement), account: true, stored: true });
+    } catch (e: any) {
+      console.error("[FearLab charts] chart-prefs get failed:", e?.message ?? e);
+      res.status(500).json({ error: "failed to load chart preferences" });
+    }
+  });
+
+  // PUT /api/chart-prefs — { gapPlacement: 'top' | 'middle' | 'fill' }.
+  app.put("/api/chart-prefs", async (req: Request, res: Response) => {
+    try {
+      if (!db) return res.status(503).json({ ok: false, error: "database unavailable" });
+      const u = await sessionUser(req);
+      if (!u) return res.status(401).json({ ok: false, error: "sign in required" });
+      const gapPlacement = (req.body as any)?.gapPlacement;
+      if (!isGapPlacement(gapPlacement)) {
+        return res.status(400).json({ ok: false, error: "gapPlacement must be top, middle or fill" });
+      }
+      await db
+        .insert(chartPreferences)
+        .values({ userId: u.id, gapLimitPlacement: gapPlacement })
+        .onConflictDoUpdate({
+          target: chartPreferences.userId,
+          set: { gapLimitPlacement: gapPlacement, updatedAt: new Date() },
+        });
+      res.json({ ok: true, gapPlacement });
+    } catch (e: any) {
+      console.error("[FearLab charts] chart-prefs save failed:", e?.message ?? e);
+      res.status(500).json({ ok: false, error: "failed to save chart preferences" });
     }
   });
 

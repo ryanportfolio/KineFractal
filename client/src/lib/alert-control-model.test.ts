@@ -8,10 +8,10 @@ import {
   setAlertEnabled,
 } from "./alert-control-model";
 
-test("creates enabled preferences with full settings defaults", () => {
+test("creates disabled preferences with full settings defaults", () => {
   assert.deepEqual(createDefaultAlertPrefs(), {
-    levels_weekly: { enabled: true, settings: LEVELS_WEEKLY_DEFAULTS },
-    gap_daily: { enabled: true, settings: GAP_DAILY_DEFAULTS },
+    levels_weekly: { enabled: false, settings: LEVELS_WEEKLY_DEFAULTS },
+    gap_daily: { enabled: false, settings: GAP_DAILY_DEFAULTS },
   });
 });
 
@@ -30,13 +30,13 @@ test("blocks a new enable when prerequisites are missing", () => {
   assert.deepEqual(setAlertEnabled(prefs, "gap_daily", true, false), prefs);
 });
 
-test("keeps explicit opt-outs while defaulting missing enabled fields on", () => {
+test("keeps explicit opt-ins while defaulting missing enabled fields off", () => {
   const prefs = normalizeAlertPrefsResponse({
-    levels_weekly: { enabled: false, settings: {} },
+    levels_weekly: { enabled: true, settings: {} },
     gap_daily: { settings: {} },
   });
-  assert.equal(prefs.levels_weekly.enabled, false);
-  assert.equal(prefs.gap_daily.enabled, true);
+  assert.equal(prefs.levels_weekly.enabled, true);
+  assert.equal(prefs.gap_daily.enabled, false);
 });
 
 test("always allows disabling", () => {

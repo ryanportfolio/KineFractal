@@ -28,6 +28,12 @@ export const GAP_DAILY_DEFAULTS = {
   minGapStage: "approaching",
 } as const;
 
+// The engine's worker prunes sent-level history after 180 days, so a longer
+// "don't repeat within" window has no effect. Larger values are clamped to
+// this cap rather than rejected, so a stored value above it doesn't make
+// normalizeAlertSettings fall back to defaults and drop the user's other settings.
+export const DEDUP_DAYS_MAX = 180;
+
 export type LevelsWeeklySettings = {
   minTfs: number;
   lookbackDays: number;
@@ -67,7 +73,7 @@ const levelsPatchSchema = z
     confluenceEnabled: z.boolean(),
     confluencePct: z.number().min(0.1).max(50),
     triplePct: z.number().min(0.1).max(50),
-    dedupDays: z.number().int().min(0).max(3650),
+    dedupDays: z.number().int().min(0).transform((days) => Math.min(days, DEDUP_DAYS_MAX)),
     dedupPct: z.number().min(0).max(10),
   })
   .strict()

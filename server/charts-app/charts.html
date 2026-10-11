@@ -441,7 +441,7 @@
   #exportDialog .xp-side .xp-link { font-size:15px; }
   #exportDialog .xp-side #exportSearch { padding:7px 9px; font-size:15px; }
   #exportDialog .xp-filters .xp-field input { width:50px; font-size:16px; }
-  #exportDialog #exportStrengthWrap button { padding:5px 14px; font-size:15px; }
+  #exportDialog #exportStrengthWrap button, #exportDialog #exportGapWrap button { padding:5px 14px; font-size:15px; }
   /* loading: the build animation used when a ticker is added to the chart */
   #exportLoading { display:flex; flex-direction:column; align-items:center; gap:4px; padding:12px 0 24px; text-align:center; }
   #exportLoading[hidden] { display:none; }
@@ -628,6 +628,8 @@
   .export-badge.pd { border-color:var(--cbuy); color:var(--cbuy); }
   #exportMsg { min-height:15px; color:var(--mut); font:14px monospace; text-align:center; }
   #exportMsg.error { color:var(--csell); }
+  #exportGapMsg { display:block; max-width:260px; margin-top:4px; color:var(--csell); font:13px monospace; }
+  #exportGapMsg[hidden] { display:none; }
   #exportDialog .xp-primary { padding:9px 22px; border-color:var(--sup); background:var(--sup);
                               color:var(--bg); font-weight:bold; font-size:14px; }
   #exportDialog .xp-primary:hover { background:#5fd8e6; }
@@ -840,6 +842,15 @@
             <button id="strengthSolid" type="button" data-strength="solid" class="active">solid</button>
             <button id="strengthStrong" type="button" data-strength="strong">strong</button>
           </span>
+        </div>
+        <div class="xp-field-group">
+          <span class="xp-count" id="exportGapLabel">Gap limit at</span>
+          <span id="exportGapWrap" class="xp-seg" role="group" aria-labelledby="exportGapLabel">
+            <button type="button" data-gap="top" aria-pressed="true">top</button>
+            <button type="button" data-gap="middle" aria-pressed="false">middle</button>
+            <button type="button" data-gap="fill" aria-pressed="false">full fill</button>
+          </span>
+          <span id="exportGapMsg" role="status" aria-live="polite" hidden></span>
         </div>
       </div>
       <div class="xp-headact">
@@ -3510,6 +3521,24 @@ function passesStrength(h, strength) {
   if (strength === 'strong') return touches >= 20 || tfs >= 3;
   return touches >= 10 || tfs >= 2;   // solid
 }
+// Where a support gap's limit sits: its top (the first price a drop reaches),
+// its middle, or its bottom (the gap fully filled). One choice per account,
+// shared with the /alerts page and the weekly email through /api/chart-prefs
+// (shared/gap-placement.ts holds the same rule for the site's TypeScript);
+// a visitor's choice stays in this browser.
+var GAP_PLACEMENT_KEY = 'kf-gap-placement-v1';
+var GAP_PLACEMENT_HINTS = {
+  top: 'Top of the gap: the first price a drop reaches',
+  middle: 'Middle of the gap: halfway in',
+  fill: 'Full fill: the bottom of the gap, where it closes completely',
+};
+var _gapPlacement = 'top';
+var _gapPlacementAccount = false;   // true once /api/chart-prefs answered for a signed-in account
+function gapLimit(g) {
+  if (_gapPlacement === 'fill') return g.bottom;
+  if (_gapPlacement === 'middle') return (g.top + g.bottom) / 2;
+  return g.top;
+}
 function exportCandidates(sym, candles, ov, depthPct, minPct, strength) {
   if (!candles.length) return [];
   var close = candles[candles.length - 1].close;
@@ -3524,10 +3553,11 @@ function exportCandidates(sym, candles, ov, depthPct, minPct, strength) {
       rows.push({ sym: sym, limit: r2(h.price), type: 'level', touches: h.touches || 0, tfs: h.tfs || 1, zone: '', close: r2(close) });
     });
   (ov.gaps || [])
-    .filter(function (g) { return g.kind === 'support' && g.top < close && g.top <= ceil && g.top >= floor; })
+    .filter(function (g) { var lim = gapLimit(g); return g.kind === 'support' && g.top < close && lim <= ceil && lim >= floor; })
     .forEach(function (g) {
-      // buy at the TOP of the zone — the first price a revisit touches
-      rows.push({ sym: sym, limit: r2(g.top), type: 'gap', touches: 0, tfs: 0, zone: r2(g.bottom) + '-' + r2(g.top), close: r2(close) });
+      // the account's gap limit placement: top (the first price a revisit
+      // touches, the default), middle, or full fill
+      rows.push({ sym: sym, limit: r2(gapLimit(g)), type: 'gap', touches: 0, tfs: 0, zone: r2(g.bottom) + '-' + r2(g.top), close: r2(close) });
     });
   // fresh (unmitigated) bullish order blocks below price = untested support to
   // buy at the zone top (first price a revisit touches). Zone-based like gaps,
@@ -3576,7 +3606,7 @@ function collectExportData(syms, done, progress, stale) {
 }
 function exportSignalHtml(row) {
   if (row.type === 'gap') {
-    return '<span class="export-badge gap" title="zone ' + row.zone + '">unfilled gap</span>';
+    return '<span class="export-badge gap" title="zone ' + row.zone + ', limit at the ' + (_gapPlacement === 'fill' ? 'full fill' : _gapPlacement) + '">unfilled gap</span>';
   }
   if (row.type === 'ob') {
     return '<span class="export-badge ob" title="fresh bullish order block — zone ' + row.zone + '">fresh OB</span>';
@@ -3648,7 +3678,7 @@ function markExportClusters(rows) {
 }
 function downloadExportCsv() {
   if (!_exportCsvReady || !_exportRows || !_exportRows.length) return;
-  var lines = ['Ticker,Limit price,Signal,Touches,Timeframes,Gap zone,Below close %,Last close'];
+  var lines = ['Ticker,Limit price,Signal,Times tested,Timeframe relevance,Gap zone,Below close %,Last close'];
   _exportRows.forEach(function (row) {
     var dist = (((row.close - row.limit) / row.close) * 100).toFixed(1);
     lines.push([
@@ -3836,9 +3866,10 @@ function chartCsrfToken(fresh) {
 }
 // body is built once by the caller, so a retry can never send a list that
 // changed in the meantime (a reopen empties it while groups reload)
-function putExportGroups(body, retried) {
+function putExportGroups(body, retried, url) {
+  url = url || '/api/chart-groups';
   return chartCsrfToken(retried).then(function (token) {
-    return fetch('/api/chart-groups', {
+    return fetch(url, {
       method: 'PUT', credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
       body: body,
@@ -3852,7 +3883,7 @@ function putExportGroups(body, retried) {
     // Either way one retry with a fresh token, like the site's csrfFetch.
     return r.clone().json().catch(function () { return {}; }).then(function (j) {
       var csrf = r.status === 419 || j.code === 'CSRF_REFRESH_NEEDED' || /CSRF/.test(j.error || '');
-      if (csrf) return putExportGroups(body, true);
+      if (csrf) return putExportGroups(body, true, url);
       throw new Error('HTTP ' + r.status);
     });
   });
@@ -4459,7 +4490,7 @@ function whyChartSvg(sec, lim, cmp) {
 function whyCompareHtml(sec, cmp) {
   if (sec.sym === 'SPY' || !superMap.SPY) return { box: '', legend: '' };
   var box = '<label class="xp-whycmp"><input type="checkbox" id="exportWhyCmp"' + (_whyCompare ? ' checked' : '')
-    + '> Compare to S&amp;P 500 (SPY)</label>';
+    + '> Compare to S&amp;P 500</label>';
   if (!_whyCompare) return { box: box, legend: '' };
   if (!cmp) {
     return { box: box, legend: '<p class="xp-whylegend">'
@@ -4566,6 +4597,84 @@ function setExportStrength(mode, rebuild) {
   });
   try { localStorage.setItem('kf-export-strength', mode); } catch (e) {}
   if (rebuild) scheduleExportBuild(0);
+}
+function renderGapPlacement() {
+  Array.prototype.forEach.call(document.querySelectorAll('#exportGapWrap button'), function (b) {
+    var p = b.getAttribute('data-gap');
+    b.setAttribute('aria-pressed', p === _gapPlacement ? 'true' : 'false');
+    b.setAttribute('data-tip', GAP_PLACEMENT_HINTS[p] + (_gapPlacementAccount ? ' · also used in your alert emails' : ''));
+  });
+}
+// A click saves to the account when signed in (and so the emails follow it),
+// and always to this browser. One save is in flight at a time; clicks made
+// meanwhile collapse into the latest, so the account ends on the last choice.
+// A click made before the account answers is saved once it does.
+var _gapSaved = 'top';          // what the account holds
+var _gapSaving = false;
+var _gapQueued = null;
+var _gapClickedEarly = false;   // clicked while the account was still loading
+var _gapEdits = 0;              // bumps on every click; a failed save rolls back only if none came after it
+function setGapMsg(text) {
+  var el = document.getElementById('exportGapMsg');
+  el.textContent = text;
+  el.hidden = !text;
+}
+function saveGapPlacement(p) {
+  if (_gapSaving) { _gapQueued = p; return; }
+  _gapSaving = true;
+  var failed = false, editsAtStart = _gapEdits;
+  putExportGroups(JSON.stringify({ gapPlacement: p }), false, '/api/chart-prefs')
+    .then(function () { _gapSaved = p; }, function () { failed = true; })
+    .then(function () {
+      _gapSaving = false;
+      var next = _gapQueued;
+      _gapQueued = null;
+      if (next !== null && next !== _gapSaved) return saveGapPlacement(next);
+      if (failed && next === null && _gapEdits === editsAtStart) {
+        setGapPlacement(_gapSaved, false);
+        scheduleExportBuild(0);
+        setGapMsg('Could not save the gap setting to your account, so it is back to ' + (_gapSaved === 'fill' ? 'full fill' : _gapSaved) + '. Try again in a minute.');
+      }
+    });
+}
+function setGapPlacement(p, byUser) {
+  if (!GAP_PLACEMENT_HINTS[p]) return;
+  var changed = p !== _gapPlacement;
+  _gapPlacement = p;
+  renderGapPlacement();
+  try { localStorage.setItem(GAP_PLACEMENT_KEY, p); } catch (e) {}
+  if (!byUser) return;
+  _gapEdits++;
+  setGapMsg('');
+  if (changed) scheduleExportBuild(0);
+  if (_gapPlacementAccount) saveGapPlacement(p);
+  else _gapClickedEarly = true;
+}
+function loadGapPlacement(openGen) {
+  var local = null;
+  try { local = localStorage.getItem(GAP_PLACEMENT_KEY); } catch (e) {}
+  _gapPlacementAccount = false;
+  _gapClickedEarly = false;
+  setGapMsg('');
+  setGapPlacement(GAP_PLACEMENT_HINTS[local] ? local : 'top', false);
+  if (!(SITE && siteUser !== false)) return;
+  fetch('/api/chart-prefs', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function (j) {
+      if (openGen !== _exportOpenGen || !j.account || !j.stored) return;
+      _gapPlacementAccount = true;
+      _gapSaved = GAP_PLACEMENT_HINTS[j.gapPlacement] ? j.gapPlacement : 'top';
+      renderGapPlacement();
+      // a choice made while this loaded wins over the stored one
+      if (_gapClickedEarly) {
+        if (_gapPlacement !== _gapSaved) saveGapPlacement(_gapPlacement);
+        return;
+      }
+      var was = _gapPlacement;
+      setGapPlacement(_gapSaved, false);
+      if (_gapPlacement !== was) scheduleExportBuild(0);
+    })
+    .catch(function () {});   // the browser's copy stands in until the next open
 }
 // Scroll wheel steps the min/max % inputs (hover, no focus needed).
 function bindWheelStep(id) {
@@ -4773,6 +4882,7 @@ function openExportDialog() {
   var savedStrength = null;
   try { savedStrength = localStorage.getItem('kf-export-strength'); } catch (e) {}
   setExportStrength(STRENGTH_HINTS[savedStrength] ? savedStrength : _exportStrength, false);
+  loadGapPlacement(openGen);
   document.getElementById('exportMsg').textContent = '';
   if (!document.getElementById('exportAddBtn').disabled) {   // a build still running keeps its status line
     document.getElementById('exportAddMsg').textContent = '';
@@ -4861,6 +4971,9 @@ function wireExportDialog() {
   document.getElementById('exportDepth').addEventListener('input', function () { scheduleExportBuild(); });
   Array.prototype.forEach.call(document.querySelectorAll('#exportStrengthWrap button'), function (b) {
     b.onclick = function () { setExportStrength(b.getAttribute('data-strength'), true); };
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#exportGapWrap button'), function (b) {
+    b.onclick = function () { setGapPlacement(b.getAttribute('data-gap'), true); };
   });
   document.getElementById('exportResult').addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('[data-strength-set]');

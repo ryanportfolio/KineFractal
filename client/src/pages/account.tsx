@@ -1,13 +1,13 @@
 // P2 account page: sign in / sign up / request a password reset (?mode=forgot;
 // the emailed link lands on /reset-password), email verification status, and the
 // versioned ToS acceptance that gates alert enablement (platform/P2-DESIGN.md).
-// Watchlist + alert toggles land here in the follow-up PR.
+// Watchlist and alert settings live on /alerts.
 
 import { useEffect, useState } from "react";
 import { Navbar } from "@/components/navbar";
 import { useDocumentMeta } from "@/hooks/use-document-meta";
 import { Link } from "wouter";
-import { ShieldCheck, MailCheck, MailWarning, LogOut, FileCheck2, ListChecks, BellRing } from "lucide-react";
+import { ShieldCheck, MailCheck, MailWarning, LogOut, FileCheck2 } from "lucide-react";
 import { useSession, signIn, signUp, signOut, authClient, csrfFetch } from "@/lib/auth-client";
 import { TOS_VERSION, TOS_POINTS } from "@shared/tos";
 import { safeNext, nextLabel } from "@/lib/safe-next";
@@ -164,149 +164,6 @@ function AuthForms() {
   );
 }
 
-function WatchlistCard() {
-  const [universe, setUniverse] = useState<string[]>([]);
-  const [symbols, setSymbols] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = () => {
-    fetch("/api/watchlist", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => {
-        setUniverse(d.universe || []);
-        setSymbols(d.symbols || []);
-      })
-      .catch(() => setError("failed to load watchlist"));
-  };
-  useEffect(load, []);
-
-  const toggle = async (sym: string) => {
-    const on = symbols.includes(sym);
-    setError(null);
-    // optimistic
-    setSymbols((prev) => (on ? prev.filter((s) => s !== sym) : [...prev, sym].sort()));
-    try {
-      const r = on
-        ? await csrfFetch(`/api/watchlist/${sym}`, { method: "DELETE" })
-        : await csrfFetch("/api/watchlist", { method: "POST", body: JSON.stringify({ symbol: sym }) });
-      if (!r.ok) throw new Error((await r.json()).error || `HTTP ${r.status}`);
-    } catch (e: any) {
-      setError(e.message);
-      load(); // resync
-    }
-  };
-
-  return (
-    <div className="border border-border rounded-lg p-6 bg-card/50">
-      <div className="flex items-center gap-2 mb-3">
-        <ListChecks className="w-4 h-4 text-primary" />
-        <h2 className="text-sm font-mono uppercase tracking-widest">Watchlist</h2>
-        <span className="ml-auto text-[10px] font-mono text-muted-foreground">
-          {symbols.length}/{universe.length}
-        </span>
-      </div>
-      <p className="text-[11px] text-muted-foreground mb-4">
-        Pick from the symbols published nightly (charts + alerts follow your selection).
-      </p>
-      {universe.length === 0 ? (
-        <div className="text-xs font-mono text-muted-foreground">symbol list unavailable · try again later</div>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {universe.map((sym) => {
-            const on = symbols.includes(sym);
-            return (
-              <button
-                key={sym}
-                onClick={() => toggle(sym)}
-                data-on={on}
-                className="px-3 py-1.5 rounded border text-xs font-mono border-border text-muted-foreground data-[on=true]:border-primary data-[on=true]:text-primary data-[on=true]:bg-primary/10"
-              >
-                {sym}
-              </button>
-            );
-          })}
-        </div>
-      )}
-      {error && <div className="text-red-400 text-xs font-mono mt-3">{error}</div>}
-    </div>
-  );
-}
-
-const ALERT_KIND_META: { kind: string; label: string; desc: string }[] = [
-  {
-    kind: "levels_weekly",
-    label: "Weekly buy-limit digest",
-    desc: "Mon + Fri: the strongest recently-tested support level below price for each watchlist symbol, framed as a suggested limit.",
-  },
-  {
-    kind: "gap_daily",
-    label: "Daily structure alerts",
-    desc: "End of day: unfilled-gap, order-block and equilibrium transitions on your watchlist symbols. Only sends when something changed.",
-  },
-];
-
-function AlertsCard({ canEnable, gateHint }: { canEnable: boolean; gateHint: string | null }) {
-  const [prefs, setPrefs] = useState<Record<string, boolean>>({});
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/api/alerts/prefs", { credentials: "include" })
-      .then((r) => r.json())
-      .then((d) => setPrefs(d.prefs || {}))
-      .catch(() => setError("failed to load alert settings"));
-  }, []);
-
-  const toggle = async (kind: string) => {
-    const enabled = !prefs[kind];
-    setError(null);
-    setPrefs((p) => ({ ...p, [kind]: enabled })); // optimistic
-    try {
-      const r = await csrfFetch("/api/alerts/prefs", {
-        method: "PUT",
-        body: JSON.stringify({ kind, enabled }),
-      });
-      if (!r.ok) throw new Error((await r.json()).error || `HTTP ${r.status}`);
-    } catch (e: any) {
-      setError(e.message);
-      setPrefs((p) => ({ ...p, [kind]: !enabled })); // revert
-    }
-  };
-
-  return (
-    <div className="border border-border rounded-lg p-6 bg-card/50">
-      <div className="flex items-center gap-2 mb-3">
-        <BellRing className="w-4 h-4 text-primary" />
-        <h2 className="text-sm font-mono uppercase tracking-widest">Email alerts</h2>
-      </div>
-      {!canEnable && gateHint && (
-        <p className="text-[11px] text-amber-400 font-mono mb-4">{gateHint}</p>
-      )}
-      <div className="space-y-4">
-        {ALERT_KIND_META.map(({ kind, label, desc }) => (
-          <label key={kind} className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="mt-1"
-              checked={!!prefs[kind]}
-              disabled={!canEnable && !prefs[kind]}
-              onChange={() => toggle(kind)}
-            />
-            <span>
-              <span className="block text-sm">{label}</span>
-              <span className="block text-[11px] text-muted-foreground leading-relaxed">{desc}</span>
-            </span>
-          </label>
-        ))}
-      </div>
-      {error && <div className="text-red-400 text-xs font-mono mt-3">{error}</div>}
-      <p className="mt-4 text-[11px] text-muted-foreground leading-relaxed">
-        Identical signal content for every recipient, on a fixed schedule. Informational only ·
-        never investment advice. Every email carries a one-click unsubscribe.
-      </p>
-    </div>
-  );
-}
-
 function TosCard({ accepted, onAccepted }: { accepted: boolean; onAccepted: () => void }) {
   const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -406,7 +263,7 @@ export default function Account() {
             href={next}
             className="mb-6 flex items-center justify-between gap-4 border border-primary/60 rounded-lg px-5 py-4 font-mono text-sm text-primary hover:bg-primary/5"
           >
-            <span>Signed in. Your account is ready to use on {nextLabel(next)}.</span>
+            <span>You're signed in.</span>
             <span className="uppercase tracking-widest text-xs">Back to {nextLabel(next)} →</span>
           </a>
         )}

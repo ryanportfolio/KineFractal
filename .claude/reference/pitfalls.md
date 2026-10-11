@@ -65,3 +65,23 @@ Check the port is free first (`netstat -ano | grep ":<port> "`). Other sessions 
 A keyframe value built from a custom property, such as `stroke-dashoffset: calc(var(--len) + 1)` or `transform: translateX(calc(var(--to) * 1px))`, animated discretely in Chrome: the value held its start and flipped to its end at 50%. Every SVG draw-on in the logo prototypes popped in instead of drawing, and frame strips had to be rebuilt. Keep animated values constant: draw strokes with `pathLength="1"` plus `stroke-dasharray: 1 1.02` and offsets from `1.01` to `0`, write literal colours, and generate per-instance keyframes from script when a value has to vary. `var()` in `animation-delay` or `animation-duration` is fine.
 
 Related cost: an `infinite` CSS animation on SVG stroke properties keeps the main thread busy every frame, even through keyframe stretches where nothing changes (measured 19 to 42 ms per second for a 176 px nav logo; transform and opacity loops measured about 0). Run idle loops as bursts: a timer adds a class for one pass and removes it afterwards.
+
+### 2026-10-11: Drizzle's "Failed query" message hides the Postgres error
+
+A failed Drizzle query throws an error whose `message` is only `Failed query: <sql>` plus the parameters. The Postgres error (code, message, detail) is on `e.cause`, and the route handlers log only `e.message`. A local unsubscribe test returned 500 and was left unexplained for a session; logging `e.cause` showed `23503` (foreign key violation): the token's user id was not in the hand-inserted `user` table. When a query fails locally, print `e.cause.code`, `e.cause.message` and `e.cause.detail` before guessing. For local alert tests, build the schema from `migrations/*.sql` (strip `--> statement-breakpoint`) and mint tokens for user ids that exist.
+
+### 2026-10-11: Source-text tests pin the alerts page's copy and defaults
+
+Several tests read source files as text instead of rendering them: `scripts/alerts-ux.test.mjs` (the on-by-default insert in `server/alerts-routes.ts`, the `InfoTip` structure in `alert-control-panel.tsx`, and a ban on sentence-ending full stops in visible prose of `alerts.tsx` and `alert-control-panel.tsx`), `client/src/pages/alerts-copy.test.tsx` (exact hero and signed-out sentences) and `client/src/components/alert-control-panel.test.tsx` (exact class strings). Changing the opt-in default or the page copy failed `npm test` in two rounds whose write scope left these files out. Before changing alerts behavior or wording, grep the tests for the strings you are changing and update only the assertions the change overturns.
+
+Related: the site's root font size is 22px at some widths, so Tailwind rem classes (`h-11`, `gap-3`, `text-xs`) render larger than their nominal pixel sizes. Use px values (`h-[44px]`) where an exact size matters, such as 44px touch targets.
+
+### 2026-10-11: Local server checks: charts.html is read once, test sign-ups can email, and repeated runs hit the API limit
+
+Three things cost reruns while checking the Limit Buy dialog and /alerts against a local server:
+
+- The server reads `server/charts-app/charts.html` once and serves it from memory (`readLocalChartsHtml` in `server/fearlab-charts.ts`). After editing the page, restart the dev server; a browser check otherwise runs the old page while the React pages already show the new code.
+- On this machine the shell can carry a real `RESEND_API_KEY`. A local sign-up then tries to send the verification email through Resend (it refused `example.com` addresses with 422). Start the dev server with `RESEND_API_KEY=` for local checks.
+- Several browser-check runs in a row exhaust the in-memory `/api/` rate limit and every API call returns 429 ("Too many API requests"). Restarting the server resets it.
+
+For a throwaway database without Docker or a Postgres install, PGlite works: `@electric-sql/pglite` plus `@electric-sql/pglite-socket` in a scratch folder, apply `migrations/*.sql` with `--> statement-breakpoint` removed, serve on a local port, and point `DATABASE_URL` at it with `?sslmode=disable` (`server/db.ts` asks for TLS on any non-`railway.internal` host).
