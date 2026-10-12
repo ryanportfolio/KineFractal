@@ -97,16 +97,12 @@ export default async function runApp(
   // the catch-all route doesn't interfere with the other routes
   await setup(app, server);
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Serve the API and the client on PORT (Railway sets it); default 5000 locally.
   const port = parseInt(process.env.PORT || '5000', 10);
   server.listen({
     port,
     host: "0.0.0.0",
-    // reusePort is a Linux/Replit feature; it throws ENOTSUP on Windows, so only
-    // request it off-Windows. No effect on the Replit (Linux) deploy.
+    // reusePort throws ENOTSUP on Windows, so only request it off-Windows.
     reusePort: process.platform !== "win32",
   }, () => {
     log(`serving on port ${port}`);
