@@ -53,33 +53,48 @@ export default function Alerts() {
       : !tosAccepted
         ? "Accept the current terms before turning on alerts"
         : null;
+  // the signed-out pitch waits for the session check, so a signed-in visitor
+  // never sees it flash before the header shrinks
+  const showPitch = !isPending && !session?.user;
 
   return (
     <div className="bg-background text-foreground">
       <Navbar />
       <main data-phosphor="ice" className="px-5 pb-10 pt-28 md:px-10 md:pb-12">
         <div className="mx-auto max-w-6xl">
-          <section className="border-b border-[hsl(var(--beam-ghost))] pb-12 md:grid md:grid-cols-[1fr_0.72fr] md:items-start md:gap-16">
+          {/* Signed in, the panel's own summary explains the page, so the header
+              shrinks to the title; signed out, it carries the pitch. */}
+          <section
+            className={
+              !showPitch
+                ? "pb-8"
+                : "border-b border-[hsl(var(--beam-ghost))] pb-12 md:grid md:grid-cols-[1fr_0.72fr] md:items-start md:gap-16"
+            }
+          >
             <div>
               <div className="etched mb-4 text-beam-dim">EMAIL ALERTS · AFTER THE CLOSE</div>
-              <div className="max-w-[560px]">
+              <div className={!showPitch ? "max-w-[360px]" : "max-w-[560px]"}>
                 <BeamHeading text="ALERTS" as="h1" active instant={false} />
               </div>
-              <p className="mt-8 max-w-[58ch] font-mono text-sm leading-relaxed text-beam-mid md:text-base">
-                Free watchlist emails built after each market close from the same data that draws the charts and delivered the next morning; you choose what qualifies, and a quiet day sends nothing
-              </p>
+              {showPitch && (
+                <p className="mt-8 max-w-[58ch] font-mono text-sm leading-relaxed text-beam-mid md:text-base">
+                  Free watchlist emails built after each market close from the same data that draws the charts and delivered the next morning; you choose what qualifies, and a quiet day sends nothing
+                </p>
+              )}
             </div>
-            <div className="mt-12 border-t border-[hsl(var(--beam-ghost))] pt-6 md:mt-0">
-              <div className="grid grid-cols-2 gap-x-6 gap-y-6 font-mono text-[12px] xl:text-xs">
-                <div><Radar className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">WATCHLIST DRIVEN</span></div>
-                <div><MailCheck className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">INBOX DELIVERY</span></div>
-                <div><SlidersHorizontal className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">YOUR FILTERS</span></div>
-                <div><BellRing className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">FREE · UNSUBSCRIBE</span></div>
+            {showPitch && (
+              <div className="mt-12 border-t border-[hsl(var(--beam-ghost))] pt-6 md:mt-0">
+                <div className="grid grid-cols-2 gap-x-6 gap-y-6 font-mono text-[12px] xl:text-xs">
+                  <div><Radar className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">WATCHLIST DRIVEN</span></div>
+                  <div><MailCheck className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">INBOX DELIVERY</span></div>
+                  <div><SlidersHorizontal className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">YOUR FILTERS</span></div>
+                  <div><BellRing className="mb-2 h-4 w-4 text-beam-hot" aria-hidden="true" /><span className="text-beam-dim">FREE · UNSUBSCRIBE</span></div>
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
-          <section id="control" className="py-8 md:py-10">
+          <section id="control" className={session?.user ? "pb-8 md:pb-10" : "py-8 md:py-10"}>
             {isPending ? (
               <div className="etched py-10 text-beam-dim">checking session…</div>
             ) : session?.user ? (
