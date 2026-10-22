@@ -85,3 +85,12 @@ Three things cost reruns while checking the Limit Buy dialog and /alerts against
 - Several browser-check runs in a row exhaust the in-memory `/api/` rate limit and every API call returns 429 ("Too many API requests"). Restarting the server resets it.
 
 For a throwaway database without Docker or a Postgres install, PGlite works: `@electric-sql/pglite` plus `@electric-sql/pglite-socket` in a scratch folder, apply `migrations/*.sql` with `--> statement-breakpoint` removed, serve on a local port, and point `DATABASE_URL` at it with `?sslmode=disable` (`server/db.ts` asks for TLS on any non-`railway.internal` host).
+
+### 2026-10-22: The bucket secret is a pasted copy, and the worker refuses to run during market hours
+
+Two things cost reruns while recovering the worker after Railway's October 2026 security incident:
+
+- `web`, `worker` and `chart-refresh` hold a literal copy of the `artifacts` bucket's credentials in `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`; `chart-builder` references `${{worker.*}}`. When Railway rotated bucket credentials, every bucket read failed with `403 SignatureDoesNotMatch`: `/charts/` showed "could not load data-index.js" and `/api/fearlab/*` fell back to the bundled snapshot. Fix: read the new secret from the GraphQL query `bucketS3Credentials(bucketId, environmentId, projectId)` and write it with `variableUpsert` on each literal holder, without printing it. `chart-builder` then still needs its own redeploy (`serviceInstanceRedeploy`): a reference updates the stored value, not the running container.
+- A manual worker run (`deploymentInstanceExecutionCreate` with the worker's service instance id) during US market hours halts in `emit_signals.py` with `HALT (P3): decision bar is still FORMING`. It cannot backfill a missed session then; run it after the close, or let the `0 11 * * 2-6` cron run.
+
+Read logs with the GraphQL query `deploymentLogs(deploymentId, limit)`: `railway logs --deployment <id>` printed nothing for two of the crashed cron runs.
