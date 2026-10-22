@@ -530,6 +530,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       const body = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(body.error || `HTTP ${response.status}`);
       savedGapPlacement.current = value;
+      setGapPlacementLoadError(null);
     } catch (reason: any) {
       failure = reason?.message || "failed to save";
     }
@@ -888,7 +889,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
           <span aria-live="polite" className="font-mono text-sm">{pageStatus}</span>
         </div>
         <div className="border-y border-[hsl(var(--beam-ghost))] py-6">
-          <div aria-hidden="true" className="mb-4 hidden grid-cols-[22rem_repeat(5,minmax(0,1fr))] md:grid">
+          <div aria-hidden="true" className="mb-4 hidden grid-cols-[22rem_repeat(5,minmax(0,1fr))] lg:grid">
             <span />
             {MORNINGS.map((morning) => (
               <span key={morning.day} className="text-center font-mono">
@@ -898,7 +899,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
             ))}
           </div>
           <div className="space-y-6">
-            <div className="grid gap-3 md:grid-cols-[22rem_1fr] md:items-center">
+            <div className="grid gap-3 lg:grid-cols-[22rem_1fr] lg:items-center">
               <div className="flex items-start gap-1">
                 <div className="min-w-0">
                   <Toggle
@@ -931,14 +932,14 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
                     >
                       <Mail aria-hidden="true" className="h-7 w-7" strokeWidth={picked ? 2 : 1.4} />
                       {picked && <Check aria-hidden="true" className="absolute right-1 top-1 h-4 w-4" strokeWidth={3} />}
-                      <span aria-hidden="true" className="mt-1 font-mono text-xs md:hidden">{morning.day}</span>
+                      <span aria-hidden="true" className="mt-1 font-mono text-xs lg:hidden">{morning.day}</span>
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-[22rem_1fr] md:items-center">
+            <div className="grid gap-3 lg:grid-cols-[22rem_1fr] lg:items-center">
               <div className="flex items-start gap-1">
                 <div className="min-w-0">
                   <Toggle
@@ -956,7 +957,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
                   <li key={morning.day} className="flex min-h-[56px] flex-col items-center justify-center border border-dashed border-[hsl(var(--beam-mid)/0.6)] py-2 text-beam-mid">
                     <span className="sr-only">{morning.long}</span>
                     <Mail aria-hidden="true" className="h-7 w-7" strokeWidth={1.4} />
-                    <span aria-hidden="true" className="mt-1 font-mono text-xs md:hidden">{morning.day}</span>
+                    <span aria-hidden="true" className="mt-1 font-mono text-xs lg:hidden">{morning.day}</span>
                   </li>
                 ))}
               </ul>
