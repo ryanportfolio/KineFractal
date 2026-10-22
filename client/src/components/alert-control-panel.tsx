@@ -423,6 +423,7 @@ function Sparkline({ closes, on }: { closes?: number[]; on: boolean }) {
 
 // A chart drawing with its choices stacked beside it, each button set at the
 // height of the price it stands for (`top` is a percentage of the drawing).
+// Below lg the drawing is too short for that, so the buttons sit in a grid under it.
 function ChartChoices<T extends string>({
   labelledBy,
   chart,
@@ -439,9 +440,9 @@ function ChartChoices<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-stretch">
       <div className="min-w-0 flex-1">{chart}</div>
-      <div role="group" aria-labelledby={labelledBy} className="grid grid-cols-2 gap-2 sm:relative sm:block sm:w-[8.5rem] sm:shrink-0">
+      <div role="group" aria-labelledby={labelledBy} className="grid grid-cols-2 gap-2 lg:relative lg:block lg:w-[8.5rem] lg:shrink-0">
         {options.map((option) => {
           const on = option.value === value;
           return (
@@ -452,7 +453,7 @@ function ChartChoices<T extends string>({
               disabled={disabled}
               onClick={() => onChange(option.value)}
               style={{ top: option.top }}
-              className={`min-h-[44px] sm:absolute sm:left-0 sm:right-0 sm:-translate-y-1/2 border px-2 py-1 text-left font-mono text-xs font-semibold tracking-[0.06em] disabled:cursor-not-allowed min-[600px]:min-h-0 ${
+              className={`min-h-[44px] lg:absolute lg:left-0 lg:right-0 lg:-translate-y-1/2 border px-2 py-1 text-left font-mono text-xs font-semibold tracking-[0.06em] disabled:cursor-not-allowed min-[600px]:min-h-0 ${
                 on
                   ? "border-beam-hot bg-[hsl(var(--beam-hot))] text-[hsl(var(--primary-foreground))]"
                   : "border-[hsl(var(--beam-mid))] bg-background text-beam-hot hover:border-beam-hot"
@@ -486,6 +487,8 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // the first load failed: the switches show defaults, not the saved settings
+  const [loadError, setLoadError] = useState<string | null>(null);
   const failedSnapshot = useRef<string | null>(null);
   const [statusZone, setStatusZone] = useState<StatusZone>("weekly");
   // flips once anything on the page saves, so the top status can say so
@@ -497,6 +500,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   const [gapPlacement, setGapPlacement] = useState<GapPlacement>("top");
   const [gapPlacementState, setGapPlacementState] = useState<"loading" | "idle" | "saving" | "saved">("loading");
   const [gapPlacementError, setGapPlacementError] = useState<string | null>(null);
+  const [gapPlacementLoadError, setGapPlacementLoadError] = useState<string | null>(null);
   const savedGapPlacement = useRef<GapPlacement>("top");
   const gapPlacementSaving = useRef(false);
   const gapPlacementQueued = useRef<GapPlacement | null>(null);
@@ -514,7 +518,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
       .catch((reason) => {
         if (reason?.name === "AbortError") return;
         setGapPlacementState("idle");
-        setGapPlacementError("gap limit price is unavailable right now · try again later");
+        setGapPlacementLoadError("this choice is unavailable right now · try again later");
       });
     return () => controller.abort();
   }, []);
@@ -565,7 +569,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   useEffect(() => {
     const controller = new AbortController();
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     Promise.all([
       fetch("/api/watchlist", { credentials: "include", signal: controller.signal }),
       fetch("/api/alerts/prefs", { credentials: "include", signal: controller.signal }),
@@ -589,7 +593,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
         setSavedPrefs(normalized);
       })
       .catch((reason) => {
-        if (reason?.name !== "AbortError") setError(reason?.message || "failed to load alert settings");
+        if (reason?.name !== "AbortError") setLoadError(reason?.message || "failed to load alert settings");
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -849,6 +853,15 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
   if (loading) {
     return <div className="py-12 font-mono text-sm text-beam-mid">loading your alert settings…</div>;
   }
+  // Nothing to edit until the saved settings arrive: default values on screen
+  // would be saved over the real ones by the first click.
+  if (loadError) {
+    return (
+      <p role="alert" className="py-12 font-mono text-base text-red-400">
+        {loadError} · refresh the page to try again
+      </p>
+    );
+  }
 
   const closeDays = weekly.closeDays;
   const toggleCloseDay = (close: CloseDay) => {
@@ -1082,7 +1095,7 @@ export function AlertControlPanel({ canEnable, gateHint = null }: Props) {
                   />
                   <p className="mt-3 font-mono text-sm text-beam-mid">Also sets gap prices in the Limit Buy dialog on the charts page</p>
                   <div aria-live="polite" className="mt-2 min-h-5 font-mono text-sm">
-                    {gapPlacementError ? <span className="text-red-400">{gapPlacementError}</span> : null}
+                    {gapPlacementError || gapPlacementLoadError ? <span className="text-red-400">{gapPlacementError ?? gapPlacementLoadError}</span> : null}
                   </div>
                 </div>
 
