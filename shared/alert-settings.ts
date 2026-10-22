@@ -3,6 +3,13 @@ import { z } from "zod";
 export const ALERT_KINDS = ["levels_weekly", "gap_daily"] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
+// Weekday closes the weekly email can follow; it lands the next morning. The
+// engine (range worker/alerts.py) treats the default Monday + Friday pick as
+// "the week's first and last sessions", holiday shift included.
+export const CLOSE_DAYS = ["mon", "tue", "wed", "thu", "fri"] as const;
+export type CloseDay = (typeof CLOSE_DAYS)[number];
+const DEFAULT_CLOSE_DAYS: readonly CloseDay[] = ["mon", "fri"];
+
 export const LEVELS_WEEKLY_DEFAULTS = {
   minTfs: 2,
   lookbackDays: 90,
@@ -13,6 +20,7 @@ export const LEVELS_WEEKLY_DEFAULTS = {
   triplePct: 3,
   dedupDays: 30,
   dedupPct: 0.5,
+  closeDays: DEFAULT_CLOSE_DAYS,
 } as const;
 
 export const GAP_DAILY_DEFAULTS = {
@@ -44,6 +52,7 @@ export type LevelsWeeklySettings = {
   triplePct: number;
   dedupDays: number;
   dedupPct: number;
+  closeDays: readonly CloseDay[];
 };
 
 export type GapDailySettings = {
@@ -75,6 +84,12 @@ const levelsPatchSchema = z
     triplePct: z.number().min(0.1).max(50),
     dedupDays: z.number().int().min(0).transform((days) => Math.min(days, DEDUP_DAYS_MAX)),
     dedupPct: z.number().min(0).max(10),
+    // stored in week order without repeats, and never empty
+    closeDays: z
+      .array(z.enum(CLOSE_DAYS))
+      .min(1)
+      .max(CLOSE_DAYS.length)
+      .transform((days) => CLOSE_DAYS.filter((day) => days.includes(day))),
   })
   .strict()
   .partial();

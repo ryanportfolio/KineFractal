@@ -68,3 +68,10 @@ test("rejects an unknown alert kind", () => {
     /unknown alert kind/i,
   );
 });
+
+test("weekly close days keep week order, drop repeats and are never empty", () => {
+  assert.deepEqual(parseAlertSettings("levels_weekly", { closeDays: ["fri", "wed", "fri"] }).closeDays, ["wed", "fri"]);
+  assert.deepEqual(normalizeAlertSettings("levels_weekly", {}).closeDays, ["mon", "fri"]);
+  assert.throws(() => parseAlertSettings("levels_weekly", { closeDays: [] }));
+  assert.throws(() => parseAlertSettings("levels_weekly", { closeDays: ["sat"] }));
+});

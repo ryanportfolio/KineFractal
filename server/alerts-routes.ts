@@ -48,6 +48,63 @@ export async function publishedUniverse(): Promise<string[]> {
 }
 
 // ---------------------------------------------------------------------------
+// Ticker sparklines for the /alerts picker: the last month of daily closes per
+// published symbol, read from the run's chart.v1 files (the same candles the
+// charts page draws). Built at most once per 10 minutes for everyone.
+// ---------------------------------------------------------------------------
+
+interface ChartCandles {
+  candles?: Array<{ time?: unknown; close?: unknown }>;
+}
+
+const SPARKLINE_DAYS = 22;
+const SPARKLINE_TTL_MS = 10 * 60 * 1000;
+let sparklineCache: { at: number; closes: Record<string, number[]> } | null = null;
+let sparklineBuild: Promise<Record<string, number[]>> | null = null;
+
+// Last close of each UTC day, oldest first, keeping the final `days` of them.
+// The display timeframe can be intraday, so several candles share a day.
+export function dailyCloses(candles: ChartCandles["candles"], days = SPARKLINE_DAYS): number[] {
+  const byDay = new Map<number, number>();
+  for (const candle of candles ?? []) {
+    const time = Number(candle?.time);
+    const close = Number(candle?.close);
+    if (!Number.isFinite(time) || !Number.isFinite(close)) continue;
+    byDay.set(Math.floor(time / 86_400), close);
+  }
+  return [...byDay.entries()].sort((a, b) => a[0] - b[0]).slice(-days).map(([, close]) => close);
+}
+
+async function buildSparklines(): Promise<Record<string, number[]>> {
+  const symbols = await publishedUniverse();
+  const closes: Record<string, number[]> = {};
+  // a few at a time: a cold cache reads each chart file from the bucket
+  for (let index = 0; index < symbols.length; index += 4) {
+    await Promise.all(symbols.slice(index, index + 4).map(async (symbol) => {
+      const result = await getRunArtifact<ChartCandles>(`charts/v1/${symbol}.json`);
+      if (!result.ok) return;
+      const series = dailyCloses(result.data.candles);
+      if (series.length >= 2) closes[symbol] = series;
+    }));
+  }
+  return closes;
+}
+
+async function tickerSparklines(): Promise<Record<string, number[]>> {
+  if (sparklineCache && Date.now() - sparklineCache.at < SPARKLINE_TTL_MS) return sparklineCache.closes;
+  if (!isConfigured()) return sparklineCache?.closes ?? {};
+  sparklineBuild ??= buildSparklines()
+    .then((closes) => {
+      sparklineCache = { at: Date.now(), closes };
+      return closes;
+    })
+    .finally(() => {
+      sparklineBuild = null;
+    });
+  return sparklineBuild;
+}
+
+// ---------------------------------------------------------------------------
 // Unsubscribe tokens: base64url("<userId>|<kind>") + "." + HMAC-SHA256 sig.
 // Minted here AND by the Python worker (same ALERTS_UNSUB_SECRET) for the
 // List-Unsubscribe headers — keep the format in sync with worker/alerts.py.
@@ -177,6 +234,16 @@ export function registerAlertsRoutes(app: Express): void {
     } catch (e: any) {
       console.error("[watchlist] GET failed:", e?.message ?? e);
       res.status(500).json({ error: "failed to load watchlist" });
+    }
+  });
+
+  // Public chart data, but only the signed-in Alerts page asks for it.
+  app.get("/api/watchlist/sparklines", requireUser, async (_req: Request, res: Response) => {
+    try {
+      res.json({ closes: await tickerSparklines() });
+    } catch (e: any) {
+      console.error("[watchlist] sparklines failed:", e?.message ?? e);
+      res.json({ closes: {} });
     }
   });
 
