@@ -2698,6 +2698,7 @@ function initSiteAccount() {
         renderAccountControl();
         renderFactBand();
         loadAccountGapPlacement();
+        xpAccountKnown();
       })
       .catch(function () {});
   } catch (e) {}
@@ -3235,6 +3236,19 @@ function runAskChip(chip) {
   }
   if (chip === 'compare') return askCompareAnswer(sym, f, tok);
 }
+// One sentence from the windows where sym did better, worse or the same as QQQ.
+// A tie counts as compared; "not enough history" only when no window could be.
+function askCompareSentence(sym, ahead, behind, same) {
+  if (!ahead.length && !behind.length) {
+    return same.length ? sym + ' and QQQ had the same price change over ' + xpList(same) + '.'
+      : 'There is not enough history to compare the two.';
+  }
+  var parts = [];
+  if (ahead.length) parts.push('did better than QQQ over ' + xpList(ahead));
+  if (behind.length) parts.push((parts.length ? 'worse over ' : 'did worse than QQQ over ') + xpList(behind));
+  if (same.length) parts.push('matched it over ' + xpList(same));
+  return sym + ' ' + (parts.length < 2 ? parts[0] : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1]) + '.';
+}
 function askCompareAnswer(sym, f, tok) {
   askAnswer(sym + ' vs QQQ', ['Loading QQQ facts…'], askCloseSource(f, false));
   tickerFacts('QQQ').then(function (q) { return q; }, function () { return undefined; }).then(function (q) {
@@ -3246,21 +3260,17 @@ function askCompareAnswer(sym, f, tok) {
     var table = askNode('table'), head = askNode('tr');
     ['Price change', sym, 'QQQ'].forEach(function (t) { head.appendChild(askNode('th', null, t)); });
     table.appendChild(head);
-    var ahead = [], behind = [];
+    var ahead = [], behind = [], same = [];
     ['d21', 'm3', 'm6'].forEach(function (w) {
       var a = f.windows && f.windows[w], b = q.windows && q.windows[w], tr = askNode('tr');
       tr.appendChild(askNode('td', null, TREND_HL_NAMES[w]));
       tr.appendChild(askNode('td', a ? askVerdictCls(a.verdict) : '', a ? fbSigned(a.change) : '—'));
       tr.appendChild(askNode('td', b ? askVerdictCls(b.verdict) : '', b ? fbSigned(b.change) : '—'));
       table.appendChild(tr);
-      if (a && b && a.change > b.change) ahead.push(FB_WINDOW_WORDS[w][0]);
-      else if (a && b && a.change < b.change) behind.push(FB_WINDOW_WORDS[w][0]);
+      if (!a || !b) return;
+      (a.change > b.change ? ahead : a.change < b.change ? behind : same).push(FB_WINDOW_WORDS[w][0]);
     });
-    var sentence = ahead.length && behind.length
-      ? sym + ' did better than QQQ over ' + ahead.join(' and ') + ', and worse over ' + behind.join(' and ') + '.'
-      : ahead.length ? sym + ' did better than QQQ over ' + ahead.join(', ') + '.'
-      : behind.length ? sym + ' did worse than QQQ over ' + behind.join(', ') + '.'
-      : 'There is not enough history to compare the two.';
+    var sentence = askCompareSentence(sym, ahead, behind, same);
     var src = askCloseSource(f, false) + (q.asOf !== f.asOf ? ' (QQQ through ' + fbDay(q.asOf) + ')' : ', both tickers');
     askAnswer(sym + ' vs QQQ', [table, sentence, 'Price change only; distributions are not counted.'], src);
   });
@@ -6065,6 +6075,15 @@ function renderXpAssist() {
   clearXpFilter();
   xpAnswerBox().replaceChildren();
   setXpCheckActive(null);
+}
+// The account check answered while Limit Buy was open: a signed-in visitor gets
+// the assistant column and the table's fact cells now, not on the next opening.
+// The fact cells load within this opening's XP_TABLE_CAP, untouched until now.
+// Results not drawn yet (opening cleared them) get the fact columns from their build.
+function xpAccountKnown() {
+  if (!xpFactsOn() || !document.getElementById('exportDialog').classList.contains('open')) return;
+  renderXpAssist();
+  if (_exportView === 'table' && document.querySelector('#exportResult [data-sec]')) renderExportTable(_exportLastSections);
 }
 // dialog opened or closed: nothing carries over
 function resetXpAssist() {

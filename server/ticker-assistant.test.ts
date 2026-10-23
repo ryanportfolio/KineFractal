@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computeTickerFacts, type TickerFacts, type TickerFactsRow } from "./ticker-facts";
+import { computeTickerFacts, TickerFactsUnavailableError, type TickerFacts, type TickerFactsRow } from "./ticker-facts";
 import {
   answerTickerQuestion,
   buildTickerAssistantPrompt,
@@ -224,6 +224,27 @@ test("answer aborted while facts load ends with no output and no model call", as
   assert.equal(calls.length, 0);
   // The four symbols already in flight finish; no new one starts after the abort.
   assert.deepEqual(fetched, ["CLOZ", "SPY", "TSLA", "QQQ"]);
+});
+
+test("one failed ticker stops the rest of the facts fetch and makes no model call", async () => {
+  const { adapter, calls } = stubAdapter(["never"]);
+  const started: string[] = [];
+  const syms = Array.from({ length: 12 }, (_, i) => `T${i}`);
+  await assert.rejects(
+    collect(answerTickerQuestion({ symbols: syms, question: "Which yields most?" }, {
+      adapter,
+      fetchFacts: async (s) => {
+        started.push(s);
+        if (s === "T0") throw new TickerFactsUnavailableError(500);
+        await new Promise((r) => setTimeout(r, 20));
+        return CLOZ;
+      },
+    })),
+    TickerFactsUnavailableError,
+  );
+  await new Promise((r) => setTimeout(r, 100));
+  assert.deepEqual(started, ["T0", "T1", "T2", "T3"]);
+  assert.equal(calls.length, 0);
 });
 
 test("answer passes its abort signal to the model request", async () => {

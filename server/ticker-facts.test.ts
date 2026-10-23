@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   clearTickerFactsCache,
   computeTickerFacts,
+  fetchFactsForSymbols,
   fetchTickerFacts,
   nextNewYorkRefresh,
   TickerFactsUnavailableError,
@@ -385,4 +386,54 @@ test("a failed request is not cached", async (t) => {
   status = 200;
   assert.equal((await fetchTickerFacts("SPY", { fetch: fn, now: () => NOW }))?.symbol, "SPY");
   assert.equal(calls.length, 2);
+});
+
+test("fetchFactsForSymbols keeps symbol order and runs at most four at a time", async () => {
+  const facts = computeTickerFacts("SPY", rows(200, (i) => 100 + i * 0.1));
+  let running = 0;
+  let peak = 0;
+  const syms = ["A", "B", "C", "D", "E", "F", "G"];
+  const out = await fetchFactsForSymbols(syms, async (s) => {
+    running++;
+    peak = Math.max(peak, running);
+    await new Promise((r) => setTimeout(r, s === "A" ? 30 : 5));
+    running--;
+    return s === "C" ? null : { ...facts, symbol: s };
+  });
+  assert.deepEqual(out.map((f) => f?.symbol ?? null), ["A", "B", null, "D", "E", "F", "G"]);
+  assert.equal(peak, 4);
+  assert.deepEqual(await fetchFactsForSymbols([], async () => facts), []);
+});
+
+test("fetchFactsForSymbols starts no symbol after the first failure and rejects with it", async () => {
+  const started: string[] = [];
+  const boom = new TickerFactsUnavailableError(500);
+  const syms = Array.from({ length: 20 }, (_, i) => `S${i}`);
+  await assert.rejects(
+    fetchFactsForSymbols(syms, async (s) => {
+      started.push(s);
+      if (s === "S1") throw boom;
+      await new Promise((r) => setTimeout(r, 20));
+      return null;
+    }),
+    (e) => e === boom,
+  );
+  await new Promise((r) => setTimeout(r, 100));
+  // The four already in flight finish; nothing new starts once S1 failed.
+  assert.deepEqual(started, ["S0", "S1", "S2", "S3"]);
+});
+
+test("fetchFactsForSymbols starts no symbol after the signal aborts", async () => {
+  const controller = new AbortController();
+  const started: string[] = [];
+  const syms = Array.from({ length: 10 }, (_, i) => `S${i}`);
+  const out = await fetchFactsForSymbols(syms, async (s) => {
+    started.push(s);
+    await new Promise((r) => setTimeout(r, s === "S0" ? 5 : 20));
+    if (s === "S0") controller.abort();
+    return null;
+  }, controller.signal);
+  assert.equal(out.length, 10);
+  // The four already in flight finish; nothing new starts after the abort.
+  assert.deepEqual(started, ["S0", "S1", "S2", "S3"]);
 });

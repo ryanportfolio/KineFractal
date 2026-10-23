@@ -32,6 +32,7 @@ import {
   TICKER_ASSISTANT_DAILY_LIMIT,
 } from "./ticker-assistant";
 import {
+  fetchFactsForSymbols,
   fetchTickerFacts,
   TickerFactsUnavailableError,
   TICKER_RE,
@@ -374,20 +375,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(503).json({ error: "ticker facts unavailable" });
     }
     try {
+      // A few Tiingo requests at a time, none started after the first failure.
+      const results = await fetchFactsForSymbols(symbols, (s) => fetchTickerFacts(s));
       const facts: Record<string, TickerFacts> = {};
       const missing: string[] = [];
-      // A few Tiingo requests at a time; cache hits return immediately.
-      let next = 0;
-      const worker = async () => {
-        while (next < symbols.length) {
-          const sym = symbols[next++];
-          const result = await fetchTickerFacts(sym);
-          if (result) facts[sym] = result;
-          else missing.push(sym);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(4, symbols.length) }, worker));
-      missing.sort((a, b) => symbols.indexOf(a) - symbols.indexOf(b));
+      symbols.forEach((sym, i) => {
+        const result = results[i];
+        if (result) facts[sym] = result;
+        else missing.push(sym);
+      });
       res.json({ facts, missing });
     } catch (error) {
       // TickerFactsUnavailableError messages carry only the upstream status.

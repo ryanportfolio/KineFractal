@@ -6,6 +6,7 @@
 
 import { createOpenRouterRatioAdapter, type OpenRouterRatioInput } from "./openrouter-ratio";
 import {
+  fetchFactsForSymbols,
   fetchTickerFacts,
   TickerFactsUnavailableError,
   TICKER_RE,
@@ -177,25 +178,6 @@ export interface TickerAssistantInput {
   nearestBuy?: Record<string, number>;
 }
 
-async function factsFor(
-  symbols: string[],
-  fetchFacts: (symbol: string) => Promise<TickerFacts | null>,
-  signal?: AbortSignal,
-): Promise<(TickerFacts | null)[]> {
-  // A few Tiingo requests at a time; cache hits return immediately. No new
-  // symbol starts once the caller has gone away.
-  const results: (TickerFacts | null)[] = new Array(symbols.length).fill(null);
-  let next = 0;
-  const worker = async () => {
-    while (next < symbols.length && !signal?.aborted) {
-      const i = next++;
-      results[i] = await fetchFacts(symbols[i]);
-    }
-  };
-  await Promise.all(Array.from({ length: Math.min(4, symbols.length) }, worker));
-  return results;
-}
-
 /**
  * Streams the model's answer, then a final "\n\n" + source line chunk. Throws
  * TickerAssistantNoFactsError, without calling the model, when no symbol has
@@ -212,7 +194,7 @@ export async function* answerTickerQuestion(
   } = {},
 ): AsyncGenerator<string> {
   const { signal } = deps;
-  const results = await factsFor(input.symbols, deps.fetchFacts ?? ((s) => fetchTickerFacts(s)), signal);
+  const results = await fetchFactsForSymbols(input.symbols, deps.fetchFacts ?? ((s) => fetchTickerFacts(s)), signal);
   if (signal?.aborted) return;
   const facts = results.filter((f): f is TickerFacts => f !== null);
   const missing = input.symbols.filter((_, i) => results[i] === null);

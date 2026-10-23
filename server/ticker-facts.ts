@@ -275,3 +275,32 @@ export async function fetchTickerFacts(
   inFlight.set(sym, request);
   return request;
 }
+
+/**
+ * Facts for each symbol in order (null where a ticker has none), a few Tiingo
+ * requests at a time; cache hits return immediately. Every uncached ticker
+ * costs one call on the shared free-tier key, so no new symbol starts after
+ * the first failure or once `signal` aborts. Rejects with the first failure.
+ */
+export async function fetchFactsForSymbols(
+  symbols: string[],
+  fetchFacts: (symbol: string) => Promise<TickerFacts | null>,
+  signal?: AbortSignal,
+): Promise<(TickerFacts | null)[]> {
+  const results: (TickerFacts | null)[] = new Array(symbols.length).fill(null);
+  let next = 0;
+  let failed = false;
+  const worker = async () => {
+    while (next < symbols.length && !failed && !signal?.aborted) {
+      const i = next++;
+      try {
+        results[i] = await fetchFacts(symbols[i]);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(4, symbols.length) }, worker));
+  return results;
+}

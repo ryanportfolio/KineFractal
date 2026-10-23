@@ -975,3 +975,29 @@ test("Limit Buy: with the filter on, the ticker list's jump lands on a visible p
   page("TSLA");
   assert.deepEqual(calls, [["first", "TSLA", true]], "no filter: the usual jump");
 });
+
+test("ASK AI compare: a tie with QQQ counts as compared", () => {
+  const { askCompareSentence } = pageFns(["xpList", "askCompareSentence"]);
+  assert.equal(askCompareSentence("TSLA", [], [], ["21 days", "3 months", "6 months"]),
+    "TSLA and QQQ had the same price change over 21 days, 3 months and 6 months.");
+  assert.equal(askCompareSentence("TSLA", ["21 days"], [], ["3 months", "6 months"]),
+    "TSLA did better than QQQ over 21 days, and matched it over 3 months and 6 months.");
+  assert.equal(askCompareSentence("TSLA", ["21 days"], ["3 months"], ["6 months"]),
+    "TSLA did better than QQQ over 21 days, worse over 3 months, and matched it over 6 months.");
+  assert.equal(askCompareSentence("TSLA", [], ["21 days", "3 months"], []), "TSLA did worse than QQQ over 21 days and 3 months.");
+  assert.equal(askCompareSentence("TSLA", [], [], []), "There is not enough history to compare the two.");
+  const compare = fnBody("askCompareAnswer");
+  assert.match(compare, /if \(!a \|\| !b\) return;/);
+  assert.match(compare, /\(a\.change > b\.change \? ahead : a\.change < b\.change \? behind : same\)\.push/);
+});
+
+test("Limit Buy opened before the account check answers turns signed in when it does", () => {
+  assert.match(fnBody("initSiteAccount"), /loadAccountGapPlacement\(\);\s*xpAccountKnown\(\);/);
+  const known = fnBody("xpAccountKnown");
+  assert.match(known, /if \(!xpFactsOn\(\) \|\| !document\.getElementById\('exportDialog'\)\.classList\.contains\('open'\)\) return;/);
+  assert.match(known, /renderXpAssist\(\);/);
+  assert.match(known, /if \(_exportView === 'table' && document\.querySelector\('#exportResult \[data-sec\]'\)\) renderExportTable\(_exportLastSections\);/,
+    "drawn table results get their fact columns; a build still running draws them itself");
+  // the opening's allowance is not spent while the account is unknown
+  assert.match(fnBody("xpFactWant"), /if \(!xpFactsOn\(\) \|\| _exportView !== 'table'\) return;/);
+});
