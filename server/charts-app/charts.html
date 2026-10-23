@@ -2941,7 +2941,9 @@ function renderFactBand() {
     if (!r.ok) setFactMsg('Could not load facts for ' + sym + '. Try again in a minute.', true, true);
     else if (!r.facts) setFactMsg('No facts for ' + sym + ': Tiingo has no daily prices for it.', false, false);
     else setFactMsg('');
-    _factReady = { sym: sym, ok: r.ok, facts: r.ok ? r.facts : null, buy: res[1] };
+    // expires: when these facts go stale (the cache entry's 18:30 New York); none after a failure
+    _factReady = { sym: sym, ok: r.ok, facts: r.ok ? r.facts : null, buy: res[1], expires: r.ok ? _tickerFactsExpires[sym] : undefined };
+    armFactBandExpiry();
     renderAskDock();
     // a chip answer on screen was built from the facts before these (often "still
     // loading"): answer it again from the new ones
@@ -2968,6 +2970,43 @@ function refreshExpiredFacts() {
 document.addEventListener('visibilitychange', function () {
   if (document.visibilityState === 'visible') refreshExpiredFacts();
 });
+// A tab kept visible past 18:30 New York: a timer redraws the band from new facts
+// once its own expire, and the band answers an open chip again when they arrive.
+// Settling the band arms it. It wakes at most a minute apart and reads the clock
+// each time, so a computer that sleeps through the expiry or a clock that jumps
+// still refreshes on the next wake; the wakes make no request until the facts have
+// expired, then one. It fires 30 s after the expiry so a browser clock a little
+// ahead of the server's does not ask before the server has dropped its own copy.
+// Hidden tabs stop the timer; showing the tab again arms it after the refresh above.
+var FACT_EXPIRY_STEP = 60e3, FACT_EXPIRY_GRACE = 30e3;
+var _factExpiryTimer = 0;
+function factBandStale() {   // the band shows facts for the ticker on screen that have since expired
+  var r = _factReady;
+  return !!(r && r.sym === _factSym && r.expires != null && !(Date.now() < r.expires));
+}
+function armFactBandExpiry() {
+  clearTimeout(_factExpiryTimer);
+  _factExpiryTimer = 0;
+  var r = _factReady;
+  if (!r || r.sym !== _factSym || r.expires == null || document.visibilityState === 'hidden') return;
+  var wait = r.expires + FACT_EXPIRY_GRACE - Date.now();
+  _factExpiryTimer = setTimeout(onFactBandExpiry, Math.max(0, Math.min(wait, FACT_EXPIRY_STEP)));
+}
+function onFactBandExpiry() {
+  _factExpiryTimer = 0;
+  var r = _factReady;
+  if (factBandStale() && !(Date.now() < r.expires + FACT_EXPIRY_GRACE)) refreshStaleFactBand();
+  else armFactBandExpiry();
+}
+// Drops expired facts and redraws what showed them, as coming back to the tab does.
+// The band is redrawn even when its cache entry was already dropped elsewhere (the
+// Limit Buy table or a quick check asked for the ticker first).
+function refreshStaleFactBand() {
+  var r = _factReady;
+  refreshExpiredFacts();
+  if (_factReady === r && factBandStale()) renderFactBand();
+}
+document.addEventListener('visibilitychange', armFactBandExpiry);
 // Phones show the band collapsed to its summary line; this opens and closes the tiles.
 // Wider screens never show the summary, so the class has no effect there.
 document.querySelector('#factBand [data-action="fact-band-toggle"]').addEventListener('click', function () {
@@ -3032,7 +3071,11 @@ function readAskMode() {
   try { m = localStorage.getItem(ASK_MODE_KEY); } catch (e) {}
   return m === 'open' ? 'open' : 'rail';
 }
-function askFacts() {   // the facts for the ticker on screen, once the band has them
+// The facts for the ticker on screen, once the band has them. Never expired ones:
+// past 18:30 New York the band fetches new facts first and this answers null (still
+// loading); once they arrive the band answers an open chip again from them.
+function askFacts() {
+  if (factBandStale()) refreshStaleFactBand();
   return _factReady && _factReady.sym === _factSym ? _factReady : null;
 }
 function askPayer(f) { return !!(f && f.cadence && f.cadence !== 'none'); }

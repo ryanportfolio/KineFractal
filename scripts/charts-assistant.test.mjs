@@ -1001,3 +1001,85 @@ test("Limit Buy opened before the account check answers turns signed in when it 
   // the opening's allowance is not spent while the account is unknown
   assert.match(fnBody("xpFactWant"), /if \(!xpFactsOn\(\) \|\| _exportView !== 'table'\) return;/);
 });
+
+test("a visible tab redraws the band and the dock from new facts once they expire at 18:30 New York", () => {
+  const settle = fnBody("renderFactBand");
+  assert.match(settle, /expires: r\.ok \? _tickerFactsExpires\[sym\] : undefined \};\s*armFactBandExpiry\(\);/, "settling the band arms the timer");
+  assert.match(html, /document\.addEventListener\('visibilitychange', armFactBandExpiry\);/);
+  assert.match(fnBody("askFacts"), /if \(factBandStale\(\)\) refreshStaleFactBand\(\);\s*return _factReady/, "askFacts never hands out expired facts");
+  // the visibilitychange refresh is unchanged
+  assert.match(html, /document\.addEventListener\('visibilitychange', function \(\) \{\s*if \(document\.visibilityState === 'visible'\) refreshExpiredFacts\(\);/);
+
+  const prelude = `var now = 0, timers = [], log = [], vis = 'visible', _factSym = 'SPY', _factReady = null;
+    var Date = { now: function () { return now; } };
+    var document = { get visibilityState() { return vis; }, addEventListener: function () {},
+      querySelector: function () { return { addEventListener: function () {} }; } };
+    function setTimeout(fn, ms) { timers.push({ fn: fn, at: now + ms }); return timers.length; }
+    function clearTimeout(id) { if (id) timers[id - 1] = null; }
+    function refreshExpiredFacts() { log.push('refreshExpiredFacts'); if (dropped) { _factReady = null; log.push('render'); } }
+    function renderFactBand() { _factReady = null; log.push('render'); }
+    var dropped = true;
+    var FACT_EXPIRY_STEP = 60e3, FACT_EXPIRY_GRACE = 30e3, _factExpiryTimer = 0;`;
+  const names = ["factBandStale", "armFactBandExpiry", "onFactBandExpiry", "refreshStaleFactBand", "askFacts"];
+  const page = new Function(`${prelude}\n${names.map((n) => fnBody(n)).join("\n")}\nreturn {
+    ready(o) { _factReady = o; armFactBandExpiry(); },
+    set(o) { if ('now' in o) now = o.now; if ('vis' in o) vis = o.vis; if ('dropped' in o) dropped = o.dropped; if ('sym' in o) _factSym = o.sym; },
+    pending() { return timers.filter(Boolean); },
+    fire() { var t = timers.filter(Boolean); timers = timers.map(function () { return null; }); t.forEach(function (x) { x.fn(); }); },
+    log, askFacts, factBandStale, armFactBandExpiry, cur() { return _factReady; } };`)();
+  const H = 3600e3, exp = 8.5 * H;
+
+  page.ready({ sym: "SPY", ok: true, facts: { yield: 0.99 }, expires: exp });
+  assert.deepEqual(page.pending().map((t) => t.at), [60e3], "the timer wakes at most a minute apart");
+  page.set({ now: 60e3 }); page.fire();
+  assert.deepEqual(page.log, [], "before the expiry a wake only re-arms: no request");
+  assert.equal(page.pending().length, 1);
+
+  // the computer sleeps through 18:30, or the clock jumps: the next wake refreshes once
+  page.set({ now: exp + 60e3 }); page.fire();
+  assert.deepEqual(page.log, ["refreshExpiredFacts", "render"]);
+  assert.equal(page.cur(), null);
+  page.fire();
+  assert.deepEqual(page.log, ["refreshExpiredFacts", "render"], "no band, no timer: nothing more until the band settles again");
+
+  // a wake within 30 s of the expiry waits out the rest of that grace
+  page.log.length = 0;
+  page.set({ now: 0 });
+  page.ready({ sym: "SPY", ok: true, facts: {}, expires: 50e3 });
+  assert.deepEqual(page.pending().map((t) => t.at), [60e3]);
+  page.set({ now: 60e3 }); page.fire();
+  assert.deepEqual(page.log, [], "10 s past the expiry: not yet");
+  assert.deepEqual(page.pending().map((t) => t.at), [80e3]);
+  page.set({ now: 80e3 }); page.fire();
+  assert.deepEqual(page.log, ["refreshExpiredFacts", "render"]);
+
+  // the cache entry was already dropped elsewhere: the band is still redrawn
+  page.log.length = 0;
+  page.set({ now: 0, dropped: false });
+  page.ready({ sym: "SPY", ok: true, facts: {}, expires: 1000 });
+  page.set({ now: 31e3 }); page.fire();
+  assert.deepEqual(page.log, ["refreshExpiredFacts", "render"]);
+
+  // a failed load has no expiry; a hidden tab stops the timer
+  page.set({ now: 0, dropped: true });
+  page.ready({ sym: "SPY", ok: false, facts: null, expires: undefined });
+  assert.equal(page.pending().length, 0);
+  page.set({ vis: "hidden" });
+  page.ready({ sym: "SPY", ok: true, facts: {}, expires: exp });
+  assert.equal(page.pending().length, 0, "hidden: no timer; showing the tab arms it");
+  page.set({ vis: "visible" }); page.armFactBandExpiry();
+  assert.equal(page.pending().length, 1);
+
+  // askFacts: fresh facts as they are, expired ones never (it starts the refresh instead)
+  page.log.length = 0;
+  const fresh = { sym: "SPY", ok: true, facts: { yield: 0.99 }, expires: exp };
+  page.ready(fresh);
+  page.set({ now: exp - 1 });
+  assert.equal(page.askFacts(), fresh);
+  page.set({ now: exp });
+  assert.equal(page.askFacts(), null, "a chip tapped at or after 18:30 waits for new facts");
+  assert.deepEqual(page.log, ["refreshExpiredFacts", "render"]);
+  page.set({ sym: "QQQ" });
+  page.ready({ sym: "SPY", ok: true, facts: {}, expires: 0 });
+  assert.equal(page.factBandStale(), false, "facts for another ticker are not the band's");
+});
