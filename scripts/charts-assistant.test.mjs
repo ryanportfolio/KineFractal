@@ -145,13 +145,17 @@ test("ASK AI: Esc in the dock collapses it to the rail and returns focus to the 
   assert.match(fnBody("collapseAskDock"), /setAskMode\('rail'\);\s*document\.getElementById\('askAiBtn'\)\.focus\(\);/);
 });
 
-test("ASK AI: chips and rail icons, with payout for payers and Compare with QQQ for non-payers", () => {
-  for (const k of ["yield", "why", "payout", "compare", "buy"]) assert.match(html, new RegExp(`class="ask-chip" data-chip="${k}"`));
+test("ASK AI: a tab strip and rail icons, with payout for payers and VS QQQ for non-payers", () => {
+  const tabs = { summary: "SUMMARY", yield: "YIELD", why: "TREND", payout: "PAYOUT", compare: "VS QQQ", buy: "BUY" };
+  for (const [k, label] of Object.entries(tabs)) {
+    assert.match(html, new RegExp(`class="ask-chip" data-chip="${k}" aria-pressed="false"[^>]*>${label}</button>`));
+  }
   for (const k of ["yield", "trend", "payout", "compare", "buy", "ask"]) {
     assert.match(html, new RegExp(`class="ask-railbtn" data-rail="${k}" aria-label="[^"]+" data-tip="[^"]+"`));
   }
+  assert.match(fnBody("setAskPressed"), /c\.setAttribute\('aria-pressed', on \? 'true' : 'false'\);/);
   const render = fnBody("renderAskDock");
-  assert.match(render, /'Why ' \+ overall \+ '\?'/);
+  assert.doesNotMatch(render, /'Why '/, "the trend tab keeps one name");
   assert.match(render, /\[data-chip="yield"\]'\)\.hidden = !\(known && payer\);/, "hidden while facts load, shown only for payers");
   assert.match(render, /\[data-chip="payout"\]'\)\.hidden = !\(known && payer\)/);
   assert.match(render, /\[data-chip="compare"\]'\)\.hidden = !\(known && !payer\)/);
@@ -172,7 +176,10 @@ test("ASK AI: chips answer from facts with a source line, never a model call or 
   }
   assert.match(fnBody("askAnswer"), /askNode\('p', 'ask-src', 'Source: ' \+ source\)/);
   assert.match(fnBody("askCompareAnswer"), /tickerFacts\('QQQ'\)/);
-  assert.match(fnBody("runAskChip"), /'Next ex-date expected around ' \+ fbDay\(next\) \+ ' \(estimate from the ' \+ f\.cadence \+ ' cadence; not an announced date\)\.'/);
+  assert.match(fnBody("askPayoutView"), /askHero\('around ' \+ askDay\(next\), 'is-est', 'next ex-date, ' \+ askDaysAway\(next\), 'ESTIMATE'\)/);
+  assert.match(fnBody("askPayoutView"), /It is not an announced date/);
+  assert.match(fnBody("askView"), /askNode\('summary', null, 'How this is worked out'\)/);
+  assert.match(fnBody("askView"), /foot\.appendChild\(askNode\('p', 'ask-src', 'Source: ' \+ source\)\);/);
   assert.match(fnBody("askBuyAnswer"), /px2\(buy\.lim\.row\.limit\)/);
   assert.match(fnBody("initAskDock"), /addEventListener\('submit', function \(e\) \{\s*e\.preventDefault\(\);/);
   assert.match(html, /<div id="askAnswer" aria-live="polite"><\/div>/);
@@ -1000,9 +1007,14 @@ test("ASK AI compare: a tie with QQQ counts as compared", () => {
     "TSLA did better than QQQ over 21 days, worse over 3 months, and matched it over 6 months.");
   assert.equal(askCompareSentence("TSLA", [], ["21 days", "3 months"], []), "TSLA did worse than QQQ over 21 days and 3 months.");
   assert.equal(askCompareSentence("TSLA", [], [], []), "There is not enough history to compare the two.");
-  const compare = fnBody("askCompareAnswer");
-  assert.match(compare, /if \(!a \|\| !b\) return;/);
-  assert.match(compare, /\(a\.change > b\.change \? ahead : a\.change < b\.change \? behind : same\)\.push/);
+  const { askCompareHeadline } = pageFns(["xpList", "askCompareSentence", "askCompareHeadline"]);
+  assert.equal(askCompareHeadline("IAU", [], ["21 days", "3 months", "6 months"], []), "QQQ did better in all 3 periods");
+  assert.equal(askCompareHeadline("IAU", ["21 days", "3 months"], ["6 months"], []), "IAU did better in 2 of 3 periods");
+  assert.equal(askCompareHeadline("IAU", ["21 days"], ["3 months"], ["6 months"]),
+    "IAU did better than QQQ over 21 days, worse over 3 months, and matched it over 6 months.", "a tie keeps the full sentence");
+  const windows = fnBody("askCompareWindows");
+  assert.match(windows, /if \(a && b\) \{/, "a window missing on either side is not compared");
+  assert.match(windows, /\(a\.change > b\.change \? out\.ahead : a\.change < b\.change \? out\.behind : out\.same\)\.push/);
 });
 
 test("Limit Buy opened before the account check answers turns signed in when it does", () => {
@@ -1183,9 +1195,12 @@ test("typed answers render as a bold lead, bullet lists and web section headings
   assert.equal(flat(box.childNodes[0]), "Short answer.");
 });
 
-test("the dock opens with an empty answer area once a ticker is on screen", () => {
+test("the dock opens on the SUMMARY board once a ticker is on screen", () => {
   const hint = fnBody("askHint");
-  assert.match(hint, /if \(_askSym\) box\.replaceChildren\(\);/);
+  assert.match(hint, /if \(_askSym\) \{ runAskChip\('summary'\); return; \}/);
+  assert.match(fnBody("runAskChip"), /if \(chip === 'summary'\) return askSummaryView\(sym, f, r\.buy, tok\);/);
+  assert.match(fnBody("refreshFactBandBuy"), /if \(\(_askChip === 'buy' \|\| _askChip === 'summary'\) && _askSym === r\.sym\) runAskChip\(_askChip\);/,
+    "a new NEAREST BUY redraws the summary too");
   assert.doesNotMatch(html, /Pick a quick question about/);
   assert.doesNotMatch(html, /Quick checks use the facts and buy prices shown here/);
 });
