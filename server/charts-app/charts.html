@@ -928,7 +928,6 @@
                         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #askDock .ask-collapse { flex:0 0 auto; min-width:36px; min-height:36px; padding:0 8px; color:var(--mut); }
   #askDock .ask-collapse:hover { color:var(--fg); }
-  #askDock .ask-note { margin:0; color:var(--mut); font-size:12px; line-height:1.45; }
   #askDock .ask-chips { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
   #askDock .ask-chip { display:flex; align-items:center; gap:10px; min-height:44px; padding:8px 10px;
                        text-align:left; border-color:var(--grid); background:var(--bg); }
@@ -949,8 +948,6 @@
                                           color:var(--fg); font-size:13px; cursor:pointer; }
   #askDock .ask-web input, #xpAssist .ask-web input { width:18px; height:18px; margin:0; accent-color:var(--sup); }
   #askDock .ask-web input:focus-visible, #xpAssist .ask-web input:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
-  #askDock .ask-webnote, #xpAssist .ask-webnote { margin:2px 0 0; color:var(--mut); font-size:12px; line-height:1.45; }
-  #askDock .ask-webnote[hidden], #xpAssist .ask-webnote[hidden] { display:none; }
   @media (max-width:600px) { #askDock .ask-web, #xpAssist .ask-web { min-height:44px; } }
   #askAnswer table { border-collapse:collapse; margin:4px 0 10px; }
   #askAnswer th, #askAnswer td { padding:3px 14px 3px 0; text-align:right; font-variant-numeric:tabular-nums; }
@@ -967,7 +964,19 @@
   #askDock .ask-send svg { stroke-width:2.4; }
   #askDock .ask-send:disabled { opacity:.5; cursor:default; }
   #askAnswer .ask-card .ask-q, #xpAssistAnswer .ask-card .ask-q { margin:0 0 10px; padding-left:8px; border-left:2px solid var(--sup); color:var(--fg); }
-  #askAnswer .ask-stream, #xpAssistAnswer .ask-stream { white-space:pre-wrap; }
+  /* a typed answer, laid out by askRenderAnswer: lead sentence, bullets, small
+     section headings for the web answer, coloured signed percentages */
+  #askAnswer .ask-stream, #xpAssistAnswer .ask-stream { line-height:1.5; }
+  #askAnswer .ask-stream p, #xpAssistAnswer .ask-stream p { margin:0 0 8px; }
+  #askAnswer .ask-stream .ask-lead, #xpAssistAnswer .ask-stream .ask-lead { color:var(--fg); font-weight:bold; font-size:14px; }
+  #askAnswer .ask-stream ul, #xpAssistAnswer .ask-stream ul { margin:0 0 8px; padding-left:18px; }
+  #askAnswer .ask-stream li, #xpAssistAnswer .ask-stream li { margin:0 0 5px; }
+  #askAnswer .ask-stream li::marker, #xpAssistAnswer .ask-stream li::marker { color:var(--sup); }
+  #askAnswer .ask-stream h4, #exportDialog #xpAssistAnswer .ask-stream h4 { margin:12px 0 4px; color:var(--mut); font-size:11px;
+                                                                    font-weight:bold; letter-spacing:.1em; text-transform:uppercase; }
+  #askAnswer .ask-stream .ask-site, #xpAssistAnswer .ask-stream .ask-site { color:var(--sup); font-weight:bold; }
+  #xpAssistAnswer .ask-stream .is-up { color:var(--cbuy); }
+  #xpAssistAnswer .ask-stream .is-down { color:var(--csell); }
   #askAnswer .ask-stream:empty, #xpAssistAnswer .ask-stream:empty { display:none; }
   #askAnswer .ask-err, #xpAssistAnswer .ask-err { color:var(--fg); }
   #askAnswer .ask-retry, #exportDialog #xpAssistAnswer .ask-retry { min-height:36px; padding:0 14px; border:1px solid var(--grid); background:none; cursor:pointer; font:inherit; color:var(--fg); }
@@ -1148,7 +1157,6 @@
       <h2 class="ask-title" id="askTitle">ASK ABOUT —</h2>
       <button type="button" class="ask-collapse" aria-label="Collapse to the side rail" title="Collapse (Esc)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 6l6 6-6 6M13 6l6 6-6 6"/></svg></button>
     </div>
-    <p class="ask-note">Explains the numbers shown on this page. Not investment advice, and the site never places orders.</p>
     <div class="ask-chips" role="group" aria-label="Quick questions">
       <button type="button" class="ask-chip" data-chip="yield"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7M10 20V6M15 20v-9M20 20V4"/></svg><span>Yield &amp; cadence</span></button>
       <button type="button" class="ask-chip" data-chip="why"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span class="ask-chiplabel">Why this trend?</span></button>
@@ -1161,8 +1169,7 @@
       <input id="askInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about this ticker" placeholder="Ask about this ticker…">
       <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
     </form>
-    <label class="ask-web"><input type="checkbox" id="askWeb" autocomplete="off" aria-describedby="askWebNote"> Search the web</label>
-    <p class="ask-webnote" id="askWebNote" hidden>Typed questions also search the web for news and context. Your question goes to the search; web results are not checked by this site.</p>
+    <label class="ask-web"><input type="checkbox" id="askWeb" autocomplete="off"> Search the web</label>
   </div>
 </aside>
 <div id="cmpMenu" role="dialog" aria-label="Compare a ticker" hidden>
@@ -1334,8 +1341,7 @@
           <input id="xpAskInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about the selected tickers" placeholder="Ask about these tickers…">
           <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
         </form>
-        <label class="ask-web"><input type="checkbox" id="xpAskWeb" autocomplete="off" aria-describedby="xpAskWebNote"> Search the web</label>
-        <p class="ask-webnote" id="xpAskWebNote" hidden>Typed questions also search the web for news and context. Your question goes to the search; web results are not checked by this site.</p>
+        <label class="ask-web"><input type="checkbox" id="xpAskWeb" autocomplete="off"> Search the web</label>
       </aside>
     </div>
     <div id="exportEditor" role="region" aria-labelledby="exportEditorTitle" hidden>
@@ -3472,15 +3478,23 @@ function askWebOn(id) { var c = document.getElementById(id); return !!(c && c.ch
 // Browsers can restore a ticked box on reload (Firefox form restore) or on Back
 // (page cache), so it is cleared at start and on every pageshow.
 function wireAskWeb(id) {
-  var c = document.getElementById(id), note = document.getElementById(id + 'Note');
-  var reset = function () { c.checked = false; note.hidden = true; };
+  var c = document.getElementById(id);
+  var reset = function () { c.checked = false; };
   reset();
-  c.addEventListener('change', function () { note.hidden = !c.checked; });
   window.addEventListener('pageshow', reset);
 }
-// The server's source line, with any web result links it lists made clickable
-// (http and https only, named by their site). Text nodes only, never HTML.
+// The server's source line: the Tiingo part, then the web results (when the
+// question searched the web) on a line of their own, as links.
 function askSourceNode(line) {
+  var frag = document.createDocumentFragment();
+  var m = /^(.*?)\s+(Web results \(not checked by this site\): .*|Web search returned no sources\.)$/.exec(String(line));
+  frag.appendChild(askLinkLine(m ? m[1] : String(line)));
+  if (m) frag.appendChild(askLinkLine(m[2].replace(/^Web results \(not checked by this site\):/, 'Web, not checked by this site:')));
+  return frag;
+}
+// One source line with its http and https links made clickable, named by their
+// site. Text nodes only, never HTML.
+function askLinkLine(line) {
   var p = askNode('p', 'ask-src'), parts = String(line).split(/(https?:\/\/\S+)/);
   parts.forEach(function (part, i) {
     var url = null;
@@ -3499,6 +3513,44 @@ function askSourceNode(line) {
     p.appendChild(a);
   });
   return p;
+}
+// Lays out a typed answer as the model writes it (rule 6 of the prompt): the first
+// line as a bold lead, "- " lines as a bulleted list, and the web answer's
+// "From the facts:" and "From the web:" lines as small headings. Redrawn from the
+// whole text on every chunk, so a half-written line settles once its end arrives.
+var ASK_SECTION_RE = /^(From the facts|From the web):$/i;
+function askRenderAnswer(box, text) {
+  box.replaceChildren();
+  var list = null;
+  String(text).split(/\r?\n/).forEach(function (raw) {
+    var line = raw.replace(/\*\*/g, '').trim();
+    if (!line) { list = null; return; }
+    if (ASK_SECTION_RE.test(line)) { list = null; box.appendChild(askNode('h4', '', line.slice(0, -1))); return; }
+    var item = /^[-*\u2022]\s+(.*)$/.exec(line);
+    if (item) {
+      if (!list) { list = askNode('ul', ''); box.appendChild(list); }
+      list.appendChild(askRichText(askNode('li', ''), item[1]));
+      return;
+    }
+    list = null;
+    box.appendChild(askRichText(askNode('p', box.childNodes.length ? '' : 'ask-lead'), line));
+  });
+}
+// a web point's leading site ("reuters.com:" or "reuters.com says") stands out, and
+// signed percentages take the band's colours (red down, green up). Text nodes only.
+function askRichText(el, s) {
+  var site = /^([a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,})(:?)\s+/i.exec(s);
+  if (site) {
+    el.appendChild(askNode('span', 'ask-site', site[1]));
+    el.appendChild(document.createTextNode(site[2] ? ': ' : ' '));
+    s = s.slice(site[0].length);
+  }
+  s.split(/((?:^|(?<=[\s(]))[+-]?\d+(?:\.\d+)?%)/).forEach(function (part, i) {
+    if (!part) return;
+    if (i % 2) el.appendChild(askNode('b', part[0] === '-' ? 'is-down' : part[0] === '+' ? 'is-up' : '', part));
+    else el.appendChild(document.createTextNode(part));
+  });
+  return el;
 }
 // the card for a typed question: the question on top, then the answer
 function askTypedCard(question) {
@@ -3542,8 +3594,7 @@ function sendAskQuestion(question) {
   var live = function () { return _askReq === req && req.tok === _askToken && card.isConnected; };
   var web = askWebOn('askWeb');
   var wait = askNode('p', 'ask-hint', web ? 'Searching the web and writing an answer…' : 'Writing an answer…');
-  var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
-  answer.appendChild(text);
+  var answer = askNode('div', 'ask-stream'), buf = '';
   card.appendChild(wait);
   card.appendChild(answer);
   var payload = { symbols: [sym], question: question };
@@ -3571,17 +3622,18 @@ function sendAskQuestion(question) {
     var add = function (chunk) {
       if (!live() || !chunk) return;
       if (wait.parentNode) wait.remove();
-      text.data += chunk;
+      buf += chunk;
+      askRenderAnswer(answer, buf);
     };
     var finish = function () {
       if (!live()) return drop();
-      var all = text.data;
+      var all = buf;
       var lines = all.replace(/\s+$/, '').split(/\r?\n/);
       var last = lines.pop() || '';
       if (/\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);
       _askReq = null;
       setAskBusy(false);
-      text.data = lines.join('\n').trim();
+      askRenderAnswer(answer, lines.join('\n').trim());
       card.appendChild(askSourceNode(last));
     };
     return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
@@ -6567,8 +6619,7 @@ function sendXpQuestion(question) {
   var card = xpTypedCard(question);
   var web = askWebOn('xpAskWeb');
   var wait = askNode('p', 'ask-hint', (web ? 'Searching the web and writing' : 'Writing') + ' an answer about ' + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + '…');
-  var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
-  answer.appendChild(text);
+  var answer = askNode('div', 'ask-stream'), buf = '';
   card.appendChild(wait);
   card.appendChild(answer);
   var payload = { symbols: syms, question: question }, buy = {}, anyBuy = false;
@@ -6597,17 +6648,18 @@ function sendXpQuestion(question) {
     var add = function (chunk) {
       if (!live() || !chunk) return;
       if (wait.parentNode) wait.remove();
-      text.data += chunk;
+      buf += chunk;
+      askRenderAnswer(answer, buf);
     };
     var finish = function () {
       if (!live()) return drop();
-      var all = text.data;
+      var all = buf;
       var lines = all.replace(/\s+$/, '').split(/\r?\n/);
       var last = lines.pop() || '';
       if (/\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);
       _xpAskReq = null;
       setXpAskBusy(false);
-      text.data = lines.join('\n').trim();
+      askRenderAnswer(answer, lines.join('\n').trim());
       card.appendChild(askSourceNode(last));
     };
     return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });

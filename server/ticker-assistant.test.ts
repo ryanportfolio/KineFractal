@@ -95,13 +95,15 @@ test("prompt carries the facts as JSON under plain labels and the grounding and 
     "startDate", "startClose", "exDate", "lastExDate", "verdict", "source"]) {
     assert.equal(systemPrompt.includes(`"${key}"`), false, key);
   }
-  assert.match(systemPrompt, /Every number in the answer must name the ticker it belongs to/);
+  assert.match(systemPrompt, /When the answer covers more than one ticker, every number must name its ticker on the same line/);
   assert.match(systemPrompt, /Use the plain period names \(21-day, 3-month, 6-month\)/);
   assert.match(systemPrompt, /Use only numbers and dates that appear in the facts/);
   assert.match(systemPrompt, /price change, not total return/);
   assert.match(systemPrompt, /Do not give buy, sell or hold advice/);
   assert.match(systemPrompt, /say the facts do not include it/);
-  assert.match(systemPrompt, /at most about 120 words/);
+  assert.match(systemPrompt, /first line, one short sentence that answers the question\. Then 2 to 4 lines that each start with "- "/);
+  assert.match(systemPrompt, /At most about 100 words in all/);
+  assert.match(systemPrompt, /10\. Write percentages with the % sign/);
   assert.match(systemPrompt, /Do not add a source line/);
   assert.match(systemPrompt, /No data for: ZZZZ/);
   assert.match(systemPrompt, /Chart levels \(JSON\).*\{"CLOZ":26\.5\}/s);
@@ -348,6 +350,7 @@ test("with web search the request carries the Exa web plugin and the source line
   assert.deepEqual(seen[0]?.plugins, [TICKER_ASSISTANT_WEB_PLUGIN]);
   assert.equal(TICKER_ASSISTANT_WEB_PLUGIN.engine, "exa");
   assert.equal(TICKER_ASSISTANT_WEB_PLUGIN.max_results, 5);
+  assert.deepEqual(TICKER_ASSISTANT_WEB_PLUGIN.exclude_domains, ["exa.ai"], "the search engine's own price pages are not sources");
   assert.match(TICKER_ASSISTANT_WEB_PLUGIN.search_prompt, /Do not write links, URLs or markdown/);
   assert.equal(out.at(-1),
     `\n\n${tickerSourceLine([CLOZ])} Web results (not checked by this site): https://www.reuters.com/a https://example.com/b`);
@@ -356,10 +359,12 @@ test("with web search the request carries the Exa web plugin and the source line
 test("web prompt keeps the facts as the only source of the ticker's numbers and names the tickers for the search", () => {
   const { systemPrompt, userPrompt } = buildTickerAssistantPrompt([CLOZ, SPY], "why did it drop?", { web: true });
   assert.equal(userPrompt, "About CLOZ, SPY: why did it drop?");
-  assert.match(systemPrompt, /1\. For the ticker's prices, price changes, yield, cadence, payouts and their dates, use only the facts/);
-  assert.match(systemPrompt, /5\. Say which statements come from web results and name the site/);
+  assert.match(systemPrompt, /1\. For the ticker's prices, closes, price changes, volume, yield, cadence, payouts and their dates, use only the facts/);
   assert.match(systemPrompt, /If a web result disagrees with the facts, use the facts/);
-  assert.match(systemPrompt, /6\. Answer in plain text with no markdown, links or URLs/);
+  assert.match(systemPrompt, /a line that reads exactly "From the facts:"[\s\S]*a line that reads exactly "From the web:"/);
+  assert.match(systemPrompt, /No other markdown: no bold, no # headings, no links or URLs/);
+  assert.match(systemPrompt, /even when a web result shows its own figure/);
+  assert.match(systemPrompt, /names its site in plain words at the start of the line/);
   assert.match(systemPrompt, /4\. Do not give buy, sell or hold advice/, "the no-advice rule stays");
   assert.match(systemPrompt, /7\. Do not use em dashes/);
 });
