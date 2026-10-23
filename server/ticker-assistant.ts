@@ -54,9 +54,10 @@ export function createTickerAssistantAdapter(
     ...opts,
     model: TICKER_ASSISTANT_MODEL,
     // High reasoning effort, kept out of the stream (only the answer is sent). The
-    // reasoning counts toward max_tokens, so the cap leaves room for it: a measured
-    // answer used about 140 reasoning and 150 answer tokens and took about 0.5 s longer.
-    maxTokens: 2000,
+    // reasoning counts toward max_tokens, so the cap (owner's choice) leaves it ample
+    // room: a measured answer used about 140 reasoning and 150 answer tokens. The prompt,
+    // not the cap, keeps answers short; the cap bounds a runaway answer at about $0.024.
+    maxTokens: 20000,
     reasoning: { effort: "high", exclude: true },
     // Ask OpenRouter to route only to providers that do not keep prompts.
     provider: { data_collection: "deny" },
@@ -82,7 +83,7 @@ const FIELD_GUIDE = [
 const RULES = [
   "Rules:",
   "1. Use only numbers and dates that appear in the facts, copied exactly or rounded. Do not calculate new numbers (no differences, sums, averages or counts) and do not mention any other number, month or year.",
-  "2. Write dates exactly as they appear in the facts (YYYY-MM-DD).",
+  "2. Write every date as the short month name, the day and the year, for example \"Oct 22, 2026\" for 2026-10-22. Always include the year.",
   "3. Trend figures are price change, not total return. Payouts are reported separately as yield.",
   "4. Do not give buy, sell or hold advice, recommendations, price targets or predictions. When asked for advice, say briefly that you cannot give buy or sell advice, then describe what the facts show.",
   "5. When a question needs data that is not in the facts (pay dates, news, earnings, forecasts, targets, fundamentals), say the facts do not include it.",
@@ -91,6 +92,7 @@ const RULES = [
   "8. When the answer covers more than one ticker, every number must name its ticker on the same line. Never give one ticker's figure for another.",
   "9. Use the plain period names (21-day, 3-month, 6-month) and the plain labels from the facts. Never write code-style field names or JSON.",
   "10. Write percentages with the % sign and their sign as given, for example -1.5% or 7.14%. Do not put \"down\" or \"up\" in front of a signed percentage.",
+  "11. Make it easy to scan: never write a paragraph. After the first line every line is a bullet that starts with a short label, a colon, then the value, for example \"- 21-day change: -1.5%\" or \"- reuters.com: fund inflows rose\". The only other lines allowed are any section lines rule 6 asks for, written exactly as rule 6 gives them, never as bullets. One fact per bullet, the number near the start. Do not restate the question, add filler, or repeat the ticker on every line of a one-ticker answer.",
 ].join("\n");
 
 // With web search on, rules 1, 5 and 6 change: the facts stay the only source for
@@ -213,6 +215,14 @@ export function webSourcesLine(citations: OpenRouterCitation[]): string {
     : " Web search returned no sources.";
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-10-22" as "Oct 22, 2026", the way answers write dates (prompt rule 2). */
+export function longDay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m && MONTHS[+m[2] - 1] ? `${MONTHS[+m[2] - 1]} ${+m[3]}, ${m[1]}` : iso;
+}
+
 /** One line, starting "Source: ", naming the data and the as-of date(s). */
 export function tickerSourceLine(facts: TickerFacts[]): string {
   const bySymbol = new Map<string, string[]>();
@@ -221,8 +231,8 @@ export function tickerSourceLine(facts: TickerFacts[]): string {
   const asOf = dates.length === 0
     ? ""
     : dates.length === 1
-      ? `, as of ${dates[0]}`
-      : `, as of ${dates.map((d) => `${d} (${bySymbol.get(d)!.join(", ")})`).join(", ")}`;
+      ? `, as of ${longDay(dates[0])}`
+      : `, as of ${dates.map((d) => `${longDay(d)} (${bySymbol.get(d)!.join(", ")})`).join("; ")}`;
   return `Source: Tiingo daily closes and distributions${asOf}; trend is price change, not total return.`;
 }
 

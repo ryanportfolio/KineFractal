@@ -104,6 +104,8 @@ test("prompt carries the facts as JSON under plain labels and the grounding and 
   assert.match(systemPrompt, /first line, one short sentence that answers the question\. Then 2 to 4 lines that each start with "- "/);
   assert.match(systemPrompt, /At most about 100 words in all/);
   assert.match(systemPrompt, /10\. Write percentages with the % sign/);
+  assert.match(systemPrompt, /2\. Write every date as the short month name, the day and the year, for example "Oct 22, 2026" for 2026-10-22\. Always include the year/);
+  assert.match(systemPrompt, /11\. Make it easy to scan: never write a paragraph\. After the first line every line is a bullet that starts with a short label, a colon, then the value/);
   assert.match(systemPrompt, /Do not add a source line/);
   assert.match(systemPrompt, /No data for: ZZZZ/);
   assert.match(systemPrompt, /Chart levels \(JSON\).*\{"CLOZ":26\.5\}/s);
@@ -128,11 +130,11 @@ test("prompt leaves out the no-data and chart-level sections when there are none
 test("source line names Tiingo, the as-of dates and price change", () => {
   assert.equal(
     tickerSourceLine([CLOZ, SPY]),
-    "Source: Tiingo daily closes and distributions, as of 2026-10-22; trend is price change, not total return.",
+    "Source: Tiingo daily closes and distributions, as of Oct 22, 2026; trend is price change, not total return.",
   );
   assert.equal(
     tickerSourceLine([CLOZ, TSLA, SPY]),
-    "Source: Tiingo daily closes and distributions, as of 2026-10-22 (CLOZ, SPY), 2026-10-21 (TSLA);"
+    "Source: Tiingo daily closes and distributions, as of Oct 22, 2026 (CLOZ, SPY); Oct 21, 2026 (TSLA);"
       + " trend is price change, not total return.",
   );
 });
@@ -302,7 +304,7 @@ test("answer with no text after the browser left ends quietly", async () => {
   assert.deepEqual(out, []);
 });
 
-test("adapter sends the pinned model, 2000 tokens, high hidden reasoning, no data collection, streaming", async () => {
+test("adapter sends the pinned model, 20000 tokens, high hidden reasoning, no data collection, streaming", async () => {
   let body: Record<string, unknown> | undefined;
   const adapter = createTickerAssistantAdapter({
     env: { OPENROUTER_API: "test-openrouter-key" },
@@ -314,7 +316,7 @@ test("adapter sends the pinned model, 2000 tokens, high hidden reasoning, no dat
   await collect(adapter.stream({ systemPrompt: "s", userPrompt: "u" }));
   assert.equal(body?.model, TICKER_ASSISTANT_MODEL);
   assert.equal(TICKER_ASSISTANT_MODEL, "deepseek/deepseek-v4.1-flash-1017");
-  assert.equal(body?.max_tokens, 2000);
+  assert.equal(body?.max_tokens, 20000);
   assert.deepEqual(body?.reasoning, { effort: "high", exclude: true });
   assert.deepEqual(body?.provider, { data_collection: "deny" });
   assert.equal(body?.stream, true);
@@ -362,6 +364,7 @@ test("web prompt keeps the facts as the only source of the ticker's numbers and 
   assert.match(systemPrompt, /1\. For the ticker's prices, closes, price changes, volume, yield, cadence, payouts and their dates, use only the facts/);
   assert.match(systemPrompt, /If a web result disagrees with the facts, use the facts/);
   assert.match(systemPrompt, /a line that reads exactly "From the facts:"[\s\S]*a line that reads exactly "From the web:"/);
+  assert.match(systemPrompt, /The only other lines allowed are any section lines rule 6 asks for, written exactly as rule 6 gives them, never as bullets/, "rule 11 leaves the section lines bare");
   assert.match(systemPrompt, /No other markdown: no bold, no # headings, no links or URLs/);
   assert.match(systemPrompt, /even when a web result shows its own figure/);
   assert.match(systemPrompt, /names its site in plain words at the start of the line/);
