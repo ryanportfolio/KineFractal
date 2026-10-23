@@ -12,8 +12,11 @@ import {
   tickerSourceLine,
   TickerAssistantNoFactsError,
   TICKER_ASSISTANT_MODEL,
+  TICKER_ASSISTANT_WEB_PLUGIN,
+  webSourcesLine,
   type TickerAssistantAdapter,
 } from "./ticker-assistant";
+import type { OpenRouterStreamOptions } from "./openrouter-ratio";
 
 const DAY = 86_400_000;
 
@@ -313,6 +316,67 @@ test("adapter sends the pinned model, 400 tokens, no reasoning, no data collecti
   assert.deepEqual(body?.reasoning, { enabled: false });
   assert.deepEqual(body?.provider, { data_collection: "deny" });
   assert.equal(body?.stream, true);
+});
+
+test("without web search the request, prompt and source line are unchanged: no plugin, no citations", async () => {
+  const seen: (OpenRouterStreamOptions | undefined)[] = [];
+  const adapter: TickerAssistantAdapter = {
+    async *stream(_input, opts) { seen.push(opts); yield "CLOZ is up."; },
+  };
+  const out = await collect(answerTickerQuestion({ symbols: ["CLOZ"], question: "trend?" }, { adapter, fetchFacts: async () => CLOZ }));
+  assert.deepEqual(seen, [undefined]);
+  assert.equal(out.at(-1), `\n\n${tickerSourceLine([CLOZ])}`);
+  const plain = buildTickerAssistantPrompt([CLOZ], "trend?");
+  assert.deepEqual(buildTickerAssistantPrompt([CLOZ], "trend?", { web: false }), plain);
+  assert.equal(plain.userPrompt, "trend?");
+  assert.doesNotMatch(plain.systemPrompt, /web/i);
+});
+
+test("with web search the request carries the Exa web plugin and the source line lists the result links", async () => {
+  const seen: (OpenRouterStreamOptions | undefined)[] = [];
+  const adapter: TickerAssistantAdapter = {
+    async *stream(_input, opts) {
+      seen.push(opts);
+      yield "According to reuters.com, CLOZ held steady.";
+      opts?.onCitation?.({ url: "https://www.reuters.com/a#top", title: "A" });
+      opts?.onCitation?.({ url: "https://www.reuters.com/a" });
+      opts?.onCitation?.({ url: "javascript:alert(1)" });
+      opts?.onCitation?.({ url: "https://example.com/b" });
+    },
+  };
+  const out = await collect(answerTickerQuestion({ symbols: ["CLOZ"], question: "news?", web: true }, { adapter, fetchFacts: async () => CLOZ }));
+  assert.deepEqual(seen[0]?.plugins, [TICKER_ASSISTANT_WEB_PLUGIN]);
+  assert.equal(TICKER_ASSISTANT_WEB_PLUGIN.engine, "exa");
+  assert.equal(TICKER_ASSISTANT_WEB_PLUGIN.max_results, 5);
+  assert.match(TICKER_ASSISTANT_WEB_PLUGIN.search_prompt, /Do not write links, URLs or markdown/);
+  assert.equal(out.at(-1),
+    `\n\n${tickerSourceLine([CLOZ])} Web results (not checked by this site): https://www.reuters.com/a https://example.com/b`);
+});
+
+test("web prompt keeps the facts as the only source of the ticker's numbers and names the tickers for the search", () => {
+  const { systemPrompt, userPrompt } = buildTickerAssistantPrompt([CLOZ, SPY], "why did it drop?", { web: true });
+  assert.equal(userPrompt, "About CLOZ, SPY: why did it drop?");
+  assert.match(systemPrompt, /1\. For the ticker's prices, price changes, yield, cadence, payouts and their dates, use only the facts/);
+  assert.match(systemPrompt, /5\. Say which statements come from web results and name the site/);
+  assert.match(systemPrompt, /If a web result disagrees with the facts, use the facts/);
+  assert.match(systemPrompt, /6\. Answer in plain text with no markdown, links or URLs/);
+  assert.match(systemPrompt, /4\. Do not give buy, sell or hold advice/, "the no-advice rule stays");
+  assert.match(systemPrompt, /7\. Do not use em dashes/);
+});
+
+test("web sources line says so when the search returned nothing", () => {
+  assert.equal(webSourcesLine([]), " Web search returned no sources.");
+  assert.equal(webSourcesLine([{ url: "ftp://x.example/a" }, { url: "not a url" }]), " Web search returned no sources.");
+  const many = Array.from({ length: 8 }, (_, i) => ({ url: `https://s${i}.example/` }));
+  assert.equal(webSourcesLine(many).split(" https://").length - 1, 5, "at most 5 links");
+});
+
+test("body validation accepts web true or false only, and drops web false", () => {
+  const on = parseTickerAssistantBody({ symbols: ["spy"], question: "q", web: true });
+  assert.deepEqual(on, { ok: true, value: { symbols: ["SPY"], question: "q", web: true } });
+  const off = parseTickerAssistantBody({ symbols: ["spy"], question: "q", web: false });
+  assert.deepEqual(off, { ok: true, value: { symbols: ["SPY"], question: "q" } });
+  assert.equal(parseTickerAssistantBody({ symbols: ["spy"], question: "q", web: "yes" }).ok, false);
 });
 
 test("daily cap allows 30 questions per user per New York day and resets at New York midnight", () => {

@@ -214,7 +214,7 @@ test("ASK AI: the answer streams in as text under the question, source line last
   assert.match(fnBody("readAskStream"), /if \(!live\(\)\) \{ reader\.cancel\(\)/, "a dropped answer stops reading");
   assert.match(send, /readAskStream\(r, live, add\)\.then\(function \(complete\) \{ if \(complete\) finish\(\); else drop\(\); \}\)/);
   assert.match(send, /text\.data \+= chunk;/, "chunks append to a text node");
-  assert.match(send, /card\.appendChild\(askNode\('p', 'ask-src', last\)\);/);
+  assert.match(send, /card\.appendChild\(askSourceNode\(last\)\);/);
   assert.ok(send.includes("if (/\\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);"),
     "an interrupted answer or one without the source line ends in the retry message");
   const typed = html.slice(html.indexOf("// --- typed questions"), html.indexOf("function initAskDock("));
@@ -1095,4 +1095,34 @@ test("a visible tab redraws the band and the dock from new facts once they expir
   page.set({ sym: "QQQ" });
   page.ready({ sym: "SPY", ok: true, facts: {}, expires: 0 });
   assert.equal(page.factBandStale(), false, "facts for another ticker are not the band's");
+});
+
+test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends web: true only when ticked", () => {
+  for (const id of ["askWeb", "xpAskWeb"]) {
+    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" autocomplete="off" aria-describedby="${id}Note"> Search the web</label>`));
+    assert.match(html, new RegExp(`<p class="ask-webnote" id="${id}Note" hidden>[^<]*web results are not checked by this site\\.</p>`));
+    assert.match(html, new RegExp(`wireAskWeb\\('${id}'\\);`));
+  }
+  assert.doesNotMatch(html, /id="(xp)?[aA]skWeb"[^>]*checked/, "never ticked by default");
+  assert.doesNotMatch(html, /localStorage\.setItem\([^)]*[wW]eb/, "the choice is not saved");
+  const dock = fnBody("sendAskQuestion"), xp = fnBody("sendXpQuestion");
+  assert.match(dock, /var web = askWebOn\('askWeb'\);/);
+  assert.match(dock, /if \(web\) payload\.web = true;/);
+  assert.match(xp, /var web = askWebOn\('xpAskWeb'\);/);
+  assert.match(xp, /if \(web\) payload\.web = true;/);
+  assert.match(xp, /card\.appendChild\(askSourceNode\(last\)\);/);
+  assert.match(fnBody("wireAskWeb"), /note\.hidden = !c\.checked;/);
+  // a box the browser restored on reload or Back starts unticked again
+  const wire = fnBody("wireAskWeb");
+  assert.match(wire, /var reset = function \(\) \{ c\.checked = false; note\.hidden = true; \};\s*reset\(\);/);
+  assert.match(wire, /window\.addEventListener\('pageshow', reset\);/);
+});
+
+test("source line links: only http and https become links, opened safely, as text nodes", () => {
+  const src = fnBody("askSourceNode");
+  assert.match(src, /url\.protocol !== 'https:' && url\.protocol !== 'http:'/);
+  assert.match(src, /a\.rel = 'noopener noreferrer';/);
+  assert.match(src, /a\.target = '_blank';/);
+  assert.match(src, /document\.createTextNode\(part\)/);
+  assert.doesNotMatch(src, /innerHTML/);
 });

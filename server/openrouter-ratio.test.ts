@@ -192,6 +192,36 @@ test("yields only first-choice delta content from fragmented CRLF OpenRouter SSE
   assert.deepEqual(await collect(adapter.stream(input)), ["first ", "line"]);
 });
 
+test("sends per-request plugins and reports url_citation annotations; none by default", async () => {
+  const bodies: Record<string, unknown>[] = [];
+  const events = () => sseResponse([
+    sse({ choices: [{ delta: { content: "text" } }] }),
+    sse({ choices: [{ delta: { annotations: [
+      { type: "url_citation", url_citation: { url: "https://a.example/x", title: "X" } },
+      { type: "file", file: {} },
+      { type: "url_citation", url_citation: { title: "no url" } },
+    ] } }] }),
+    sse({ choices: [{ message: { annotations: [{ type: "url_citation", url_citation: { url: "https://b.example/" } }] } }] }),
+    doneSse(),
+  ]);
+  const adapter = createOpenRouterRatioAdapter({
+    env: { OPENROUTER_API: "test-openrouter-key" },
+    fetch: async (_url: RequestInfo | URL, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return events();
+    },
+  });
+
+  const cited: unknown[] = [];
+  const out = await collect(adapter.stream(input, { plugins: [{ id: "web" }], onCitation: (c) => cited.push(c) }));
+  assert.deepEqual(out, ["text"]);
+  assert.deepEqual(bodies[0].plugins, [{ id: "web" }]);
+  assert.deepEqual(cited, [{ url: "https://a.example/x", title: "X" }, { url: "https://b.example/" }]);
+
+  await collect(adapter.stream(input));
+  assert.equal("plugins" in bodies[1], false, "no plugins field unless a caller asks");
+});
+
 test("throws an actionable error when OpenRouter rejects the request", async () => {
   const adapter = createOpenRouterRatioAdapter({
     env: { OPENROUTER_API: "test-openrouter-key" },

@@ -4,7 +4,12 @@
 // prompt tells the model to use only those, and the server appends the source
 // line itself. No buy or sell advice; the site never places orders.
 
-import { createOpenRouterRatioAdapter, type OpenRouterRatioInput } from "./openrouter-ratio";
+import {
+  createOpenRouterRatioAdapter,
+  type OpenRouterCitation,
+  type OpenRouterRatioInput,
+  type OpenRouterStreamOptions,
+} from "./openrouter-ratio";
 import {
   fetchFactsForSymbols,
   fetchTickerFacts,
@@ -19,8 +24,26 @@ export const TICKER_ASSISTANT_MAX_QUESTION = 500;
 export const TICKER_ASSISTANT_DAILY_LIMIT = 30;
 
 export interface TickerAssistantAdapter {
-  stream(input: OpenRouterRatioInput, opts?: { signal?: AbortSignal }): AsyncIterable<string>;
+  stream(input: OpenRouterRatioInput, opts?: OpenRouterStreamOptions): AsyncIterable<string>;
 }
+
+// Web search, only when the user ticks it: OpenRouter's web plugin through Exa
+// (about $0.007 a search, 5 results). Exa receives the search built from the
+// question. The model is told to name the site in plain words; the server lists
+// the result links on the source line.
+export const TICKER_ASSISTANT_WEB_RESULTS = 5;
+const WEB_SEARCH_PROMPT = [
+  "Web search results for the user's question follow.",
+  "Use them only for news, events and context that the ticker facts do not cover.",
+  "When you use a result, name its site in plain words (for example: according to reuters.com).",
+  "Do not write links, URLs or markdown.",
+].join(" ");
+export const TICKER_ASSISTANT_WEB_PLUGIN = {
+  id: "web",
+  engine: "exa",
+  max_results: TICKER_ASSISTANT_WEB_RESULTS,
+  search_prompt: WEB_SEARCH_PROMPT,
+};
 
 export function createTickerAssistantAdapter(
   opts: { env?: Record<string, string | undefined>; fetch?: typeof globalThis.fetch } = {},
@@ -63,6 +86,13 @@ const RULES = [
   "8. Every number in the answer must name the ticker it belongs to in the same sentence, and never give one ticker's figure for another.",
   "9. Use the plain period names (21-day, 3-month, 6-month) and the plain labels from the facts. Never write code-style field names or JSON.",
 ].join("\n");
+
+// With web search on, rules 1, 5 and 6 change: the facts stay the only source for
+// the ticker's numbers, and web results may add news and context, named by site.
+const WEB_RULES = RULES
+  .replace(/^1\. .*$/m, "1. For the ticker's prices, price changes, yield, cadence, payouts and their dates, use only the facts, copied exactly or rounded. Do not calculate new numbers (no differences, sums, averages or counts). Web search results may add news, events and context that the facts do not cover.")
+  .replace(/^5\. .*$/m, "5. Say which statements come from web results and name the site in plain words. If a web result disagrees with the facts, use the facts and say they differ. When neither covers the question, say so.")
+  .replace(/^6\. .*$/m, "6. Answer in plain text with no markdown, links or URLs, at most about 150 words. Do not add a source line; the server adds it.");
 
 // An em dash plus the spaces and any further em dashes around it.
 const EM_DASH_RUN = / *—[ —]*/g;
@@ -124,12 +154,14 @@ function factsForPrompt(facts: TickerFacts[]) {
 export function buildTickerAssistantPrompt(
   facts: TickerFacts[],
   question: string,
-  opts: { missing?: string[]; nearestBuy?: Record<string, number> } = {},
+  opts: { missing?: string[]; nearestBuy?: Record<string, number>; web?: boolean } = {},
 ): { systemPrompt: string; userPrompt: string } {
   const parts = [
     "You explain end-of-day facts about stock and ETF tickers to a trader on a charts page.",
-    "You only explain the numbers you are given. You never produce facts of your own.",
-    RULES,
+    opts.web
+      ? "You explain the numbers you are given, and you may add news and context from the web search results. You never produce numbers of your own."
+      : "You only explain the numbers you are given. You never produce facts of your own.",
+    opts.web ? WEB_RULES : RULES,
     FIELD_GUIDE,
     `Facts (JSON, keyed by ticker): ${JSON.stringify(factsForPrompt(facts))}`,
   ];
@@ -145,7 +177,33 @@ export function buildTickerAssistantPrompt(
         + ` ${JSON.stringify(Object.fromEntries(levels))}`,
     );
   }
-  return { systemPrompt: parts.join("\n\n"), userPrompt: question };
+  // The web search is built from the user message, so it names the tickers too.
+  const userPrompt = opts.web ? `About ${facts.map((f) => f.symbol).join(", ")}: ${question}` : question;
+  return { systemPrompt: parts.join("\n\n"), userPrompt };
+}
+
+/**
+ * The web results the answer drew on, for the source line: http(s) links only,
+ * each page once, at most TICKER_ASSISTANT_WEB_RESULTS of them.
+ */
+export function webSourcesLine(citations: OpenRouterCitation[]): string {
+  const urls: string[] = [];
+  for (const c of citations) {
+    let url: URL;
+    try {
+      url = new URL(c.url);
+    } catch {
+      continue;
+    }
+    if (url.protocol !== "https:" && url.protocol !== "http:") continue;
+    url.hash = "";
+    const href = url.toString();
+    if (!urls.includes(href)) urls.push(href);
+    if (urls.length >= TICKER_ASSISTANT_WEB_RESULTS) break;
+  }
+  return urls.length
+    ? ` Web results (not checked by this site): ${urls.join(" ")}`
+    : " Web search returned no sources.";
 }
 
 /** One line, starting "Source: ", naming the data and the as-of date(s). */
@@ -176,6 +234,7 @@ export interface TickerAssistantInput {
   symbols: string[];
   question: string;
   nearestBuy?: Record<string, number>;
+  web?: boolean;
 }
 
 /**
@@ -200,12 +259,19 @@ export async function* answerTickerQuestion(
   const missing = input.symbols.filter((_, i) => results[i] === null);
   if (facts.length === 0) throw new TickerAssistantNoFactsError(missing);
 
+  const web = input.web === true;
   const prompt = buildTickerAssistantPrompt(facts, input.question, {
     missing,
     nearestBuy: input.nearestBuy,
+    ...(web ? { web } : {}),
   });
   const adapter = deps.adapter ?? createTickerAssistantAdapter();
-  const stream = signal ? adapter.stream(prompt, { signal }) : adapter.stream(prompt);
+  const citations: OpenRouterCitation[] = [];
+  const opts: OpenRouterStreamOptions = {
+    ...(signal ? { signal } : {}),
+    ...(web ? { plugins: [TICKER_ASSISTANT_WEB_PLUGIN], onCitation: (c: OpenRouterCitation) => { citations.push(c); } } : {}),
+  };
+  const stream = Object.keys(opts).length ? adapter.stream(prompt, opts) : adapter.stream(prompt);
   // Whitespace before the first real text is held back, so an answer with no
   // text throws before anything is sent: the route then reports the error and
   // refunds the question instead of showing a bare source line.
@@ -226,7 +292,7 @@ export async function* answerTickerQuestion(
     if (signal?.aborted) return;
     throw new Error(TICKER_ASSISTANT_EMPTY_ANSWER);
   }
-  yield `\n\n${tickerSourceLine(facts)}`;
+  yield `\n\n${tickerSourceLine(facts)}${web ? webSourcesLine(citations) : ""}`;
 }
 
 /** Error detail safe to log: no API keys, no prompt or question text. */
@@ -250,7 +316,8 @@ export type TickerAssistantBodyResult =
 
 export function parseTickerAssistantBody(body: unknown): TickerAssistantBodyResult {
   if (!body || typeof body !== "object" || Array.isArray(body)) return { ok: false, error: "invalid request body" };
-  const raw = body as { symbols?: unknown; question?: unknown; nearestBuy?: unknown };
+  const raw = body as { symbols?: unknown; question?: unknown; nearestBuy?: unknown; web?: unknown };
+  if (raw.web !== undefined && typeof raw.web !== "boolean") return { ok: false, error: "web must be true or false" };
 
   if (!Array.isArray(raw.symbols) || raw.symbols.some((s) => typeof s !== "string")) {
     return { ok: false, error: "symbols must be a list of tickers" };
@@ -281,7 +348,7 @@ export function parseTickerAssistantBody(body: unknown): TickerAssistantBodyResu
     }
   }
 
-  return { ok: true, value: { symbols, question, ...(nearestBuy ? { nearestBuy } : {}) } };
+  return { ok: true, value: { symbols, question, ...(nearestBuy ? { nearestBuy } : {}), ...(raw.web === true ? { web: true } : {}) } };
 }
 
 // --- Daily question cap ---------------------------------------------------------

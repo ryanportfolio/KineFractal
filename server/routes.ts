@@ -396,8 +396,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // /charts ticker assistant: the model explains the same facts in plain text
   // (server/ticker-assistant.ts). Signed-in only, 30 questions per user per New
   // York day; tickerAssistantLimiter + CSRF in security.ts.
-  // { symbols, question, nearestBuy? } -> text/plain stream whose last line is
-  // the server's source line.
+  // { symbols, question, nearestBuy?, web? } -> text/plain stream whose last line is
+  // the server's source line (with the web result links when web is true).
   app.post("/api/ticker-assistant", requireUser, async (req, res) => {
     res.set("Cache-Control", "no-store");
     const parsed = parseTickerAssistantBody(req.body);
