@@ -176,7 +176,8 @@ test("ASK AI: chips answer from facts with a source line, never a model call or 
   assert.match(fnBody("initAskDock"), /addEventListener\('submit', function \(e\) \{\s*e\.preventDefault\(\);/);
   assert.match(html, /<div id="askAnswer" aria-live="polite"><\/div>/);
   assert.match(html, /<input id="askInput"[^>]*aria-label="[^"]+"/);
-  assert.match(html, /Not investment advice, and the site never places orders\./);
+  assert.doesNotMatch(html.slice(html.indexOf('<aside id="askDock"'), html.indexOf('</aside>', html.indexOf('<aside id="askDock"'))), /class="ask-note"/,
+    "the dock has no note line above the chips");
 });
 
 test("ASK AI: a chip answer shown before the facts arrive is answered again when they do", () => {
@@ -207,13 +208,13 @@ test("ASK AI: a typed question posts symbol, question and nearest buy with the C
   assert.match(submit, /sendAskQuestion\(q\);/);
 });
 
-test("ASK AI: the answer streams in as text under the question, source line last", () => {
+test("ASK AI: the answer streams in under the question, laid out as it arrives, source line last", () => {
   const send = fnBody("sendAskQuestion");
   assert.match(fnBody("askTypedCard"), /askNode\('p', 'ask-q', question\)/);
   assert.match(fnBody("readAskStream"), /r\.body\.getReader\(\)/);
   assert.match(fnBody("readAskStream"), /if \(!live\(\)\) \{ reader\.cancel\(\)/, "a dropped answer stops reading");
   assert.match(send, /readAskStream\(r, live, add\)\.then\(function \(complete\) \{ if \(complete\) finish\(\); else drop\(\); \}\)/);
-  assert.match(send, /text\.data \+= chunk;/, "chunks append to a text node");
+  assert.match(send, /buf \+= chunk;\s*askRenderAnswer\(answer, buf\);/, "each chunk redraws the laid-out answer");
   assert.match(send, /card\.appendChild\(askSourceNode\(last\)\);/);
   assert.ok(send.includes("if (/\\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);"),
     "an interrupted answer or one without the source line ends in the retry message");
@@ -383,7 +384,7 @@ test("Limit Buy assistant column: typed questions send every selected ticker, at
   assert.match(send, /var syms = checkedExportSymbols\(\);/);
   assert.match(send, /postAskQuestion\(JSON\.stringify\(payload\), false, req\.ctl && req\.ctl\.signal\)/, "the dock's CSRF helper");
   assert.match(send, /readAskStream\(r, live, add\)/);
-  assert.match(send, /text\.data \+= chunk;/);
+  assert.match(send, /buf \+= chunk;\s*askRenderAnswer\(answer, buf\);/);
   assert.match(send, /if \(!r\.ok\) return fail\(ASK_FAIL_MSG, true\);/);
   assert.match(send, /r\.status === 429/);
   assert.match(fnBody("xpTypedError"), /b\.setAttribute\('data-action', 'xp-ask-retry'\);/);
@@ -1099,8 +1100,7 @@ test("a visible tab redraws the band and the dock from new facts once they expir
 
 test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends web: true only when ticked", () => {
   for (const id of ["askWeb", "xpAskWeb"]) {
-    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" autocomplete="off" aria-describedby="${id}Note"> Search the web</label>`));
-    assert.match(html, new RegExp(`<p class="ask-webnote" id="${id}Note" hidden>[^<]*web results are not checked by this site\\.</p>`));
+    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" autocomplete="off"> Search the web</label>`));
     assert.match(html, new RegExp(`wireAskWeb\\('${id}'\\);`));
   }
   assert.doesNotMatch(html, /id="(xp)?[aA]skWeb"[^>]*checked/, "never ticked by default");
@@ -1111,18 +1111,74 @@ test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends 
   assert.match(xp, /var web = askWebOn\('xpAskWeb'\);/);
   assert.match(xp, /if \(web\) payload\.web = true;/);
   assert.match(xp, /card\.appendChild\(askSourceNode\(last\)\);/);
-  assert.match(fnBody("wireAskWeb"), /note\.hidden = !c\.checked;/);
+  assert.doesNotMatch(html, /ask-webnote|WebNote/, "no note under the checkbox");
   // a box the browser restored on reload or Back starts unticked again
   const wire = fnBody("wireAskWeb");
-  assert.match(wire, /var reset = function \(\) \{ c\.checked = false; note\.hidden = true; \};\s*reset\(\);/);
+  assert.match(wire, /var reset = function \(\) \{ c\.checked = false; \};\s*reset\(\);/);
   assert.match(wire, /window\.addEventListener\('pageshow', reset\);/);
 });
 
 test("source line links: only http and https become links, opened safely, as text nodes", () => {
-  const src = fnBody("askSourceNode");
+  const src = fnBody("askLinkLine");
+  assert.match(fnBody("askSourceNode"), /frag\.appendChild\(askLinkLine\(m \? m\[1\] : String\(line\)\)\);/);
+  assert.match(fnBody("askSourceNode"), /Web, not checked by this site:/, "the web links sit on their own line, still marked unchecked");
   assert.match(src, /url\.protocol !== 'https:' && url\.protocol !== 'http:'/);
   assert.match(src, /a\.rel = 'noopener noreferrer';/);
   assert.match(src, /a\.target = '_blank';/);
   assert.match(src, /document\.createTextNode\(part\)/);
   assert.doesNotMatch(src, /innerHTML/);
+});
+
+// a minimal DOM for running the answer renderer outside the browser
+function fakeDom() {
+  const mk = (tag) => ({
+    nodeName: tag.toUpperCase(), className: "", childNodes: [], textContent: "",
+    appendChild(c) { this.childNodes.push(c); return c; },
+    replaceChildren() { this.childNodes = []; },
+  });
+  return {
+    createElement: mk,
+    createTextNode: (t) => ({ nodeName: "#text", textContent: t, childNodes: [] }),
+  };
+}
+const flat = (n) => n.childNodes.length ? n.childNodes.map(flat).join("") : n.textContent;
+function shape(n) {
+  if (n.nodeName === "#text") return n.textContent;
+  const key = n.nodeName.toLowerCase() + (n.className ? "." + n.className : "");
+  if (!n.childNodes.length) return { [key]: n.textContent };
+  const kids = n.childNodes.map(shape);
+  return { [key]: kids.length === 1 && typeof kids[0] === "string" ? kids[0] : kids };
+}
+
+test("typed answers render as a bold lead, bullet lists and web section headings, with coloured signed percentages", () => {
+  const { askRenderAnswer } = pageFns(["askNode", "askRichText", "askRenderAnswer"], "var ASK_SECTION_RE = /^(From the facts|From the web):$/i; var document = (" + fakeDom.toString() + ")();");
+  const box = { childNodes: [], appendChild(c) { this.childNodes.push(c); return c; }, replaceChildren() { this.childNodes = []; } };
+  askRenderAnswer(box, [
+    "CLOZ fell on 2026-10-22 and is down in all three periods.",
+    "From the facts:",
+    "- 21-day change: -1.5%, 6-month **change**: -1.1%",
+    "- Trailing 12-month yield: 7.14%, paid monthly",
+    "",
+    "From the web:",
+    "- seekingalpha.com: tighter credit spreads weighed on CLO funds (+0.2% for peers).",
+  ].join("\n"));
+  const out = box.childNodes.map(shape);
+  assert.deepEqual(out[0], { "p.ask-lead": "CLOZ fell on 2026-10-22 and is down in all three periods." });
+  assert.deepEqual(out[1], { h4: "From the facts" });
+  assert.equal(box.childNodes[2].nodeName, "UL");
+  assert.equal(box.childNodes[2].childNodes.length, 2, "consecutive bullets share one list");
+  assert.deepEqual(shape(box.childNodes[2].childNodes[0]), { li: ["21-day change: ", { "b.is-down": "-1.5%" }, ", 6-month change: ", { "b.is-down": "-1.1%" }] },
+    "markdown bold is dropped and a hyphenated period name is not a minus sign");
+  assert.deepEqual(shape(box.childNodes[2].childNodes[1]), { li: ["Trailing 12-month yield: ", { b: "7.14%" }, ", paid monthly"] });
+  assert.deepEqual(out[3], { h4: "From the web" });
+  assert.deepEqual(shape(box.childNodes[4].childNodes[0]),
+    { li: [{ "span.ask-site": "seekingalpha.com" }, ": ", "tighter credit spreads weighed on CLO funds (", { "b.is-up": "+0.2%" }, " for peers)."] });
+  askRenderAnswer(box, "Lead.\n- seekingalpha.com says spreads tightened.\n- CLOZ closed at 25.92 on 2026-10-22.");
+  assert.deepEqual(shape(box.childNodes[1].childNodes[0]), { li: [{ "span.ask-site": "seekingalpha.com" }, " ", "says spreads tightened."] },
+    "a site named without a colon still stands out");
+  assert.deepEqual(shape(box.childNodes[1].childNodes[1]), { li: "CLOZ closed at 25.92 on 2026-10-22." }, "a ticker is not taken for a site");
+  // redrawn from scratch on every chunk
+  askRenderAnswer(box, "Short answer.");
+  assert.equal(box.childNodes.length, 1);
+  assert.equal(flat(box.childNodes[0]), "Short answer.");
 });

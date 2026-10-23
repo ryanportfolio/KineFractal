@@ -43,6 +43,8 @@ export const TICKER_ASSISTANT_WEB_PLUGIN = {
   engine: "exa",
   max_results: TICKER_ASSISTANT_WEB_RESULTS,
   search_prompt: WEB_SEARCH_PROMPT,
+  // Exa's own market-data pages are the search engine's copy of prices, not a source
+  exclude_domains: ["exa.ai"],
 };
 
 export function createTickerAssistantAdapter(
@@ -81,18 +83,20 @@ const RULES = [
   "3. Trend figures are price change, not total return. Payouts are reported separately as yield.",
   "4. Do not give buy, sell or hold advice, recommendations, price targets or predictions. When asked for advice, say briefly that you cannot give buy or sell advice, then describe what the facts show.",
   "5. When a question needs data that is not in the facts (pay dates, news, earnings, forecasts, targets, fundamentals), say the facts do not include it.",
-  "6. Answer in plain text with no markdown, at most about 120 words. Do not add a source line; the server adds it.",
+  "6. Layout (the page shows it as a short answer with bullets): first line, one short sentence that answers the question. Then 2 to 4 lines that each start with \"- \", one point per line, at most about 20 words each. No other markdown: no bold, no # headings, no links. At most about 100 words in all. Do not add a source line; the server adds it.",
   "7. Do not use em dashes. Use a comma, colon or period instead.",
-  "8. Every number in the answer must name the ticker it belongs to in the same sentence, and never give one ticker's figure for another.",
+  "8. When the answer covers more than one ticker, every number must name its ticker on the same line. Never give one ticker's figure for another.",
   "9. Use the plain period names (21-day, 3-month, 6-month) and the plain labels from the facts. Never write code-style field names or JSON.",
+  "10. Write percentages with the % sign and their sign as given, for example -1.5% or 7.14%. Do not put \"down\" or \"up\" in front of a signed percentage.",
 ].join("\n");
 
 // With web search on, rules 1, 5 and 6 change: the facts stay the only source for
 // the ticker's numbers, and web results may add news and context, named by site.
+// The page turns the two section lines of rule 6 into small headings.
 const WEB_RULES = RULES
-  .replace(/^1\. .*$/m, "1. For the ticker's prices, price changes, yield, cadence, payouts and their dates, use only the facts, copied exactly or rounded. Do not calculate new numbers (no differences, sums, averages or counts). Web search results may add news, events and context that the facts do not cover.")
-  .replace(/^5\. .*$/m, "5. Say which statements come from web results and name the site in plain words. If a web result disagrees with the facts, use the facts and say they differ. When neither covers the question, say so.")
-  .replace(/^6\. .*$/m, "6. Answer in plain text with no markdown, links or URLs, at most about 150 words. Do not add a source line; the server adds it.");
+  .replace(/^1\. .*$/m, "1. For the ticker's prices, closes, price changes, volume, yield, cadence, payouts and their dates, use only the facts, copied exactly or rounded, even when a web result shows its own figure. Do not calculate new numbers (no differences, sums, averages or counts). Web search results may add news, events and context that the facts do not cover.")
+  .replace(/^5\. .*$/m, "5. Every point from a web result names its site in plain words at the start of the line, for example \"- reuters.com: ...\". If a web result disagrees with the facts, use the facts and say they differ. When neither covers the question, say so in the first line.")
+  .replace(/^6\. .*$/m, "6. Layout (the page shows it as a short answer with sections): first line, one short sentence that answers the question. Then a line that reads exactly \"From the facts:\" followed by 1 to 3 lines that each start with \"- \". Then a line that reads exactly \"From the web:\" followed by 1 to 3 lines that each start with \"- \". One point per line, at most about 25 words each. No other markdown: no bold, no # headings, no links or URLs. At most about 140 words in all. Do not add a source line; the server adds it.");
 
 // An em dash plus the spaces and any further em dashes around it.
 const EM_DASH_RUN = / *—[ —]*/g;
