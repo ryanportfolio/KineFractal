@@ -83,7 +83,7 @@ const FIELD_GUIDE = [
 const RULES = [
   "Rules:",
   "1. Use only numbers and dates that appear in the facts, copied exactly or rounded. Do not calculate new numbers (no differences, sums, averages or counts) and do not mention any other number, month or year.",
-  "2. Write dates exactly as they appear in the facts (YYYY-MM-DD).",
+  "2. Write every date as the short month name, the day and the year, for example \"Oct 22, 2026\" for 2026-10-22. Always include the year.",
   "3. Trend figures are price change, not total return. Payouts are reported separately as yield.",
   "4. Do not give buy, sell or hold advice, recommendations, price targets or predictions. When asked for advice, say briefly that you cannot give buy or sell advice, then describe what the facts show.",
   "5. When a question needs data that is not in the facts (pay dates, news, earnings, forecasts, targets, fundamentals), say the facts do not include it.",
@@ -215,6 +215,14 @@ export function webSourcesLine(citations: OpenRouterCitation[]): string {
     : " Web search returned no sources.";
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** "2026-10-22" as "Oct 22, 2026", the way answers write dates (prompt rule 2). */
+export function longDay(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  return m && MONTHS[+m[2] - 1] ? `${MONTHS[+m[2] - 1]} ${+m[3]}, ${m[1]}` : iso;
+}
+
 /** One line, starting "Source: ", naming the data and the as-of date(s). */
 export function tickerSourceLine(facts: TickerFacts[]): string {
   const bySymbol = new Map<string, string[]>();
@@ -223,8 +231,8 @@ export function tickerSourceLine(facts: TickerFacts[]): string {
   const asOf = dates.length === 0
     ? ""
     : dates.length === 1
-      ? `, as of ${dates[0]}`
-      : `, as of ${dates.map((d) => `${d} (${bySymbol.get(d)!.join(", ")})`).join(", ")}`;
+      ? `, as of ${longDay(dates[0])}`
+      : `, as of ${dates.map((d) => `${longDay(d)} (${bySymbol.get(d)!.join(", ")})`).join("; ")}`;
   return `Source: Tiingo daily closes and distributions${asOf}; trend is price change, not total return.`;
 }
 

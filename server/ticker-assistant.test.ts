@@ -104,6 +104,7 @@ test("prompt carries the facts as JSON under plain labels and the grounding and 
   assert.match(systemPrompt, /first line, one short sentence that answers the question\. Then 2 to 4 lines that each start with "- "/);
   assert.match(systemPrompt, /At most about 100 words in all/);
   assert.match(systemPrompt, /10\. Write percentages with the % sign/);
+  assert.match(systemPrompt, /2\. Write every date as the short month name, the day and the year, for example "Oct 22, 2026" for 2026-10-22\. Always include the year/);
   assert.match(systemPrompt, /11\. Make it easy to scan: never write a paragraph\. After the first line every line is a bullet that starts with a short label, a colon, then the value/);
   assert.match(systemPrompt, /Do not add a source line/);
   assert.match(systemPrompt, /No data for: ZZZZ/);
@@ -129,11 +130,11 @@ test("prompt leaves out the no-data and chart-level sections when there are none
 test("source line names Tiingo, the as-of dates and price change", () => {
   assert.equal(
     tickerSourceLine([CLOZ, SPY]),
-    "Source: Tiingo daily closes and distributions, as of 2026-10-22; trend is price change, not total return.",
+    "Source: Tiingo daily closes and distributions, as of Oct 22, 2026; trend is price change, not total return.",
   );
   assert.equal(
     tickerSourceLine([CLOZ, TSLA, SPY]),
-    "Source: Tiingo daily closes and distributions, as of 2026-10-22 (CLOZ, SPY), 2026-10-21 (TSLA);"
+    "Source: Tiingo daily closes and distributions, as of Oct 22, 2026 (CLOZ, SPY); Oct 21, 2026 (TSLA);"
       + " trend is price change, not total return.",
   );
 });
