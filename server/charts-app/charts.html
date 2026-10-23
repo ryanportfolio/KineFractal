@@ -618,6 +618,8 @@
   .xp-tgroup .xp-fact.is-down { color:var(--csell); }
   .xp-tgroup .xp-fact.is-none { color:var(--mut); font-weight:normal; }
   .xp-tgroup .xp-fpend { color:var(--mut); opacity:.5; letter-spacing:.12em; }
+  #exportDialog .xp-tgroup .xp-fload { min-height:24px; font:13px monospace; white-space:nowrap; }   /* past the table's allowance */
+  @media (max-width:600px) { #exportDialog .xp-tgroup .xp-fload { min-height:44px; } }
   .xp-vh { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
   #exportResult .xp-factnote { margin:10px 12px 0; color:var(--mut); font:13px monospace; }
   /* why panel: third column beside the cards */
@@ -5741,6 +5743,17 @@ function goToExportTicker(sym) {
     return;
   }
   if (!document.querySelector('#exportResult [data-sec="' + sym + '"]')) { _exportGoPending = sym; return; }
+  // With the up-in-all-three filter on, the jump lands on something visible: a
+  // ticker under "Close: down in one period" opens the price that section shows;
+  // a ticker the filter hides clears the filter first, then jumps as usual.
+  var copy = document.querySelector('#xpCloseSection tbody[data-sec="' + sym + '"]');
+  if (copy) {
+    openCloseSectionPrice(sym, copy.querySelector('[data-first]'));
+    copy.scrollIntoView({ block: 'start' });
+    return;
+  }
+  var tb = document.querySelector('#exportResult .xp-tablewrap tbody[data-sec="' + sym + '"]');
+  if (tb && tb.hidden) { clearXpFilter(); setXpCheckActive(null); }
   openFirstPrice(sym, true);
 }
 function openFirstPrice(sym, scroll) {
@@ -5777,6 +5790,12 @@ function nearestStrongIndex(limits) {
 // TICKER_FACTS_BATCH per request, into the page cache shared with the fact band;
 // at most XP_FACT_MAX requests at once, never twice for one ticker. A ticker that leaves the area before its turn comes is taken off the
 // queue, so scrolling past a row costs nothing.
+// The shared Tiingo key allows 50 calls an hour for the whole site, and every
+// uncached ticker costs one. So rows coming into view load at most XP_TABLE_CAP
+// tickers that are not cached and fresh per opening of the dialog; past that, a
+// row's cells show "—" and a Load facts button for that row. Selecting a ticker
+// (its heading, a price, its checkbox, the ticker list) or its Load facts button
+// always loads it.
 var XP_FACT_KEYS = ['yield', 'cadence', 'd21', 'm3', 'm6'];
 var XP_FACT_HEADS = {
   yield: ['Yield', 'distributions in the last 12 months ÷ latest close'],
@@ -5790,12 +5809,19 @@ var _xpFactQueue = [];                       // symbols waiting for a request sl
 var _xpFactRunning = 0;                      // requests this queue has in flight
 var _xpFactState = Object.create(null);      // SYM -> 'queued' | 'loading' | 'error'; facts themselves live in _tickerFactsCache
 var _xpFactObserver = null;
+var XP_TABLE_CAP = 10;
+var _xpTableLeft = XP_TABLE_CAP;               // uncached tickers rows coming into view may still load in this opening
+var _xpTableSpent = Object.create(null);     // SYM -> true while it waits in the queue on that allowance
 function xpFactsOn() { return SITE && siteUser === true; }
 // One fact cell's look: { state, text, cls, tip }.
 function xpFactView(sym, key) {
   var st = _xpFactState[sym];
   if (!factsCachedFresh(sym)) {   // past 18:30 New York counts as not loaded
     if (st === 'error') return { state: 'error', text: '—', cls: 'is-none', tip: 'Could not load ' + sym + ' facts · click the ticker to try again' };
+    if (!st && _xpTableLeft <= 0) {
+      return { state: 'capped', text: '—', cls: 'is-none',
+        tip: 'Not loaded: the table loads facts for ' + XP_TABLE_CAP + ' tickers each time it opens · Load facts gets ' + sym };
+    }
     return { state: 'pending', text: '', cls: 'is-pending', tip: '' };
   }
   var f = _tickerFactsCache[sym];
@@ -5822,16 +5848,27 @@ function xpFactCellHtml(sym, key) {
   var v = xpFactView(sym, key);
   return '<td class="xp-fact ' + v.cls + '" data-xp-fact="' + key + '" data-state="' + v.state + '"'
     + (v.tip ? ' data-tip="' + escHtml(v.tip) + '"' : '') + '>'
-    + (v.state === 'pending' ? '<span class="xp-fpend" aria-hidden="true">···</span><span class="xp-vh">loading</span>' : escHtml(v.text))
+    + (v.state === 'pending' ? '<span class="xp-fpend" aria-hidden="true">···</span><span class="xp-vh">loading</span>'
+      : v.state === 'capped' && key === 'yield'   // one button per row, in its first fact cell
+        ? '<button type="button" class="xp-link xp-fload" data-xp-load="' + escHtml(sym) + '" aria-label="Load facts for ' + escHtml(sym) + '">Load facts</button>'
+        : escHtml(v.text))
     + '</td>';
 }
-// Redraw one ticker's fact cells in place (the table may have been rebuilt since the request started).
+// Redraw a ticker's fact cells in place, in every copy of its rows: the table
+// (which may have been rebuilt since the request started) and the copy under
+// "Close: down in one period". Focus inside a redrawn cell (its Load facts
+// button) moves to that row's new button, else its first price, else its heading.
 function fillXpFactCells(sym) {
-  var sec = document.querySelector('#exportResult tbody[data-sec="' + sym + '"]');
-  if (!sec) return;
-  XP_FACT_KEYS.forEach(function (key) {
-    var cell = sec.querySelector('[data-xp-fact="' + key + '"]');
-    if (cell) cell.outerHTML = xpFactCellHtml(sym, key);
+  Array.prototype.forEach.call(document.querySelectorAll('#exportResult tbody[data-sec="' + sym + '"]'), function (sec) {
+    var act = document.activeElement, had = !!(act && sec.contains(act) && act.closest('.xp-fact'));
+    XP_FACT_KEYS.forEach(function (key) {
+      var cell = sec.querySelector('[data-xp-fact="' + key + '"]');
+      if (cell) cell.outerHTML = xpFactCellHtml(sym, key);
+    });
+    if (!had) return;
+    var to = sec.querySelector('[data-xp-load]') || sec.querySelector('tr.xp-trow');
+    if (!to) { to = sec.querySelector('.xp-tgroup th'); if (to) to.setAttribute('tabindex', '-1'); }
+    if (to) to.focus();
   });
 }
 // Ask for a ticker's facts. urgent (the visitor selected it) jumps the queue
@@ -5845,12 +5882,23 @@ function xpFactWant(sym, urgent) {
   var st = _xpFactState[sym];
   if (st === 'loading' || (st === 'error' && !urgent)) return;
   if (st === 'queued') {
-    if (urgent) { _xpFactQueue.splice(_xpFactQueue.indexOf(sym), 1); _xpFactQueue.unshift(sym); }
+    if (urgent) { _xpFactQueue.splice(_xpFactQueue.indexOf(sym), 1); _xpFactQueue.unshift(sym); delete _xpTableSpent[sym]; }
     return;
+  }
+  // a row coming into view uses the allowance unless its facts are already on
+  // their way (the fact band asked); with none left its cells offer Load facts
+  var ranOut = false;
+  if (urgent || _tickerFactsPending[sym]) delete _xpTableSpent[sym];
+  else {
+    if (_xpTableLeft <= 0) { fillXpFactCells(sym); return; }
+    _xpTableSpent[sym] = true;
+    ranOut = --_xpTableLeft === 0;
   }
   _xpFactState[sym] = 'queued';
   if (urgent) _xpFactQueue.unshift(sym); else _xpFactQueue.push(sym);
-  if (st === 'error' || expired) fillXpFactCells(sym);   // back to the dim placeholder
+  // back to the dim placeholder: a failed, expired or Load facts row
+  if (st === 'error' || expired || urgent) fillXpFactCells(sym);
+  if (ranOut) xpRedrawCapped();
   pumpXpFacts();
 }
 // A row left the area before its request started: take it off the queue.
@@ -5859,6 +5907,22 @@ function xpFactDrop(sym) {
   if (xpRunNeeds(sym)) return;   // a running quick check still waits for it
   _xpFactQueue.splice(_xpFactQueue.indexOf(sym), 1);
   delete _xpFactState[sym];
+  xpTableRefund(sym);
+}
+// A queued ticker left before its request started: it gives its share of the
+// table's allowance back.
+function xpTableRefund(sym) {
+  if (!_xpTableSpent[sym]) return;
+  delete _xpTableSpent[sym];
+  _xpTableLeft++;
+}
+// The allowance just ran out: rows not loaded and not on their way switch from
+// the loading dots to "—" and Load facts.
+function xpRedrawCapped() {
+  Array.prototype.forEach.call(document.querySelectorAll('#exportResult .xp-tablewrap tbody[data-sec]'), function (tb) {
+    var sym = tb.getAttribute('data-sec');
+    if (!_xpFactState[sym] && !factsCachedFresh(sym)) fillXpFactCells(sym);
+  });
 }
 // Start queued requests while fewer than XP_FACT_MAX run. Each request carries
 // up to TICKER_FACTS_BATCH tickers from the front of the queue and holds one
@@ -5907,7 +5971,10 @@ function xpFactTrack(sym, ask) {
 function stopXpFactRows() {
   if (_xpFactObserver) { _xpFactObserver.disconnect(); _xpFactObserver = null; }
   var keep = [];
-  _xpFactQueue.forEach(function (sym) { if (xpRunNeeds(sym)) keep.push(sym); else delete _xpFactState[sym]; });
+  _xpFactQueue.forEach(function (sym) {
+    if (xpRunNeeds(sym)) keep.push(sym);
+    else { delete _xpFactState[sym]; xpTableRefund(sym); }
+  });
   _xpFactQueue = keep;
 }
 // Watch every ticker section of a freshly rendered table. The root is the
@@ -5935,9 +6002,12 @@ function observeXpFactRows() {
 // and the dialog's own lead prices, never from the model. A check that needs the
 // whole selection loads the facts it still lacks only when tapped, through the
 // same queue as the table cells (up to TICKER_FACTS_BATCH tickers per request),
-// with a progress line. The question box sends every selected ticker to
+// with a progress line. One tap fetches at most XP_CHECK_CAP uncached tickers; its
+// answer covers the tickers with facts and says how many were not checked, and
+// the next tap fetches the next ones. The question box sends every selected ticker to
 // POST /api/ticker-assistant (at most XP_ASK_MAX) and streams the answer as text.
 var XP_ASK_MAX = 40;          // the assistant route takes 1 to 40 symbols
+var XP_CHECK_CAP = 10;        // uncached tickers one quick-check tap may fetch (shared Tiingo key: 50 calls an hour)
 var XP_WINDOW_NAMES = { d21: '21D', m3: '3M', m6: '6M' };
 var _xpRun = null;            // { kind, syms, need } while a quick check waits for facts
 var _xpFilter = null;         // { up, close } while the table shows only tickers up in all three periods
@@ -6024,17 +6094,23 @@ function runXpCheck(kind) {
   var syms = checkedExportSymbols();
   if (!syms.length) return xpAnswerCard('No tickers selected', ['Tick one or more tickers on the left first.'], null);
   if (kind === 'buy') return xpBuyAnswer(syms);
-  var run = { kind: kind, syms: syms, need: Object.create(null), tok: tok };
+  // check: the tickers this tap answers for; skipped: uncached ones past the
+  // XP_CHECK_CAP this tap may fetch, left for the next tap
+  var run = { kind: kind, syms: syms, check: [], skipped: [], need: Object.create(null), tok: tok };
+  var fetching = 0;
   _xpRun = run;
   syms.forEach(function (sym) {
-    var expired = sym in _tickerFactsCache;
-    if (factsCachedFresh(sym)) return;   // past 18:30 New York it was dropped: fetched again below
-    run.need[sym] = true;
+    if (factsCachedFresh(sym)) { run.check.push(sym); return; }   // past 18:30 New York it was dropped: fetched again below
     var st = _xpFactState[sym];
-    if (st === 'loading' || st === 'queued') return;   // already on its way: never a second request
+    if (st === 'loading' || st === 'queued') { run.check.push(sym); run.need[sym] = true; return; }   // already on its way: never a second request
+    var costs = !_tickerFactsPending[sym];   // one the fact band is fetching costs no new call
+    if (costs && fetching >= XP_CHECK_CAP) { run.skipped.push(sym); return; }
+    if (costs) fetching++;
+    run.check.push(sym);
+    run.need[sym] = true;
     _xpFactState[sym] = 'queued';
     _xpFactQueue.push(sym);
-    if (st === 'error' || expired) fillXpFactCells(sym);   // back to the dim placeholder
+    fillXpFactCells(sym);   // back to the dim placeholder (failed, expired or Load facts cells)
   });
   pumpXpFacts();
   xpRunTick();
@@ -6045,18 +6121,18 @@ function runXpCheck(kind) {
 function xpRunTick() {
   var run = _xpRun;
   if (!run || run.tok !== _xpToken) return;
-  var done = run.syms.filter(function (s) {
+  var done = run.check.filter(function (s) {
     return (s in _tickerFactsCache) || !_xpFactState[s] || _xpFactState[s] === 'error';
   }).length;
-  if (done < run.syms.length) {
+  if (done < run.check.length) {
     setXpBusy(true);
-    document.getElementById('xpAssistProgress').textContent = 'Checking ' + done + ' of ' + run.syms.length + ' tickers…';
+    document.getElementById('xpAssistProgress').textContent = 'Checking ' + done + ' of ' + run.check.length + ' tickers…';
     return;
   }
   _xpRun = null;
   setXpBusy(false);
   document.getElementById('xpAssistProgress').textContent = '';
-  xpCheckAnswer(run.kind, run.syms);
+  xpCheckAnswer(run.kind, run.check, run.skipped);
 }
 // The selection's facts: { facts: [{ sym, f }], failed, none }.
 function xpFactsOf(syms) {
@@ -6087,14 +6163,21 @@ function xpPartialNote(r) {
   if (r.none.length) parts.push('no price data for ' + xpList(r.none));
   return parts.length ? askNode('p', 'xp-partial', 'Partial answer: ' + parts.join('; ') + '.') : null;
 }
-function xpCheckAnswer(kind, syms) {
+// The tickers a tap left for the next one (XP_CHECK_CAP per tap), or null.
+function xpSkippedNote(skipped) {
+  if (!skipped || !skipped.length) return null;
+  return askNode('p', 'xp-partial', skipped.length + ' not checked: facts load ' + XP_CHECK_CAP + ' at a time; tap again to check more.');
+}
+// syms: the tickers this tap answers for; skipped: the ones it left for the next tap.
+function xpCheckAnswer(kind, syms, skipped) {
   var r = xpFactsOf(syms), partial = xpPartialNote(r), n = r.facts.length;
+  var more = xpSkippedNote(skipped);
   var through = xpThrough(r);
   if (kind === 'monthly') {
     var monthly = r.facts.filter(function (x) { return x.f.cadence === 'monthly'; });
     var named = monthly.map(function (x) { return x.sym + (fbNum(x.f.yield) ? ' (' + x.f.yield.toFixed(2) + '% yield)' : ''); });
     return xpAnswerCard(monthly.length ? monthly.length + ' of ' + n + (monthly.length === 1 ? ' pays' : ' pay') + ' monthly' : 'None pay monthly', [
-      partial,
+      partial, more,
       monthly.length ? 'Paid monthly in the last 12 months: ' + named.join(', ') + '.'
         : 'None of the ' + n + ' checked tickers paid monthly in the last 12 months.'
     ], 'Tiingo distributions, last 12 months' + through);
@@ -6103,12 +6186,12 @@ function xpCheckAnswer(kind, syms) {
     var payers = r.facts.filter(function (x) { return askPayer(x.f) && fbNum(x.f.yield); })
       .sort(function (a, b) { return b.f.yield - a.f.yield; });
     if (!payers.length) {
-      return xpAnswerCard('No payers', [partial, 'None of the ' + n + ' checked tickers paid distributions in the last 12 months.'],
+      return xpAnswerCard('No payers', [partial, more, 'None of the ' + n + ' checked tickers paid distributions in the last 12 months.'],
         'Tiingo distributions, last 12 months' + through);
     }
     var top = payers[0], next = payers.slice(1, 4), non = n - payers.length;
     return xpAnswerCard('Highest yield: ' + top.sym, [
-      partial,
+      partial, more,
       top.sym + ' yields ' + top.f.yield.toFixed(1) + '%, paid ' + top.f.cadence + '.',
       next.length ? 'Next: ' + next.map(function (x) { return x.sym + ' ' + x.f.yield.toFixed(1) + '%'; }).join(', ') + '.' : null,
       non ? non + ' of the checked tickers paid nothing in the last 12 months.' : null
@@ -6133,7 +6216,7 @@ function xpCheckAnswer(kind, syms) {
     _xpFilter = { up: up, close: close.map(function (x) { return x.sym; }) };
     if (_exportView !== 'table') setExportView('table'); else applyXpFilter();
     return xpAnswerCard(up.length ? up.length + (up.length === 1 ? ' ticker matches' : ' tickers match') : 'No ticker matches', [
-      partial,
+      partial, more,
       up.length ? xpList(up) + (up.length === 1 ? ' is' : ' are') + ' up in all three periods (21D, 3M and 6M).'
         : 'None of the ' + n + ' checked tickers is up in all three periods.',
       close.length ? 'Close, down in one period: ' + close.map(function (x) { return x.text; }).join(', ') + '.' : null,
@@ -6970,6 +7053,8 @@ function openExportDialog() {
   document.getElementById('exportResult').innerHTML = '';
   resetXpAssist();
   stopXpFactRows();
+  _xpTableLeft = XP_TABLE_CAP;   // each opening may load XP_TABLE_CAP uncached tickers as rows come into view
+  _xpTableSpent = Object.create(null);
   // tickers whose facts failed last time get one more try in this opening
   Object.keys(_xpFactState).forEach(function (sym) { if (_xpFactState[sym] === 'error') delete _xpFactState[sym]; });
   document.getElementById('exportPicks').innerHTML = '';
@@ -7065,6 +7150,8 @@ function wireExportDialog() {
     b.onclick = function () { setGapPlacement(b.getAttribute('data-gap'), true); };
   });
   document.getElementById('exportResult').addEventListener('click', function (e) {
+    var load = e.target.closest && e.target.closest('[data-xp-load]');
+    if (load) { xpFactWant(load.getAttribute('data-xp-load'), true); return; }   // past the table's allowance: this row only
     var b = e.target.closest && e.target.closest('[data-strength-set]');
     if (b) { setExportStrength(b.getAttribute('data-strength-set'), true); document.getElementById('strengthAny').focus(); return; }
     var more = e.target.closest && e.target.closest('[data-more]');
@@ -7081,6 +7168,7 @@ function wireExportDialog() {
     var why = e.target.closest && e.target.closest('[data-why]');
     if (why) {
       var parts = why.getAttribute('data-why').split('|');
+      xpFactWant(parts[0], true);   // picking a price loads its ticker's facts (table view only)
       openWhyPanel(parts[0], Number(parts[1]), why);
       return;
     }
@@ -7126,6 +7214,7 @@ function wireExportDialog() {
     if (!row || row !== e.target) return;
     e.preventDefault();
     var parts = row.getAttribute('data-why').split('|');
+    xpFactWant(parts[0], true);
     openWhyPanel(parts[0], Number(parts[1]), row);
   });
   document.getElementById('exportCombineToggle').onclick = function () {

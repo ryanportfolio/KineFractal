@@ -348,12 +348,12 @@ test("Limit Buy assistant column: up in all three never includes a negative or m
 test("Limit Buy assistant column: whole-selection checks load through the shared 3-at-a-time queue", () => {
   const run = fnBody("runXpCheck");
   assert.match(run, /if \(kind === 'buy'\) return xpBuyAnswer\(syms\);/, "buy needs no facts");
-  assert.match(run, /if \(st === 'loading' \|\| st === 'queued'\) return;/, "never a second request");
+  assert.match(run, /if \(st === 'loading' \|\| st === 'queued'\) \{ run\.check\.push\(sym\); run\.need\[sym\] = true; return; \}/, "never a second request");
   assert.match(run, /_xpFactQueue\.push\(sym\);/);
   assert.match(run, /pumpXpFacts\(\);\s*xpRunTick\(\);/);
   assert.match(fnBody("pumpXpFactsNow"), /xpRunTick\(\);/);
   const tick = fnBody("xpRunTick");
-  assert.match(tick, /'Checking ' \+ done \+ ' of ' \+ run\.syms\.length \+ ' tickers…'/);
+  assert.match(tick, /'Checking ' \+ done \+ ' of ' \+ run\.check\.length \+ ' tickers…'/);
   assert.match(tick, /setXpBusy\(true\);/);
   assert.match(fnBody("setXpBusy"), /box\.setAttribute\('data-busy', 'true'\)/);
   assert.match(fnBody("xpFactDrop"), /if \(xpRunNeeds\(sym\)\) return;/, "scrolling away keeps a check's tickers queued");
@@ -508,14 +508,16 @@ test("coming back to the tab refetches expired facts for the band and an open Li
   assert.match(refresh, /if \(_factSym && gone\.indexOf\(_factSym\) >= 0\) renderFactBand\(\);/);
   assert.match(refresh, /observeXpFactRows\(\);/);
   assert.match(refresh, /runXpCheck\(kind\);/);
-  assert.match(fnBody("runXpCheck"), /if \(factsCachedFresh\(sym\)\) return;/, "a quick check refetches expired tickers");
+  assert.match(fnBody("runXpCheck"), /if \(factsCachedFresh\(sym\)\) \{ run\.check\.push\(sym\); return; \}/, "a quick check refetches expired tickers");
 });
 
 test("Limit Buy table: facts past their 18:30 New York expiry are never drawn and are fetched again", () => {
   const prelude = `var _tickerFactsCache = Object.create(null); var _tickerFactsExpires = Object.create(null);
     var _xpFactState = Object.create(null); var _xpFactQueue = []; var _exportView = 'table';
+    var _tickerFactsPending = Object.create(null), _xpTableLeft = 10, _xpTableSpent = Object.create(null);
     var filled = [], pumped = 0;
-    function xpFactsOn() { return true; } function fillXpFactCells(s) { filled.push(s); } function pumpXpFacts() { pumped++; }`;
+    function xpFactsOn() { return true; } function fillXpFactCells(s) { filled.push(s); } function pumpXpFacts() { pumped++; }
+    function xpRedrawCapped() {}`;
   const src = ["factsExpired", "factsCachedFresh", "xpFactWant"].map((n) => fnBody(n)).join("\n");
   const page = new Function(`${prelude}\n${src}\nreturn {
     set(sym, f, msLeft) { _tickerFactsCache[sym] = f; _tickerFactsExpires[sym] = Date.now() + msLeft; },
@@ -540,7 +542,7 @@ test("Limit Buy table: facts past their 18:30 New York expiry are never drawn an
   page.xpFactWant("IWM", false);
   assert.deepEqual(page.state().queue, ["IWM"], "never queued twice");
   assert.match(fnBody("xpFactView"), /if \(!factsCachedFresh\(sym\)\) \{/, "the table never draws expired facts");
-  assert.match(fnBody("runXpCheck"), /if \(st === 'error' \|\| expired\) fillXpFactCells\(sym\);/);
+  assert.match(fnBody("runXpCheck"), /_xpFactQueue\.push\(sym\);\s*fillXpFactCells\(sym\);/, "a queued ticker's old cells go back to the placeholder");
   assert.doesNotMatch(fnBody("xpFactWant"), /fetch\(|tickerFacts\(/, "requests still go through the queue");
 });
 
@@ -802,4 +804,174 @@ test("Limit Buy: a Close-section ticker heading opens the price that section sho
   page.open("IWM", head);
   assert.equal(page.opened().sym, "QQQ", "no price in range: nothing opens");
   assert.deepEqual(page.wanted, ["SPY", "QQQ", "IWM"], "selecting a ticker still loads its facts");
+});
+
+// Contract v2: the shared Tiingo key is on the free tier (50 calls an hour for the whole site).
+const capPrelude = `
+  var _tickerFactsCache = Object.create(null), _tickerFactsExpires = Object.create(null), _tickerFactsPending = Object.create(null);
+  var _xpFactState = Object.create(null), _xpFactQueue = [], _exportView = 'table', _xpRun = null;
+  var XP_TABLE_CAP = 10, _xpTableLeft = XP_TABLE_CAP, _xpTableSpent = Object.create(null);
+  var filled = [], pumped = 0, redrawn = 0;
+  function xpFactsOn() { return true; } function fillXpFactCells(s) { filled.push(s); } function pumpXpFacts() { pumped++; }
+  function xpRunNeeds(s) { return !!(_xpRun && _xpRun.need[s]); }`;
+
+test("Limit Buy table: rows coming into view load at most 10 uncached tickers per dialog opening", () => {
+  assert.match(html, /var XP_TABLE_CAP = 10;/);
+  const names = ["factsExpired", "factsCachedFresh", "xpFactWant", "xpFactDrop", "xpTableRefund"];
+  const page = new Function(`${capPrelude}\nfunction xpRedrawCapped() { redrawn++; }\n${names.map((n) => fnBody(n)).join("\n")}\nreturn {
+    xpFactWant, xpFactDrop,
+    cache(sym, f) { _tickerFactsCache[sym] = f; _tickerFactsExpires[sym] = Date.now() + 60000; },
+    pending(sym) { _tickerFactsPending[sym] = Promise.resolve(null); },
+    s: () => ({ queue: _xpFactQueue.slice(), left: _xpTableLeft, filled: filled.slice(), redrawn: redrawn, st: Object.assign({}, _xpFactState) }) };`)();
+  page.cache("SPY", { yield: 1 });
+  page.xpFactWant("SPY", false);
+  assert.equal(page.s().left, 10, "a cached ticker always shows and costs nothing");
+  page.pending("QQQ");
+  page.xpFactWant("QQQ", false);
+  assert.equal(page.s().left, 10, "one the fact band is already fetching costs nothing");
+  const syms = Array.from({ length: 14 }, (_, i) => "T" + i);
+  syms.forEach((s) => page.xpFactWant(s, false));
+  let s = page.s();
+  assert.deepEqual(s.queue, ["QQQ"].concat(syms.slice(0, 10)), "ten uncached tickers go on the queue");
+  assert.equal(s.left, 0);
+  assert.equal(s.redrawn, 1, "running out redraws the rows not loaded, once");
+  assert.equal(s.st.T10, undefined, "the rest are not queued");
+  assert.ok(s.filled.includes("T13"), "and their cells are redrawn to offer Load facts");
+  page.xpFactWant("T12", true);
+  s = page.s();
+  assert.equal(s.queue[0], "T12", "Load facts (or any pick of one ticker) loads it past the cap");
+  assert.equal(s.left, 0, "without touching the allowance");
+  page.xpFactDrop("T3");
+  assert.equal(page.s().left, 1, "a queued ticker scrolled past before its request gives its share back");
+  page.xpFactDrop("T12");
+  assert.equal(page.s().left, 1, "a picked ticker never refunds what it did not spend");
+  const open = fnBody("openExportDialog");
+  assert.match(open, /_xpTableLeft = XP_TABLE_CAP;/, "each opening starts a new allowance");
+  assert.match(open, /_xpTableSpent = Object\.create\(null\);/);
+  assert.match(fnBody("stopXpFactRows"), /else \{ delete _xpFactState\[sym\]; xpTableRefund\(sym\); \}/);
+});
+
+test("Limit Buy table: rows past the cap show a dash and a keyboard-reachable Load facts button", () => {
+  const page = new Function(`${capPrelude}
+    var XP_FACT_KEYS = ['yield', 'cadence', 'd21', 'm3', 'm6'];
+    ${["factsExpired", "factsCachedFresh", "escHtml", "xpFactView", "xpFactCellHtml"].map((n) => fnBody(n)).join("\n")}
+    return { cell: xpFactCellHtml, set(o) { if ('left' in o) _xpTableLeft = o.left; if ('st' in o) _xpFactState.ABC = o.st; } };`)();
+  assert.match(page.cell("ABC", "yield"), /data-state="pending"/, "allowance left: the loading placeholder");
+  page.set({ left: 0 });
+  const y = page.cell("ABC", "yield");
+  assert.match(y, /data-state="capped"/);
+  assert.match(y, /<button type="button" class="xp-link xp-fload" data-xp-load="ABC" aria-label="Load facts for ABC">Load facts<\/button>/);
+  for (const key of ["cadence", "d21", "m3", "m6"]) {
+    const c = page.cell("ABC", key);
+    assert.match(c, /data-state="capped"[^>]*>—<\/td>$/, `${key} shows a dash`);
+    assert.doesNotMatch(c, /<button/, "one button per row");
+  }
+  page.set({ st: "queued" });
+  assert.match(page.cell("ABC", "yield"), /data-state="pending"/, "a queued ticker shows the placeholder, not the button");
+  const click = fnBody("wireExportDialog");
+  const load = click.indexOf("closest('[data-xp-load]')");
+  assert.ok(load > 0 && load < click.indexOf("closest('[data-why]')") && load < click.indexOf("closest('[data-first]')"),
+    "Load facts is handled before the price and heading clicks around it");
+  assert.match(click, /if \(load\) \{ xpFactWant\(load\.getAttribute\('data-xp-load'\), true\); return; \}/);
+  assert.match(click, /xpFactWant\(parts\[0\], true\);\s*\/\/[^\n]*\n\s*openWhyPanel\(parts\[0\], Number\(parts\[1\]\), why\);/, "clicking a price row loads its ticker");
+  assert.match(click, /xpFactWant\(parts\[0\], true\);\s*openWhyPanel\(parts\[0\], Number\(parts\[1\]\), row\);/, "so does Enter on it");
+  assert.match(html, /#exportDialog \.xp-tgroup \.xp-fload \{ min-height:24px;/);
+  assert.match(html, /@media \(max-width:600px\) \{ #exportDialog \.xp-tgroup \.xp-fload \{ min-height:44px; \} \}/);
+});
+
+test("Limit Buy table: every copy of a ticker's fact cells redraws, and focus on a redrawn button stays in its row", () => {
+  const mk = (name) => {
+    const cells = {}, sec = { name, focused: null, cells };
+    for (const k of ["yield", "cadence", "d21", "m3", "m6"]) cells[k] = { set outerHTML(v) { cells[k].html = v; } };
+    const row = { focus() { sec.focused = "row"; } };
+    sec.querySelector = (sel) => {
+      const m = /data-xp-fact="(\w+)"/.exec(sel);
+      if (m) return cells[m[1]];
+      if (sel === "tr.xp-trow") return row;
+      return null;
+    };
+    sec.contains = (el) => !!el && el.sec === sec;
+    return sec;
+  };
+  const main = mk("main"), copy = mk("close copy");
+  const page = new Function("secs", "act", `var XP_FACT_KEYS = ['yield', 'cadence', 'd21', 'm3', 'm6'];
+    var document = { activeElement: act, querySelectorAll: function (sel) { return sel === '#exportResult tbody[data-sec="ABC"]' ? secs : []; } };
+    function xpFactCellHtml(sym, key) { return sym + ':' + key; }
+    ${fnBody("fillXpFactCells")}
+    return fillXpFactCells;`)([main, copy], { sec: copy, closest: () => ({}) });
+  page("ABC");
+  for (const sec of [main, copy]) assert.equal(sec.cells.d21.html, "ABC:d21", `${sec.name} redrawn`);
+  assert.equal(copy.focused, "row", "focus on a Load facts button moves to that row's first price, not the page");
+  assert.equal(main.focused, null);
+});
+
+test("Limit Buy quick checks fetch at most 10 uncached tickers per tap and leave the rest for the next tap", () => {
+  assert.match(html, /var XP_CHECK_CAP = 10;/);
+  const names = ["factsExpired", "factsCachedFresh", "runXpCheck"];
+  const page = new Function("syms", `${capPrelude}
+    var XP_CHECK_CAP = 10, _xpToken = 0;
+    function xpAskAbort() {} function xpCheckAbort() {} function setXpCheckActive() {} function xpRunTick() {}
+    function checkedExportSymbols() { return syms; }
+    ${names.map((n) => fnBody(n)).join("\n")}
+    return { run: runXpCheck, last: function () { return _xpRun; }, queue: function () { return _xpFactQueue.slice(); },
+      cache(sym) { _tickerFactsCache[sym] = { symbol: sym }; _tickerFactsExpires[sym] = Date.now() + 60000; },
+      pending(sym) { _tickerFactsPending[sym] = Promise.resolve(null); },
+      queued(sym) { _xpFactState[sym] = 'queued'; _xpFactQueue.push(sym); } };`)(
+    ["A0", "A1"].concat(Array.from({ length: 24 }, (_, i) => "T" + String(i).padStart(2, "0"))));
+  page.cache("A0");
+  page.pending("T00");   // the fact band is fetching it
+  page.queued("T01");    // the table already queued it
+  page.run("yield");
+  const run = page.last();
+  assert.equal(run.check.length, 13, "the cached one, the two already on their way and ten new fetches");
+  assert.equal(run.skipped.length, 13);
+  assert.deepEqual(run.skipped.slice(0, 2), ["T11", "T12"], "A1 and T02 to T10 are fetched; the next ones alphabetically wait for the next tap");
+  assert.equal(page.queue().filter((s) => s !== "T01" && s !== "T00").length, 10, "ten uncached tickers fetched");
+  assert.equal(run.need.A0, undefined, "a cached ticker needs nothing");
+  for (const s of run.check) page.cache(s);
+  page.run("yield");
+  assert.equal(page.last().skipped.length, 3, "tapping again fetches the next ten");
+  assert.match(fnBody("xpRunTick"), /xpCheckAnswer\(run\.kind, run\.check, run\.skipped\);/);
+});
+
+test("Limit Buy quick-check answers say how many tickers were not checked", () => {
+  const { xpSkippedNote } = pageFns(["xpSkippedNote"], `var XP_CHECK_CAP = 10;
+    function askNode(tag, cls, text) { return { tag: tag, cls: cls, text: text }; }`);
+  assert.equal(xpSkippedNote([]), null);
+  assert.equal(xpSkippedNote(undefined), null);
+  const note = xpSkippedNote(Array.from({ length: 12 }, (_, i) => "T" + i));
+  assert.equal(note.text, "12 not checked: facts load 10 at a time; tap again to check more.");
+  const answer = fnBody("xpCheckAnswer");
+  assert.match(answer, /function xpCheckAnswer\(kind, syms, skipped\)/);
+  assert.match(answer, /var more = xpSkippedNote\(skipped\);/);
+  assert.equal((answer.match(/partial, more,/g) || []).length, 4, "every quick-check answer carries the note");
+});
+
+test("Limit Buy: with the filter on, the ticker list's jump lands on a visible price", () => {
+  const els = {}, calls = [];
+  const page = new Function("els", "calls", `var _exportGoPending = null;
+    var document = { querySelector: function (sel) { return els[sel] || null; } };
+    function updateExportPickCount() {} function scheduleExportBuild() {}
+    function openCloseSectionPrice(sym, head) { calls.push(['close', sym, head]); }
+    function openFirstPrice(sym, scroll) { calls.push(['first', sym, scroll]); }
+    function clearXpFilter() { calls.push(['clear']); } function setXpCheckActive(k) { calls.push(['active', k]); }
+    ${fnBody("goToExportTicker")}
+    return goToExportTicker;`)(els, calls);
+  const head = { name: "IWM close heading" }, scrolled = [];
+  els['#exportPicks input[value="IWM"]'] = { checked: true };
+  els['#exportResult [data-sec="IWM"]'] = {};
+  els['#xpCloseSection tbody[data-sec="IWM"]'] = { querySelector: () => head, scrollIntoView: (o) => scrolled.push(o) };
+  page("IWM");
+  assert.deepEqual(calls, [["close", "IWM", head]], "a Close ticker opens the price that section shows");
+  assert.deepEqual(scrolled, [{ block: "start" }], "and scrolls to it");
+  calls.length = 0;
+  els['#exportPicks input[value="TSLA"]'] = { checked: true };
+  els['#exportResult [data-sec="TSLA"]'] = {};
+  els['#exportResult .xp-tablewrap tbody[data-sec="TSLA"]'] = { hidden: true };
+  page("TSLA");
+  assert.deepEqual(calls, [["clear"], ["active", null], ["first", "TSLA", true]], "a hidden ticker clears the filter, then jumps as usual");
+  calls.length = 0;
+  els['#exportResult .xp-tablewrap tbody[data-sec="TSLA"]'] = { hidden: false };
+  page("TSLA");
+  assert.deepEqual(calls, [["first", "TSLA", true]], "no filter: the usual jump");
 });
