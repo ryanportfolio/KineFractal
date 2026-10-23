@@ -3689,10 +3689,13 @@ function askSummaryView(sym, f, buy, tok) {
       var c = q ? askCompareWindows(f, q) : null, n = c ? c.ahead.length + c.behind.length + c.same.length : 0;
       cmp.querySelector('.ask-tile-v').textContent = n ? c.ahead.length + ' of ' + n : '—';
       cmp.querySelector('.ask-tile-s').textContent = !q ? 'QQQ facts did not load' : n ? 'periods ahead of QQQ' : 'not enough history';
+      // QQQ's facts can end on another day than the ticker's: name it, as VS QQQ does
+      if (q && q.asOf !== f.asOf) src.textContent = 'Source: ' + askCloseSource(f, payer) + ' (QQQ through ' + askDay(q.asOf) + ')' + buyNote;
     });
   }
   tiles.appendChild(askBuyTile(buy));
-  return askView([tiles], [], askCloseSource(f, payer) + '; NEAREST BUY from Limit Buy Levels');
+  var buyNote = '; NEAREST BUY from Limit Buy Levels';
+  var src = askView([tiles], [], askCloseSource(f, payer) + buyNote).querySelector('.ask-src');
 }
 function askTile(chip, label, value, cls, sub) {
   var b = askNode('button', 'ask-tile');
@@ -3776,9 +3779,17 @@ function askCompareAnswer(sym, f, tok) {
   });
 }
 // opens Limit Buy Levels as its toolbar button does; with focusRange, the range's
-// Max field takes the focus once it is open. A phone's full-screen dock collapses first.
+// Max field takes the focus once it is open. The dialog gives focus back to whatever
+// had it when it opened, and closing it redraws BUY (removing this answer's buttons),
+// so the BUY tab takes focus first; on a phone the full-screen dock collapses and the
+// ASK AI button takes it instead.
 function askOpenLimitBuy(focusRange) {
-  if (askSheetOpen()) setAskMode('rail');
+  if (askSheetOpen()) {
+    setAskMode('rail');
+    document.getElementById('askAiBtn').focus();
+  } else {
+    document.querySelector('#askDock [data-chip="buy"]').focus();
+  }
   document.getElementById('exportBtn').click();
   if (focusRange) {
     var max = document.getElementById('exportDepth');
