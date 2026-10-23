@@ -85,6 +85,26 @@ export const symbolSearchLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// /charts ticker facts: one batched GET per page load or ticker-set change,
+// answered from an in-memory cache until the next 18:30 New York.
+export const tickerFactsLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  message: { error: 'Too many ticker fact requests, please wait a few minutes and try again' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// /charts ticker assistant: one POST per question, each a paid model call.
+// The 30-per-day per-user cap lives in ticker-assistant.ts; this bounds bursts.
+export const tickerAssistantLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { error: 'Too many questions, please wait a few minutes and try again' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // /labels (charts.html hand-lines sync): outside /api so the general limiter
 // skips it, and drawing fires one small POST per edit — generous but bounded.
 export const linesLimiter = rateLimit({
@@ -290,6 +310,14 @@ export function setupSecurity(app: Express) {
   // charts.html ticker search: read-only GET, signed-in only. Outside /api
   // (like /labels) so typing does not spend the shared API counter.
   app.use('/charts/symbol-search', symbolSearchLimiter);
-  
+
+  // /charts ticker facts: read-only GET, signed-in only (CSRF-exempt by
+  // method). Its own counter on top of the shared /api limiter.
+  app.use('/api/ticker-facts', tickerFactsLimiter);
+
+  // /charts ticker assistant: each POST spends model tokens, so it takes
+  // the site's CSRF token like /api/chart-groups.
+  app.use('/api/ticker-assistant', tickerAssistantLimiter, csrfProtection);
+
   console.log('[Security] Security middleware initialized with enhanced protections');
 }

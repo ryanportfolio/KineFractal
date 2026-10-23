@@ -9,6 +9,12 @@ export interface OpenRouterRatioInput {
 export interface OpenRouterRatioAdapterOptions {
   env?: Record<string, string | undefined>;
   fetch?: typeof globalThis.fetch;
+  // Request overrides for other callers. Left out, the body is the Ratio
+  // Relevance request: Gemini Flash Lite, 2048 tokens, hidden medium reasoning.
+  model?: string;
+  maxTokens?: number;
+  reasoning?: Record<string, unknown>;
+  provider?: Record<string, unknown>;
 }
 
 class MalformedOpenRouterSseError extends Error {
@@ -78,9 +84,18 @@ function consumeSseEvent(buffer: string): { event: string; rest: string } | unde
 export function createOpenRouterRatioAdapter({
   env = process.env as Record<string, string | undefined>,
   fetch: fetchImpl = globalThis.fetch,
+  model = OPENROUTER_RATIO_MODEL,
+  maxTokens = 2048,
+  reasoning = { effort: "medium", exclude: true },
+  provider,
 }: OpenRouterRatioAdapterOptions = {}) {
   return {
-    async *stream({ systemPrompt, userPrompt }: OpenRouterRatioInput): AsyncGenerator<string> {
+    // signal, when given, is passed to fetch so the caller can cancel the
+    // upstream request (and its token spend).
+    async *stream(
+      { systemPrompt, userPrompt }: OpenRouterRatioInput,
+      { signal }: { signal?: AbortSignal } = {},
+    ): AsyncGenerator<string> {
       const apiKey = env.OPENROUTER_API?.trim();
       if (!apiKey) throw new Error("OPENROUTER_API is required for Ratio Relevance analysis");
 
@@ -93,15 +108,17 @@ export function createOpenRouterRatioAdapter({
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: OPENROUTER_RATIO_MODEL,
+            model,
             stream: true,
-            max_tokens: 2048,
-            reasoning: { effort: "medium", exclude: true },
+            max_tokens: maxTokens,
+            reasoning,
+            ...(provider ? { provider } : {}),
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
             ],
           }),
+          ...(signal ? { signal } : {}),
         });
       } catch {
         throw new Error("OpenRouter request failed");

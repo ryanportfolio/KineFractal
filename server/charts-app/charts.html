@@ -589,6 +589,39 @@
   .xp-trow.tier-strong .xp-tpx { color:var(--cbuy); } .xp-trow.tier-mid .xp-tpx { color:var(--fg); } .xp-trow.tier-light .xp-tpx { color:var(--mut); }
   .xp-tnote td { padding:4px 12px 8px; color:var(--mut); font:14px monospace; }
   .xp-table .xp-none { padding:6px 12px; }
+  /* table view facts: YIELD, CADENCE, 21D, 3M, 6M on each ticker's heading row */
+  /* the column headings stay at the top of whichever element scrolls the table:
+     the results pane (#exportMain), or the dialog body under 900px. The wrapper gets
+     no scroller of its own, because one would trap the sticky headings; a table wider
+     than the screen scrolls that same element sideways instead. Above 900px the
+     headings stick over the pane's 14px top padding, and their own top padding
+     fills it, so rows never show above them */
+  .xp-tablewrap { overflow-x:visible; }
+  .xp-table thead { position:sticky; top:-14px; z-index:2; }
+  .xp-table thead th, .xp-table thead .xp-fhead { padding-top:14px; background:var(--panel); box-shadow:inset 0 -1px 0 var(--grid); }
+  @media (max-width:900px) {
+    /* the dialog body has no top padding to cover */
+    .xp-table thead { top:0; }
+    .xp-table thead th, .xp-table thead .xp-fhead { padding-top:8px; }
+  }
+  .xp-table.has-facts { max-width:1180px; }
+  .xp-table .xp-fhead { padding:0 6px 8px; text-align:right; white-space:nowrap; }
+  #exportResult .xp-table.has-facts .xp-tgroup .xp-name { white-space:normal; }   /* long fund names wrap so the fact columns fit */
+  .xp-tgroup .xp-fact { padding:14px 6px 6px; border-top:1px solid var(--grid); text-align:right; vertical-align:middle; white-space:nowrap;
+                        font:bold 14px Verdana,Geneva,sans-serif; color:var(--fg); }
+  .xp-table .xp-fhead:nth-child(4), .xp-tgroup .xp-fact[data-xp-fact="cadence"] { text-align:left; }
+  .xp-tgroup .xp-fact[data-xp-fact="yield"], .xp-tgroup .xp-fact[data-xp-fact="cadence"] { font-weight:normal; }
+  .xp-tgroup .xp-fact[data-xp-fact="cadence"] { font-size:13px; }
+  .xp-table.has-facts .xp-tgroup th, .xp-table.has-facts .xp-tpct { padding-right:4px; }
+  .xp-tgroup:hover .xp-fact { background:rgba(38,198,218,.04); }
+  .xp-tgroup .xp-fact.is-up { color:var(--cbuy); }
+  .xp-tgroup .xp-fact.is-down { color:var(--csell); }
+  .xp-tgroup .xp-fact.is-none { color:var(--mut); font-weight:normal; }
+  .xp-tgroup .xp-fpend { color:var(--mut); opacity:.5; letter-spacing:.12em; }
+  #exportDialog .xp-tgroup .xp-fload { min-height:24px; font:13px monospace; white-space:nowrap; }   /* past the table's allowance */
+  @media (max-width:600px) { #exportDialog .xp-tgroup .xp-fload { min-height:44px; } }
+  .xp-vh { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap; }
+  #exportResult .xp-factnote { margin:10px 12px 0; color:var(--mut); font:13px monospace; }
   /* why panel: third column beside the cards */
   #exportDialog .xp-body.why-open { grid-template-columns:minmax(300px,380px) 1fr minmax(320px,380px); }
   #exportWhy { min-height:0; overflow:auto; padding:14px 16px 20px; border-left:1px solid var(--grid); background:var(--panel); }
@@ -716,12 +749,263 @@
     .ticker-reorder-foot { flex-wrap:wrap; padding:12px 14px; }
     #tickerReorderMessage { flex-basis:100%; order:-1; }
   }
+  /* fact band: signed-in only, between the toolbar and the chart. Tiles wrap
+     instead of overflowing; the chart below keeps the remaining height. */
+  #factBand { flex:0 0 auto; display:flex; flex-wrap:wrap; align-items:stretch;
+              background:var(--panel); border-bottom:1px solid var(--grid);
+              font:13px "JetBrains Mono","IBM Plex Mono",monospace; color:var(--fg); }
+  #factBand[hidden] { display:none; }
+  #factBand .fb-tile { flex:1 1 170px; min-width:0; display:flex; flex-direction:column; gap:2px;
+                       padding:7px 14px 8px; border-right:1px solid var(--grid); }
+  #factBand .fb-tile:last-of-type { border-right:0; }
+  #factBand .fb-trend { flex:1.6 1 400px; }
+  #factBand .fb-label { font-weight:bold; font-size:12px; letter-spacing:.1em; white-space:nowrap; }
+  #factBand .fb-sub { color:var(--mut); font-weight:normal; letter-spacing:normal; margin-left:6px; white-space:normal; }
+  #factBand .fact-value { font-weight:bold; font-size:24px; line-height:1.15; white-space:nowrap; }
+  #factBand .fact-note { color:var(--fg); font-size:13px; }
+  #factBand .fact-flag { color:var(--thr); font-size:12px; }
+  #factBand .fact-flag:empty, #factBand .fact-note:empty { display:none; }
+  #factBand .fact-source { margin-top:auto; padding-top:2px; color:var(--mut); font-size:12px; }
+  #factBand .fb-trendrow { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; }
+  #factBand .fb-cells { display:flex; flex:1 1 250px; min-width:0; max-width:360px; border:1px solid var(--grid); }
+  #factBand .fb-cell { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center;
+                       padding:3px 6px; border-right:1px solid var(--grid); text-align:center; }
+  #factBand .fb-cell:last-child { border-right:0; }
+  #factBand .fb-wlabel { font-size:12px; font-weight:bold; color:var(--fg); }
+  #factBand .fact-change { font-weight:bold; font-size:19px; line-height:1.2; white-space:nowrap; }
+  #factBand .fact-verdict { font-weight:bold; font-size:11px; letter-spacing:.06em; }
+  #factBand .fb-overall { display:flex; flex-direction:column; gap:1px; }
+  #factBand .fb-overall .fact-value { font-size:26px; letter-spacing:.04em; }
+  #factBand .is-up { color:var(--cbuy); }
+  #factBand .is-down { color:var(--csell); }
+  #factBand .is-mixed { color:var(--thr); }
+  #factBand .is-flat { color:var(--fg); }
+  #factBand .is-none { color:var(--mut); }
+  #factBand .fb-cell.is-none .fact-verdict { font-weight:normal; letter-spacing:normal; }
+  #factBand[data-state="loading"] .fact-value, #factBand[data-state="loading"] .fact-change { opacity:.45; }
+  #factBand .fb-msg { flex:1 1 100%; margin:0; padding:5px 14px; border-top:1px solid var(--grid);
+                      display:flex; align-items:center; gap:10px; color:var(--mut); font-size:13px; }
+  #factBand .fb-msg.error { color:var(--csell); }
+  #factBand .fb-msg:not(.shown) { display:none; }
+  #factBand .fb-retry { min-height:26px; padding:3px 10px; font:inherit; color:var(--fg); }
+  #factBand .fb-retry:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  /* trend cells are toggle buttons: pressed = that window is shaded on the chart */
+  #factBand button.fb-cell { background:transparent; border:0; border-right:1px solid var(--grid); border-radius:0;
+                             font:inherit; color:inherit; cursor:pointer; min-height:24px; }
+  #factBand button.fb-cell:last-child { border-right:0; }
+  #factBand button.fb-cell:hover { background:rgba(38,198,218,.08); }
+  #factBand button.fb-cell[aria-disabled="true"] { cursor:default; }
+  #factBand button.fb-cell[aria-disabled="true"]:hover { background:transparent; }
+  #factBand button.fb-cell[aria-pressed="true"] { background:rgba(38,198,218,.12); box-shadow:inset 0 0 0 2px var(--sup); }
+  #factBand button.fb-cell:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand .fb-hlnote { display:flex; align-items:center; gap:8px; margin:0; color:var(--fg); font-size:12px; }
+  #factBand .fb-hlclear { min-height:24px; padding:2px 10px; font:inherit; color:var(--sup); border-color:var(--sup); }
+  #factBand .fb-hlclear:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  /* linked highlight over the chart pane: JS sets left/width/height from the chart's
+     own time and price scales after every pan, zoom, resize and redraw */
+  #trendHighlight { position:absolute; top:0; z-index:3; pointer-events:none; box-sizing:border-box;
+                    border-left:1px dashed var(--hl); border-right:1px dashed var(--hl);
+                    font:bold 15px "JetBrains Mono","IBM Plex Mono",monospace; color:var(--hl); }
+  #trendHighlight[hidden] { display:none; }
+  #trendHighlight.cut-l { border-left-color:transparent; }
+  #trendHighlight.cut-r { border-right-color:transparent; }
+  #trendHighlight.is-down { --hl:var(--csell); background:rgba(255,91,91,.11); }
+  #trendHighlight.is-up { --hl:var(--cbuy); background:rgba(33,208,122,.10); }
+  #trendHighlight.is-flat { --hl:var(--fg); background:rgba(230,230,230,.07); }
+  #trendHighlight .th-label { position:absolute; top:6px; white-space:nowrap; padding:0 6px;
+                              background:var(--bg); letter-spacing:.04em; }
+  #trendHighlight .th-span { position:absolute; left:0; right:0; top:30px; height:0; border-top:1px solid var(--hl); }
+  #trendHighlight .th-span::before, #trendHighlight .th-span::after { content:""; position:absolute; top:-5px;
+                              border:5px solid transparent; }
+  #trendHighlight .th-span::before { left:0; border-left:0; border-right:7px solid var(--hl); }
+  #trendHighlight .th-span::after { right:0; border-right:0; border-left:7px solid var(--hl); }
+  #trendHighlight.cut-l .th-span::before, #trendHighlight.cut-r .th-span::after { display:none; }
+  #trendHighlight svg { position:absolute; left:0; top:0; overflow:hidden; }
+  #trendHighlight .th-start { position:absolute; white-space:nowrap; font-size:13px; padding:0 3px; background:var(--bg); }
+  #trendHighlight .th-start[hidden] { display:none; }
+  @media (max-width:600px) {
+    /* phones: smaller type, and the band scrolls inside itself past 40% of the
+       screen so the chart below keeps what height the toolbar leaves it */
+    #factBand { max-height:40vh; overflow-y:auto; }
+    #factBand .fb-tile { flex-basis:40%; padding:5px 10px; }
+    #factBand .fb-trend { flex-basis:100%; border-right:0; }
+    #factBand .fact-value { font-size:18px; }
+    #factBand .fb-overall .fact-value { font-size:20px; }
+    #factBand .fact-change { font-size:16px; }
+    #factBand .fb-cells { max-width:none; }
+    #factBand .fb-retry { min-height:44px; }
+    #factBand button.fb-cell, #factBand .fb-hlclear { min-height:44px; }
+    #trendHighlight { font-size:13px; }
+    /* collapsed (the default on phones): one line with the ticker, overall trend and
+       yield, so the chart keeps the height; the toggle opens all five tiles */
+    #factBand .fb-summary { display:flex; flex:1 1 100%; align-items:center; gap:10px; min-width:0;
+                            padding-left:10px; }
+    #factBand.is-expanded .fb-summary { border-bottom:1px solid var(--grid); }
+    #factBand:not(.is-expanded) > .fb-tile, #factBand:not(.is-expanded) > .fb-msg { display:none; }
+  }
+  @media (min-width:601px) { #factBand .fb-summary { display:none; } }
+  #factBand .fb-sumsym { font:bold 14px Verdana,Geneva,sans-serif; }
+  #factBand .fb-sumtrend { font-weight:bold; font-size:16px; letter-spacing:.04em; }
+  #factBand .fb-sumyield { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--fg); }
+  #factBand .fb-toggle { flex:0 0 auto; min-height:44px; padding:0 12px; border:0; border-left:1px solid var(--grid);
+                         border-radius:0; background:transparent; font:inherit; color:var(--sup); cursor:pointer; }
+  #factBand .fb-toggle:hover { background:rgba(38,198,218,.08); }
+  #factBand .fb-toggle:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  /* a failed load puts Try again on the collapsed summary line too, so the band
+     need not open to retry; expanded, the message row below has its own */
+  #factBand .fb-sumretry { flex:0 0 auto; min-height:44px; padding:0 12px; border:0; border-left:1px solid var(--grid);
+                           border-radius:0; background:transparent; font:inherit; color:var(--fg); cursor:pointer; }
+  #factBand .fb-sumretry:hover { background:rgba(38,198,218,.08); }
+  #factBand .fb-sumretry:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand .fb-sumretry[hidden], #factBand.is-expanded .fb-sumretry { display:none; }
+  /* ASK AI dock (signed in): fixed to the right edge under the toolbar. Open it is
+     --askW wide, collapsed it is a 52px rail; the band and the chart get the same
+     right margin, so they shrink beside it instead of sitting under it. JS keeps
+     --askTop at the toolbar's bottom edge as the toolbar wraps. */
+  :root { --askW:clamp(280px, 30vw, 460px); --askTop:44px; }
+  body.ask-open #factBand, body.ask-open #chart { margin-right:var(--askW); }
+  body.ask-rail #factBand, body.ask-rail #chart { margin-right:52px; }
+  /* with the dock open the band is narrower: small tiles give room to TREND so the
+     band stays one row at 1440 and two at 1024, leaving the chart its height */
+  @media (min-width:701px) {
+    body.ask-open #factBand .fb-tile { flex-basis:120px; }
+    body.ask-open #factBand .fb-trend { flex-basis:420px; }
+  }
+  #topActions #askAiBtn { font:bold 11px monospace; letter-spacing:1.5px; color:var(--sup); border-color:var(--sup); }
+  #topActions #askAiBtn:hover { background:rgba(38,198,218,.12); }
+  #topActions #askAiBtn[aria-expanded="true"] { background:var(--sup); color:#03181c; }
+  #askAiBtn:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #askDock { position:fixed; top:var(--askTop); right:0; bottom:0; z-index:30; width:var(--askW);
+             display:flex; flex-direction:column; background:var(--panel); border-left:1px solid var(--grid);
+             font:13px "JetBrains Mono","IBM Plex Mono",monospace; color:var(--fg); }
+  #askDock[hidden] { display:none; }
+  #askDock[data-mode="rail"] { width:52px; }
+  #askDock[data-mode="rail"] .ask-panel, #askDock[data-mode="open"] .ask-rail { display:none; }
+  #askDock button { font:inherit; color:inherit; }
+  #askDock button:focus-visible, #askDock input:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #askDock svg { width:22px; height:22px; flex:0 0 auto; fill:none; stroke:currentColor; stroke-width:1.8;
+                 stroke-linecap:round; stroke-linejoin:round; }
+  /* rail: the label opens the dock; each icon opens it and runs its question */
+  #askDock .ask-rail { display:flex; flex-direction:column; align-items:center; gap:8px; padding:8px 0; }
+  #askDock .ask-raillabel { width:44px; padding:6px 0; border:0; background:none; color:var(--sup);
+                            font-weight:bold; font-size:15px; line-height:1.2; letter-spacing:.06em; }
+  #askDock .ask-raillabel span { display:block; }
+  #askDock .ask-railbtn { position:relative; width:44px; height:44px; padding:0; display:flex;
+                          align-items:center; justify-content:center; color:var(--sup); border-color:rgba(38,198,218,.45); }
+  #askDock .ask-railbtn:hover { border-color:var(--sup); background:rgba(38,198,218,.10); }
+  #askDock .ask-railbtn[hidden] { display:none; }
+  #askDock .ask-railbtn::after { content:attr(data-tip); position:absolute; right:calc(100% + 8px); top:50%;
+                                 transform:translateY(-50%); display:none; white-space:nowrap; z-index:66;
+                                 background:var(--panel); border:1px solid var(--sup); color:var(--fg);
+                                 font:13px "JetBrains Mono","IBM Plex Mono",monospace; padding:6px 9px;
+                                 pointer-events:none; box-shadow:0 10px 26px rgba(0,0,0,.6); }
+  #askDock .ask-railbtn:hover::after, #askDock .ask-railbtn:focus-visible::after { display:block; }
+  /* open panel */
+  #askDock .ask-panel { flex:1 1 auto; min-height:0; display:flex; flex-direction:column; gap:10px; padding:12px 14px; }
+  #askDock .ask-head { display:flex; align-items:center; gap:8px; }
+  #askDock .ask-title { flex:1 1 auto; min-width:0; margin:0; font-size:19px; font-weight:bold; letter-spacing:.08em;
+                        white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #askDock .ask-collapse { flex:0 0 auto; min-width:36px; min-height:36px; padding:0 8px; color:var(--mut); }
+  #askDock .ask-collapse:hover { color:var(--fg); }
+  #askDock .ask-note { margin:0; color:var(--mut); font-size:12px; line-height:1.45; }
+  #askDock .ask-chips { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  #askDock .ask-chip { display:flex; align-items:center; gap:10px; min-height:44px; padding:8px 10px;
+                       text-align:left; border-color:var(--grid); background:var(--bg); }
+  #askDock .ask-chip svg { color:var(--sup); }
+  #askDock .ask-chip:hover { border-color:var(--sup); }
+  #askDock .ask-chip.is-active { border-color:var(--sup); background:rgba(38,198,218,.10); }
+  #askDock .ask-chip[hidden] { display:none; }
+  #askAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #askAnswer .ask-card, #xpAssistAnswer .ask-card { padding:12px 14px; border:1px solid var(--grid); background:var(--bg); line-height:1.55; }
+  #askAnswer .ask-card h3, #exportDialog #xpAssistAnswer .ask-card h3 { margin:0 0 6px; font-size:15px; letter-spacing:.03em; color:var(--fg); }
+  #askAnswer .ask-card p, #xpAssistAnswer .ask-card p { margin:0 0 8px; }
+  #askAnswer .ask-hint, #xpAssistAnswer .ask-hint { margin:0; color:var(--mut); line-height:1.5; }
+  #askAnswer .ask-src, #xpAssistAnswer .ask-src { margin:8px 0 0; color:var(--mut); font-size:12px; }
+  #askAnswer table { border-collapse:collapse; margin:4px 0 10px; }
+  #askAnswer th, #askAnswer td { padding:3px 14px 3px 0; text-align:right; font-variant-numeric:tabular-nums; }
+  #askAnswer th:first-child, #askAnswer td:first-child { text-align:left; }
+  #askAnswer th { color:var(--mut); font-weight:normal; }
+  #askAnswer .is-up { color:var(--cbuy); }
+  #askAnswer .is-down { color:var(--csell); }
+  #askAnswer .is-mixed { color:var(--thr); }
+  #askDock .ask-form { display:flex; gap:0; margin:0; }
+  #askInput { flex:1 1 auto; min-width:0; min-height:44px; padding:8px 10px; background:var(--bg); color:var(--fg);
+              border:1px solid var(--grid); border-right:0; border-radius:0; font:inherit; }
+  #askDock .ask-send { flex:0 0 auto; width:48px; min-height:44px; padding:0; display:flex; align-items:center;
+                       justify-content:center; background:var(--sup); color:#03181c; border-color:var(--sup); }
+  #askDock .ask-send svg { stroke-width:2.4; }
+  #askDock .ask-send:disabled { opacity:.5; cursor:default; }
+  #askAnswer .ask-card .ask-q, #xpAssistAnswer .ask-card .ask-q { margin:0 0 10px; padding-left:8px; border-left:2px solid var(--sup); color:var(--fg); }
+  #askAnswer .ask-stream, #xpAssistAnswer .ask-stream { white-space:pre-wrap; }
+  #askAnswer .ask-stream:empty, #xpAssistAnswer .ask-stream:empty { display:none; }
+  #askAnswer .ask-err, #xpAssistAnswer .ask-err { color:var(--fg); }
+  #askAnswer .ask-retry, #exportDialog #xpAssistAnswer .ask-retry { min-height:36px; padding:0 14px; border:1px solid var(--grid); background:none; cursor:pointer; font:inherit; color:var(--fg); }
+  #askAnswer .ask-retry:hover, #exportDialog #xpAssistAnswer .ask-retry:hover { border-color:var(--sup); }
+  /* Limit Buy dialog: assistant column (signed in), styled like the dock. Its
+     quick checks answer from facts and the dialog's own lead prices; the
+     question box sends the whole selection to the assistant route. */
+  #exportDialog .xp-body.has-assist { grid-template-columns:minmax(280px,340px) 1fr minmax(300px,380px); }
+  #exportDialog .xp-body.has-assist.why-open { grid-template-columns:minmax(260px,300px) 1fr minmax(300px,360px) minmax(280px,340px); }
+  #xpAssist { min-height:0; overflow:auto; display:flex; flex-direction:column; gap:10px; padding:14px 16px;
+              border-left:1px solid var(--grid); background:var(--panel);
+              font:13px "JetBrains Mono","IBM Plex Mono",monospace; color:var(--fg); }
+  #exportDialog #xpAssist h3 { color:var(--sup); font-size:19px; font-weight:bold; letter-spacing:.08em; }
+  #xpAssistCount { margin:-6px 0 0; color:var(--fg); font-size:14px; }
+  #xpAssist .ask-note { margin:0; color:var(--mut); font-size:12px; line-height:1.45; }
+  #exportDialog #xpAssist h4 { margin:4px 0 0; font-size:15px; letter-spacing:.03em; }
+  #xpAssist .xp-checks { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+  #exportDialog #xpAssist .xp-check { min-height:44px; padding:8px 10px; text-align:left; border-color:var(--grid); background:var(--bg);
+                                      color:var(--fg); font:13px "JetBrains Mono","IBM Plex Mono",monospace; line-height:1.3; }
+  #exportDialog #xpAssist .xp-check:hover { border-color:var(--sup); }
+  #exportDialog #xpAssist .xp-check.is-active { border-color:var(--sup); background:rgba(38,198,218,.10); color:var(--sup); }
+  #xpAssist[data-busy="true"] .xp-check { cursor:progress; }
+  #xpAssistProgress { margin:0; color:var(--sup); }
+  #xpAssistProgress:empty { display:none; }
+  #xpAssistAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #xpAssistAnswer:empty { display:none; }
+  #xpAssistAnswer .xp-partial { color:var(--thr); }
+  #xpAssist .ask-form { display:flex; gap:0; margin:auto 0 0; }
+  #exportDialog #xpAskInput { flex:1 1 auto; min-width:0; min-height:44px; box-sizing:border-box; padding:8px 10px; background:var(--bg); color:var(--fg);
+                              border:1px solid var(--grid); border-right:0; border-radius:0; font:13px "JetBrains Mono","IBM Plex Mono",monospace; }
+  #exportDialog #xpAskInput:focus { border-color:var(--sup); }
+  #exportDialog #xpAssist .ask-send { flex:0 0 auto; width:48px; min-height:44px; padding:0; display:flex; align-items:center;
+                                      justify-content:center; background:var(--sup); color:#03181c; border-color:var(--sup); }
+  #xpAssist .ask-send svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
+  #exportDialog #xpAssist .ask-send:disabled { opacity:.5; cursor:default; }
+  /* the up-in-all-three filter: chip above the table, misses by one window below it */
+  #xpFilterChip { display:inline-flex; align-items:center; gap:6px; margin:0 0 12px; padding:2px 2px 2px 12px;
+                  border:1px solid var(--sup); color:var(--sup); font:14px monospace; }
+  #exportDialog #xpFilterChip button { min-width:30px; min-height:30px; padding:0 8px; border:0; background:none; color:var(--sup); font-size:17px; line-height:1; }
+  #exportDialog #xpFilterChip button:hover { color:var(--fg); }
+  #xpCloseSection { margin-top:18px; max-width:1180px; border:1px solid var(--grid); }
+  #exportDialog #xpCloseSection h3 { padding:10px 12px; border-bottom:1px solid var(--grid); background:rgba(255,255,255,.03); font-size:16px; font-weight:normal; }
+  #xpCloseSection .xp-tgroup th, #xpCloseSection .xp-tgroup .xp-fact { border-top:0; }
+  #exportResult .xp-filterempty { margin:10px 12px 0; color:var(--mut); font:14px monospace; }
+  @media (max-width:1280px) {
+    /* no room for four columns: the why panel takes the assistant's place until it closes */
+    #exportDialog .xp-body.has-assist.why-open { grid-template-columns:minmax(260px,300px) 1fr minmax(300px,360px); }
+    #exportDialog .xp-body.has-assist.why-open #xpAssist { display:none; }
+  }
+  @media (max-width:900px) {
+    #xpAssist { border-left:0; border-top:1px solid var(--grid); overflow:visible; }
+  }
+  @media (max-width:700px) {
+    /* phones: no room for both, and the wrapped toolbar can fill most of the
+       screen, so the open dock is a full-screen sheet (collapse button or Esc) */
+    body.ask-open #factBand, body.ask-open #chart { margin-right:0; }
+    #askDock[data-mode="open"] { top:0; z-index:50; width:100%; border-left:0; }
+  }
+  @media (max-width:600px) {
+    #topActions #askAiBtn { min-height:44px; }
+    #askDock .ask-collapse { min-width:44px; min-height:44px; }
+    #askAnswer .ask-retry { min-height:44px; }
+  }
 </style>
 </head>
 <body>
 <div id="bar">
   <span class="kf-brand" title="KineFractal">KINEFRACTAL</span>
-  <span id="topActions"><span id="topUtil"><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
+  <span id="topActions"><span id="topUtil"><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="askAiBtn" type="button" aria-expanded="false" aria-controls="askDock" hidden>ASK AI</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
   <span id="tickerStrip"><span id="superBtns" title="super (MTF) charts"></span></span>
   <input id="addSym" placeholder="add ticker" maxlength="40" autocomplete="off" spellcheck="false" style="width:88px" aria-label="Add a ticker, by name or symbol" title="add a ticker by name or symbol (live build)"><button id="addBtn">+ Add</button><span id="addMsg" class="addmsg"></span>
   <button id="cmpBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cmpMenu" title="compare other tickers as % change">+ Compare</button>
@@ -759,7 +1043,88 @@
   <span id="dpAggBadge" title=""></span>
   <span id="meta"></span>
 </div>
+<section id="factBand" aria-label="Ticker facts" data-state="loading" hidden>
+  <div class="fb-summary">
+    <span class="fb-sumsym"></span>
+    <span class="fb-sumtrend is-none">—</span>
+    <span class="fb-sumyield">loading…</span>
+    <button type="button" class="fb-sumretry" hidden>Try again</button>
+    <button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">All facts</button>
+  </div>
+  <div class="fb-tile" data-fact="yield">
+    <span class="fb-label">YIELD</span>
+    <span class="fact-value">—</span>
+    <span class="fact-note"></span>
+    <span class="fact-flag"></span>
+    <span class="fact-source">loading…</span>
+  </div>
+  <div class="fb-tile" data-fact="cadence">
+    <span class="fb-label">CADENCE</span>
+    <span class="fact-value">—</span>
+    <span class="fact-note"></span>
+    <span class="fact-source">loading…</span>
+  </div>
+  <div class="fb-tile fb-trend" data-fact="trend">
+    <span class="fb-label">TREND <span class="fb-sub">price change, not total return</span></span>
+    <div class="fb-trendrow">
+      <div class="fb-cells">
+        <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="d21"><span class="fb-wlabel">21D</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
+        <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="m3"><span class="fb-wlabel">3M</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
+        <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="m6"><span class="fb-wlabel">6M</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
+      </div>
+      <div class="fb-overall" data-fact="overall">
+        <span class="fact-value">—</span>
+        <span class="fact-note"></span>
+      </div>
+    </div>
+    <p class="fb-hlnote" aria-live="polite"><span class="fb-hltext"></span><button type="button" class="fb-hlclear" data-action="clear-highlight" hidden>Clear</button></p>
+    <span class="fact-source">loading…</span>
+  </div>
+  <div class="fb-tile" data-fact="vs6mHigh">
+    <span class="fb-label">VS 6M HIGH</span>
+    <span class="fact-value">—</span>
+    <span class="fact-note"></span>
+    <span class="fact-source">loading…</span>
+  </div>
+  <div class="fb-tile" data-fact="nearestBuy">
+    <span class="fb-label">NEAREST BUY</span>
+    <span class="fact-value">—</span>
+    <span class="fact-note"></span>
+    <span class="fact-source">loading…</span>
+  </div>
+  <p class="fb-msg" role="status" aria-live="polite"><span class="fb-msgtext"></span><button type="button" class="fb-retry" hidden>Try again</button></p>
+</section>
 <div id="chart"><div id="handles"></div><div id="measureBox"></div><div id="tipBox"></div><div id="cmpLegend"></div></div>
+<aside id="askDock" aria-label="Ask about this ticker" data-mode="rail" hidden>
+  <div class="ask-rail">
+    <button type="button" class="ask-raillabel" aria-label="Open Ask AI"><span>ASK</span><span>AI</span></button>
+    <button type="button" class="ask-railbtn" data-rail="yield" aria-label="Yield and cadence" data-tip="Yield and cadence" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7M10 20V6M15 20v-9M20 20V4"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="trend" aria-label="Why this trend?" data-tip="Why this trend?"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="payout" aria-label="Next payout" data-tip="Next payout" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="compare" aria-label="Compare with QQQ" data-tip="Compare with QQQ" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="buy" aria-label="Nearest buy" data-tip="Nearest buy"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="ask" aria-label="Ask a question" data-tip="Ask a question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H10l-6 4z"/></svg></button>
+  </div>
+  <div class="ask-panel">
+    <div class="ask-head">
+      <h2 class="ask-title" id="askTitle">ASK ABOUT —</h2>
+      <button type="button" class="ask-collapse" aria-label="Collapse to the side rail" title="Collapse (Esc)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 6l6 6-6 6M13 6l6 6-6 6"/></svg></button>
+    </div>
+    <p class="ask-note">Explains the numbers shown on this page. Not investment advice, and the site never places orders.</p>
+    <div class="ask-chips" role="group" aria-label="Quick questions">
+      <button type="button" class="ask-chip" data-chip="yield"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7M10 20V6M15 20v-9M20 20V4"/></svg><span>Yield &amp; cadence</span></button>
+      <button type="button" class="ask-chip" data-chip="why"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span class="ask-chiplabel">Why this trend?</span></button>
+      <button type="button" class="ask-chip" data-chip="payout" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg><span>Next payout</span></button>
+      <button type="button" class="ask-chip" data-chip="compare" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg><span>Compare with QQQ</span></button>
+      <button type="button" class="ask-chip" data-chip="buy"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg><span>Nearest buy</span></button>
+    </div>
+    <div id="askAnswer" aria-live="polite"></div>
+    <form class="ask-form" id="askForm">
+      <input id="askInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about this ticker" placeholder="Ask about this ticker…">
+      <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+    </form>
+  </div>
+</aside>
 <div id="cmpMenu" role="dialog" aria-label="Compare a ticker" hidden>
   <input id="cmpFind" placeholder="find ticker" maxlength="40" autocomplete="off" aria-label="Find a ticker to compare">
   <div id="cmpList"></div>
@@ -900,6 +1265,7 @@
             <button type="button" data-view="table" aria-pressed="false">Table</button>
           </span>
         </div>
+        <div id="xpFilterChip" hidden><span>Filtered by assistant: up in all three periods</span><button type="button" data-action="clear-xp-filter" aria-label="Clear the assistant filter and show every selected ticker">×</button></div>
         <div id="exportLoading" role="status" hidden>
           <canvas></canvas>
           <h3>Finding limit-buy levels</h3>
@@ -910,6 +1276,24 @@
       <aside id="exportWhy" aria-labelledby="exportWhyTitle" hidden>
         <div class="xp-whytop"><h3 id="exportWhyTitle">Why this price?</h3><button id="exportWhyClose" type="button">Close</button></div>
         <div id="exportWhyBody" aria-live="polite"></div>
+      </aside>
+      <aside id="xpAssist" aria-labelledby="xpAssistTitle" hidden>
+        <h3 id="xpAssistTitle">ASK ABOUT YOUR SELECTION</h3>
+        <p id="xpAssistCount"></p>
+        <p class="ask-note">Quick checks use the facts and buy prices shown here, with no AI. A typed question goes to an AI model with the facts for every selected ticker. Not investment advice, and the site never places orders.</p>
+        <h4 id="xpChecksTitle">Quick checks</h4>
+        <div class="xp-checks" role="group" aria-labelledby="xpChecksTitle">
+          <button type="button" class="xp-check" data-xp-check="monthly">Which pay monthly?</button>
+          <button type="button" class="xp-check" data-xp-check="yield">Highest yield</button>
+          <button type="button" class="xp-check" data-xp-check="up3">Up in 21D, 3M and 6M</button>
+          <button type="button" class="xp-check" data-xp-check="buy">Closest to a buy price</button>
+        </div>
+        <p id="xpAssistProgress" role="status" aria-live="polite"></p>
+        <div id="xpAssistAnswer" aria-live="polite"></div>
+        <form class="ask-form" id="xpAskForm">
+          <input id="xpAskInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about the selected tickers" placeholder="Ask about these tickers…">
+          <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
+        </form>
       </aside>
     </div>
     <div id="exportEditor" role="region" aria-labelledby="exportEditorTitle" hidden>
@@ -1113,11 +1497,23 @@ function fitAll() {                 // 'fit' button: clear the saved view and sh
   if (chart) chart.timeScale().fitContent();
 }
 
+// A data file is injected once: callers that ask while it is still loading wait
+// for that load and get its result (or its miss), since inject's cache-busting
+// query would make a second injection a second download.
+var _loadWaiters = Object.create(null);   // prefix + key -> [[cb, onmiss], ...] while that file loads
 function loadOnce(registry, prefix, key, cb, onmiss) {
   if (registry[key]) return cb(registry[key]);
-  inject(DATA + prefix + key + '.js', function () {
-    registry[key] ? cb(registry[key]) : onmiss();
-  }, onmiss);
+  var id = prefix + key;
+  if (_loadWaiters[id]) { _loadWaiters[id].push([cb, onmiss]); return; }
+  var waiting = _loadWaiters[id] = [[cb, onmiss]];
+  function settle() {
+    delete _loadWaiters[id];
+    waiting.forEach(function (w) {
+      try { registry[key] ? w[0](registry[key]) : w[1](); }
+      catch (e) { setTimeout(function () { throw e; }); }   // one caller's error never starves the others
+    });
+  }
+  inject(DATA + prefix + key + '.js', settle, settle);
 }
 
 // ===========================================================================
@@ -2300,10 +2696,1016 @@ function initSiteAccount() {
         siteUser = !!j.user;
         siteEmail = (j.user && j.user.email) || null;
         renderAccountControl();
+        renderFactBand();
+        loadAccountGapPlacement();
+        xpAccountKnown();
       })
       .catch(function () {});
   } catch (e) {}
 }
+
+// --- ticker facts + fact band (signed in only) ---------------------------------
+// Facts come from GET /api/ticker-facts (server/ticker-facts.ts), computed from
+// Tiingo daily closes and distributions; the page only formats them. The fact
+// band and ASK AI ask for one symbol per request, only for the ticker on screen;
+// the Limit Buy table batches its rows (pumpXpFacts). A page-level cache means a
+// ticker seen before costs no new request.
+var _tickerFactsCache = Object.create(null);    // SYM -> TickerFacts, or null when the server has none
+var _tickerFactsPending = Object.create(null);  // SYM -> Promise while its request runs
+var _tickerFactsExpires = Object.create(null);  // SYM -> epoch ms when its cache entry goes stale
+var TICKER_FACTS_RE = /^[A-Z0-9](?:[A-Z0-9.-]{0,10}[A-Z0-9])?$/;
+// The server refreshes its facts at the first 18:30 New York time after it fetched
+// them (nextNewYorkRefresh in server/ticker-facts.ts); a page entry expires at the
+// same moment, counted from when the page asked for it.
+var _nyPartsFmt = null;
+function nyWallAsUtc(ms) {   // New York wall-clock time of ms, read back as if it were UTC
+  if (!_nyPartsFmt) {
+    _nyPartsFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+  }
+  var p = {};
+  _nyPartsFmt.formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+}
+function nextNewYorkRefresh(ms) {   // the first 18:30 America/New_York strictly after ms
+  try {
+    var wall = new Date(nyWallAsUtc(ms));
+    var atOrPast = wall.getUTCHours() * 60 + wall.getUTCMinutes() >= 18 * 60 + 30;
+    var target = Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate() + (atOrPast ? 1 : 0), 18, 30);
+    var guess = target - (nyWallAsUtc(target) - target);
+    return target - (nyWallAsUtc(guess) - guess);
+  } catch (e) {
+    return ms + 6 * 3600e3;   // no time zone support: refetch after six hours
+  }
+}
+function factsExpired(sym) { return !(Date.now() < _tickerFactsExpires[sym]); }
+// True when sym's facts are cached and not yet expired. An expired entry is
+// dropped first, so whoever asks draws nothing old and the next tickerFacts call
+// goes to the server.
+function factsCachedFresh(sym) {
+  if (sym in _tickerFactsCache && factsExpired(sym)) { delete _tickerFactsCache[sym]; delete _tickerFactsExpires[sym]; }
+  return sym in _tickerFactsCache;
+}
+// Drops every expired entry; returns the symbols dropped.
+function dropExpiredFacts() {
+  var gone = [];
+  Object.keys(_tickerFactsCache).forEach(function (sym) {
+    if (!factsExpired(sym)) return;
+    delete _tickerFactsCache[sym];
+    delete _tickerFactsExpires[sym];
+    gone.push(sym);
+  });
+  return gone;
+}
+// tickerFacts(sym) -> Promise<TickerFacts | null>. Resolves null when signed
+// out (no request is made) or when the server has no facts for the ticker;
+// rejects when the request fails, and a failed request is not cached, so a
+// later call tries again. Concurrent calls for one symbol share one request.
+// An entry past its 18:30 New York expiry is fetched again.
+function tickerFacts(sym) {
+  sym = String(sym || '').toUpperCase();
+  if (!SITE || siteUser !== true) return Promise.resolve(null);
+  if (!TICKER_FACTS_RE.test(sym)) return Promise.resolve(null);
+  if (sym in _tickerFactsCache && factsExpired(sym)) { delete _tickerFactsCache[sym]; delete _tickerFactsExpires[sym]; }
+  if (sym in _tickerFactsCache) return Promise.resolve(_tickerFactsCache[sym]);
+  if (_tickerFactsPending[sym]) return _tickerFactsPending[sym];
+  return fetchTickerFacts([sym])[0];
+}
+// True when tickerFacts(sym) would make a request: signed in, a valid ticker,
+// not cached (an expired entry is dropped here) and not already on its way.
+function tickerFactsNeedsRequest(sym) {
+  return !!(SITE && siteUser === true) && TICKER_FACTS_RE.test(sym) && !factsCachedFresh(sym) && !_tickerFactsPending[sym];
+}
+// One GET /api/ticker-facts for syms (1 to TICKER_FACTS_BATCH, none cached or
+// pending); returns one promise per symbol, in order. Each symbol's promise is
+// its pending entry, so a tickerFacts call for it meanwhile shares this request.
+// A symbol missing from a successful answer is cached as null; a failed request
+// rejects every symbol's promise and caches nothing.
+var TICKER_FACTS_BATCH = 40;   // the route takes 1 to 40 symbols
+function fetchTickerFacts(syms) {
+  var asked = Date.now();
+  var all = fetch('/api/ticker-facts?symbols=' + syms.map(encodeURIComponent).join(','), { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); });
+  return syms.map(function (sym) {
+    var p = all.then(function (j) {
+      var f = (j && j.facts && j.facts[sym]) || null;
+      _tickerFactsCache[sym] = f;
+      _tickerFactsExpires[sym] = nextNewYorkRefresh(asked);
+      return f;
+    });
+    _tickerFactsPending[sym] = p;
+    p.then(function () { delete _tickerFactsPending[sym]; }, function () { delete _tickerFactsPending[sym]; });
+    return p;
+  });
+}
+var FB_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function fbDay(iso) {   // "2026-10-22" -> "Oct 22", read as a calendar date (no time zone shift)
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+  return m && FB_MONTHS[+m[2] - 1] ? FB_MONTHS[+m[2] - 1] + ' ' + (+m[3]) : '';
+}
+function fbNum(v) { return typeof v === 'number' && isFinite(v); }
+function fbSigned(v) { return (v > 0 ? '+' : v < 0 ? '-' : '') + Math.abs(v).toFixed(1) + '%'; }
+var FB_WINDOW_WORDS = { d21: ['21 days', 21], m3: ['3 months', 63], m6: ['6 months', 126] };
+var _factSym = null;   // the ticker the chart shows, upper case
+var _factGen = 0;      // bumps on every render; a slower answer for an older ticker is dropped
+// show() reports every ticker change here.
+function factBandShow(sym) {
+  sym = String(sym || '').toUpperCase() || null;
+  if (sym === _factSym) return;   // a timeframe switch: same ticker, band already right
+  _factSym = sym;
+  renderFactBand();
+}
+function setFactTile(name, value, cls, note, source) {
+  var tile = document.querySelector('#factBand [data-fact="' + name + '"]');
+  if (!tile) return;
+  var v = tile.querySelector('.fact-value');
+  v.textContent = value;
+  v.className = 'fact-value' + (cls ? ' ' + cls : '');
+  var n = tile.querySelector('.fact-note');
+  if (n) n.textContent = note || '';
+  var s = tile.querySelector('.fact-source');
+  if (s) s.textContent = source || '';
+}
+// hasFacts false (loading, failed, no data): a bare dash; the tile sources and
+// the band's message say why
+function setFactWindow(w, win, hasFacts) {
+  var cell = document.querySelector('#factBand [data-window="' + w + '"]');
+  var words = FB_WINDOW_WORDS[w];
+  var cls = !win ? 'is-none' : win.verdict === 'BULLISH' ? 'is-up' : win.verdict === 'BEARISH' ? 'is-down' : 'is-flat';
+  cell.className = 'fb-cell ' + cls;
+  cell.setAttribute('aria-disabled', win ? 'false' : 'true');   // no window, nothing to shade
+  cell.querySelector('.fact-change').textContent = win ? fbSigned(win.change) : '—';
+  cell.querySelector('.fact-verdict').textContent = win ? win.verdict : hasFacts ? 'short history' : '';
+  cell.title = win
+    ? words[0] + ': ' + fbSigned(win.change) + ' price change since the ' + fbDay(win.startDate) + ' close of ' + px2(win.startClose)
+    : hasFacts ? words[0] + ': not enough history (needs ' + (words[1] + 1) + ' daily closes)' : '';
+}
+function setFactMsg(text, isError, retry) {
+  var msg = document.querySelector('#factBand .fb-msg');
+  msg.querySelector('.fb-msgtext').textContent = text || '';
+  msg.querySelector('.fb-retry').hidden = !retry;
+  document.querySelector('#factBand .fb-sumretry').hidden = !retry;   // the phone summary line's copy
+  msg.classList.toggle('error', !!isError);
+  msg.classList.toggle('shown', !!text);
+}
+// Fills every tile. facts: a TickerFacts object, null (server has none), or
+// undefined (loading or failed: state says which). buy: exportLeadPrice's result.
+function fillFactBand(sym, state, facts, buy) {
+  var f = facts || null, day = f ? fbDay(f.asOf) : '';
+  var why = state === 'loading' ? 'loading…' : state === 'error' ? 'facts did not load' : 'no daily prices for ' + sym;
+  var fromClose = day ? 'from ' + day + ' close' : why;
+  // YIELD + CADENCE
+  if (!f) {
+    setFactTile('yield', '—', 'is-none', '', why);
+    setFactTile('cadence', '—', 'is-none', '', why);
+  } else {
+    var payouts = Array.isArray(f.payouts) ? f.payouts.length : 0;
+    if (fbNum(f.yield)) setFactTile('yield', f.yield.toFixed(2) + '%', 'is-up', '', 'trailing 12 mo distributions');
+    else setFactTile('yield', 'none', 'is-none', sym + ' paid no distributions in 12 months.', 'trailing 12 mo distributions');
+    if (f.cadence && f.cadence !== 'none') {
+      setFactTile('cadence', f.cadence, 'is-up', payouts + ' payout' + (payouts === 1 ? '' : 's') + ' in 12 months',
+        f.lastExDate ? 'last ex-date ' + fbDay(f.lastExDate) : 'payouts in the last 12 months');
+    } else {
+      setFactTile('cadence', '—', 'is-none', '', 'no payouts in the last 12 months');
+    }
+  }
+  document.querySelector('#factBand [data-fact="yield"] .fact-flag').textContent =
+    f && f.special && fbNum(f.yield) ? 'includes a special payout' : '';
+  // TREND: three windows + overall
+  var wins = (f && f.windows) || {};
+  ['d21', 'm3', 'm6'].forEach(function (w) { setFactWindow(w, wins[w] || null, !!f); });
+  var overall = f && f.overall;
+  setFactTile('overall', overall || '—',
+    overall === 'UP' ? 'is-up' : overall === 'DOWN' ? 'is-down' : overall === 'MIXED' ? 'is-mixed' : 'is-none',
+    !f ? '' : overall ? f.upCount + ' of 3 periods up' : 'needs all three periods', '');
+  document.querySelector('#factBand [data-fact="trend"] > .fact-source').textContent =
+    f ? 'Tiingo daily closes through ' + day : why;
+  // VS 6M HIGH
+  if (f && fbNum(f.vs6mHigh)) {
+    setFactTile('vs6mHigh', fbSigned(f.vs6mHigh), f.vs6mHigh < 0 ? 'is-down' : 'is-flat',
+      f.vs6mHigh === 0 ? 'at the 6-month high' : fbNum(f.high6m) ? '6M high close ' + px2(f.high6m) : '', fromClose);
+  } else {
+    setFactTile('vs6mHigh', '—', 'is-none', '', why);
+  }
+  // the one-line summary phones show while the band is collapsed
+  var sum = document.querySelector('#factBand .fb-summary');
+  sum.querySelector('.fb-sumsym').textContent = sym;
+  var st = sum.querySelector('.fb-sumtrend');
+  st.textContent = overall || '—';
+  st.className = 'fb-sumtrend ' + (overall === 'UP' ? 'is-up' : overall === 'DOWN' ? 'is-down' : overall === 'MIXED' ? 'is-mixed' : 'is-none');
+  sum.querySelector('.fb-sumyield').textContent = !f ? why : fbNum(f.yield) ? f.yield.toFixed(2) + '% yield' : 'no yield';
+  setNearestBuyTile(buy);
+}
+// NEAREST BUY: the Limit Buy dialog's lead price (exportLeadPrice); null while it loads
+function setNearestBuyTile(buy) {
+  if (!buy) {
+    setFactTile('nearestBuy', '—', 'is-none', '', 'loading…');
+  } else if (buy.lim) {
+    var tier = limitStrength(buy.lim);
+    setFactTile('nearestBuy', px2(buy.lim.row.limit), tier === 'strong' ? 'is-up' : tier === 'light' ? 'is-none' : 'is-flat',
+      pctBelowText(buy.lim.row), 'Limit Buy Levels, ' + (buy.sec.closeTime != null ? 'from ' : '') + closeLabel(buy.sec));
+  } else if (buy.sec) {
+    setFactTile('nearestBuy', '—', 'is-none', 'no buy price ' + fmtPct(buy.range.min) + '–' + fmtPct(buy.range.depth) + '% below',
+      'Limit Buy Levels settings');
+  } else {
+    setFactTile('nearestBuy', '—', 'is-none', '',
+      buy.reason === 'range' ? 'Limit Buy range is not valid' : buy.reason === 'failed' ? 'chart data did not load' : 'no Limit Buy levels for this chart');
+  }
+}
+// Shows the band for the ticker on screen, or hides it when the visitor is not
+// known to be signed in (signed out or account probe pending: no band, no request).
+function renderFactBand() {
+  var band = document.getElementById('factBand');
+  if (!band) return;
+  clearTrendHighlight();   // new facts (or no band): any shaded window belonged to the old ones
+  _factReady = null;
+  renderAskDock();         // the dock follows the band: same sign-in gate, same ticker
+  if (!SITE || siteUser !== true || !_factSym) { band.hidden = true; return; }
+  var sym = _factSym, gen = ++_factGen;
+  band.hidden = false;
+  band.setAttribute('data-symbol', sym);
+  band.setAttribute('aria-label', 'Facts for ' + sym);
+  // cached answers still settle before the next paint, so this never flashes
+  band.setAttribute('data-state', 'loading');
+  band.setAttribute('aria-busy', 'true');
+  fillFactBand(sym, 'loading', undefined, null);
+  setFactMsg('');
+  var facts = tickerFacts(sym).then(function (f) { return { ok: true, facts: f }; }, function () { return { ok: false }; });
+  var buy = new Promise(function (resolve) { exportLeadPrice(sym, resolve); });
+  Promise.all([facts, buy]).then(function (res) {
+    if (gen !== _factGen) return;
+    var r = res[0], state = r.ok ? 'ready' : 'error';
+    band.setAttribute('data-state', state);
+    band.removeAttribute('aria-busy');
+    fillFactBand(sym, state, r.ok ? r.facts : undefined, res[1]);
+    if (!r.ok) setFactMsg('Could not load facts for ' + sym + '. Try again in a minute.', true, true);
+    else if (!r.facts) setFactMsg('No facts for ' + sym + ': Tiingo has no daily prices for it.', false, false);
+    else setFactMsg('');
+    // expires: when these facts go stale (the cache entry's 18:30 New York); none after a failure
+    _factReady = { sym: sym, ok: r.ok, facts: r.ok ? r.facts : null, buy: res[1], expires: r.ok ? _tickerFactsExpires[sym] : undefined };
+    armFactBandExpiry();
+    renderAskDock();
+    // a chip answer on screen was built from the facts before these (often "still
+    // loading"): answer it again from the new ones
+    if (_askChip && _askSym === sym) runAskChip(_askChip);
+  });
+}
+document.querySelector('#factBand .fb-retry').addEventListener('click', renderFactBand);
+document.querySelector('#factBand .fb-sumretry').addEventListener('click', renderFactBand);
+// A tab left open past 18:30 New York holds facts the server has since replaced.
+// Coming back to it drops the expired entries and fetches again what is on screen:
+// the band (which answers an open chip again once it settles), the Limit Buy
+// table's fact cells near view, and an open quick-check answer there.
+function refreshExpiredFacts() {
+  var gone = dropExpiredFacts();
+  if (!gone.length) return;
+  if (_factSym && gone.indexOf(_factSym) >= 0) renderFactBand();
+  if (!document.getElementById('exportDialog').classList.contains('open')) return;
+  gone.forEach(fillXpFactCells);
+  if (_exportView === 'table') observeXpFactRows();
+  var active = document.querySelector('#xpAssist .xp-check.is-active');
+  var kind = active && active.getAttribute('data-xp-check');
+  if (kind && kind !== 'buy' && xpAnswerBox().childNodes.length) runXpCheck(kind);
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') refreshExpiredFacts();
+});
+// A tab kept visible past 18:30 New York: a timer redraws the band from new facts
+// once its own expire, and the band answers an open chip again when they arrive.
+// Settling the band arms it. It wakes at most a minute apart and reads the clock
+// each time, so a computer that sleeps through the expiry or a clock that jumps
+// still refreshes on the next wake; the wakes make no request until the facts have
+// expired, then one. It fires 30 s after the expiry so a browser clock a little
+// ahead of the server's does not ask before the server has dropped its own copy.
+// Hidden tabs stop the timer; showing the tab again arms it after the refresh above.
+var FACT_EXPIRY_STEP = 60e3, FACT_EXPIRY_GRACE = 30e3;
+var _factExpiryTimer = 0;
+function factBandStale() {   // the band shows facts for the ticker on screen that have since expired
+  var r = _factReady;
+  return !!(r && r.sym === _factSym && r.expires != null && !(Date.now() < r.expires));
+}
+function armFactBandExpiry() {
+  clearTimeout(_factExpiryTimer);
+  _factExpiryTimer = 0;
+  var r = _factReady;
+  if (!r || r.sym !== _factSym || r.expires == null || document.visibilityState === 'hidden') return;
+  var wait = r.expires + FACT_EXPIRY_GRACE - Date.now();
+  _factExpiryTimer = setTimeout(onFactBandExpiry, Math.max(0, Math.min(wait, FACT_EXPIRY_STEP)));
+}
+function onFactBandExpiry() {
+  _factExpiryTimer = 0;
+  var r = _factReady;
+  if (factBandStale() && !(Date.now() < r.expires + FACT_EXPIRY_GRACE)) refreshStaleFactBand();
+  else armFactBandExpiry();
+}
+// Drops expired facts and redraws what showed them, as coming back to the tab does.
+// The band is redrawn even when its cache entry was already dropped elsewhere (the
+// Limit Buy table or a quick check asked for the ticker first).
+function refreshStaleFactBand() {
+  var r = _factReady;
+  refreshExpiredFacts();
+  if (_factReady === r && factBandStale()) renderFactBand();
+}
+document.addEventListener('visibilitychange', armFactBandExpiry);
+// Phones show the band collapsed to its summary line; this opens and closes the tiles.
+// Wider screens never show the summary, so the class has no effect there.
+document.querySelector('#factBand [data-action="fact-band-toggle"]').addEventListener('click', function () {
+  var band = document.getElementById('factBand'), open = !band.classList.contains('is-expanded');
+  band.classList.toggle('is-expanded', open);
+  this.setAttribute('aria-expanded', open ? 'true' : 'false');
+  this.textContent = open ? 'Fewer facts' : 'All facts';
+});
+// Recomputes only NEAREST BUY, after a Limit Buy setting changed (the dialog closed, or
+// the account's gap placement arrived). The facts and an active trend highlight stay.
+// A band still loading is rendered again instead: its lead price may predate the change.
+function refreshFactBandBuy() {
+  var band = document.getElementById('factBand');
+  if (!band || band.hidden) return;
+  var r = _factReady;
+  if (!r || r.sym !== _factSym) { renderFactBand(); return; }
+  var gen = _factGen;
+  exportLeadPrice(r.sym, function (buy) {
+    if (gen !== _factGen || _factReady !== r) return;   // the band moved on meanwhile
+    r.buy = buy;
+    setNearestBuyTile(buy);
+    if (_askChip === 'buy' && _askSym === r.sym) runAskChip('buy');
+  });
+}
+// The account's gap placement (shared with /alerts and the emails), loaded at page start
+// for a signed-in visitor so NEAREST BUY uses it before the Limit Buy dialog ever opens.
+// The dialog loads it again on each open (loadGapPlacement) and owns it while open.
+function loadAccountGapPlacement() {
+  if (!SITE || siteUser !== true) return;
+  fetch('/api/chart-prefs', { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
+    .then(function (j) {
+      if (!j || !j.account || !j.stored || !GAP_PLACEMENT_HINTS[j.gapPlacement]) return;
+      if (document.getElementById('exportDialog').classList.contains('open')) return;
+      var was = _gapPlacement, local = null;
+      try { local = localStorage.getItem(GAP_PLACEMENT_KEY); } catch (e) {}
+      setGapPlacement(j.gapPlacement, false);   // also this browser's copy, which exportLeadPrice reads
+      if (j.gapPlacement !== was || j.gapPlacement !== local) refreshFactBandBuy();
+    })
+    .catch(function () {});   // this browser's copy stands in, as before
+}
+
+// --- ASK AI dock (signed in) ------------------------------------------------------
+// #askAiBtn toggles #askDock between data-mode="open" (a right-side panel) and
+// data-mode="rail" (a 52px strip of icon buttons); the mode is kept in this browser.
+// The quick-question chips answer from the band's facts and its NEAREST BUY only:
+// no model call. "Compare with QQQ" is the one chip that may request facts (QQQ's,
+// through the same cached tickerFacts). The typed-question box goes to the model
+// (sendAskQuestion, below) and streams its answer.
+var ASK_MODE_KEY = 'kf-ask-dock-v1';
+var _factReady = null;   // { sym, ok, facts, buy } once the band has settled for sym
+// Every answer the dock starts (a chip, a typed question) takes a new token, and a
+// ticker change takes one too; a late answer whose token is no longer current (a slow
+// QQQ compare, a stream) neither writes nor overwrites the newer one.
+var _askToken = 0;
+var _askSym = null;
+var _askChip = null;     // the chip whose answer is on screen, or null (hint or typed answer)
+var _askReq = null;      // { ctl } while a typed question is being answered, else null
+var _askLast = null;     // { sym, question } of the last typed question, for Retry
+function readAskMode() {
+  var m = null;
+  try { m = localStorage.getItem(ASK_MODE_KEY); } catch (e) {}
+  return m === 'open' ? 'open' : 'rail';
+}
+// The facts for the ticker on screen, once the band has them. Never expired ones:
+// past 18:30 New York the band fetches new facts first and this answers null (still
+// loading); once they arrive the band answers an open chip again from them.
+function askFacts() {
+  if (factBandStale()) refreshStaleFactBand();
+  return _factReady && _factReady.sym === _factSym ? _factReady : null;
+}
+function askPayer(f) { return !!(f && f.cadence && f.cadence !== 'none'); }
+// Shows or hides the button and dock by sign-in state, and fits the header, chip
+// labels and rail icons to the ticker on screen and whether it pays distributions.
+function renderAskDock() {
+  var dock = document.getElementById('askDock'), btn = document.getElementById('askAiBtn');
+  if (!dock || !btn) return;
+  var on = SITE && siteUser === true;
+  btn.hidden = !on;
+  dock.hidden = !on;
+  document.body.classList.toggle('ask-open', on && dock.getAttribute('data-mode') === 'open');
+  document.body.classList.toggle('ask-rail', on && dock.getAttribute('data-mode') !== 'open');
+  updateAskSheet();   // phones: the open sheet makes the page behind it inert
+  if (!on) { askAbort(); return; }
+  var sym = _factSym || '';
+  if (sym !== _askSym) {   // new ticker: the old answer described the old one
+    askAbort();
+    _askSym = sym;
+    _askToken++;
+    askHint();
+  }
+  dock.setAttribute('data-symbol', sym);
+  dock.setAttribute('aria-label', sym ? 'Ask about ' + sym : 'Ask about this ticker');
+  document.getElementById('askTitle').textContent = 'ASK ABOUT ' + (sym || '—');
+  document.getElementById('askInput').placeholder = sym ? 'Ask about ' + sym + '…' : 'Ask about this ticker…';
+  var r = askFacts(), f = r && r.facts, known = !!(r && r.ok && f), payer = askPayer(f);
+  var overall = f && f.overall;
+  dock.querySelector('[data-chip="why"] .ask-chiplabel').textContent = overall ? 'Why ' + overall + '?' : 'Why this trend?';
+  dock.querySelector('[data-rail="trend"]').setAttribute('data-tip', overall ? 'Why ' + overall + '?' : 'Why this trend?');
+  dock.querySelector('[data-rail="trend"]').setAttribute('aria-label', overall ? 'Why ' + overall + '?' : 'Why this trend?');
+  // payers get yield and payout; a non-payer (known from facts) gets Compare with QQQ
+  // instead. While facts load (or when they failed) neither shows: a yield chip that
+  // vanishes once a non-payer's facts arrive would offer something it cannot answer
+  dock.querySelector('[data-chip="yield"]').hidden = !(known && payer);
+  dock.querySelector('[data-chip="payout"]').hidden = !(known && payer);
+  dock.querySelector('[data-chip="compare"]').hidden = !(known && !payer);
+  dock.querySelector('[data-rail="yield"]').hidden = !(known && payer);
+  dock.querySelector('[data-rail="payout"]').hidden = !(known && payer);
+  dock.querySelector('[data-rail="compare"]').hidden = !(known && !payer);
+}
+function setAskMode(mode, focusTarget) {
+  var dock = document.getElementById('askDock');
+  dock.setAttribute('data-mode', mode);
+  document.getElementById('askAiBtn').setAttribute('aria-expanded', mode === 'open' ? 'true' : 'false');
+  try { localStorage.setItem(ASK_MODE_KEY, mode); } catch (e) {}
+  renderAskDock();
+  if (mode === 'open') {
+    var el = focusTarget || dock.querySelector('.ask-chip:not([hidden])') || dock.querySelector('.ask-collapse');
+    el.focus();
+  }
+}
+function collapseAskDock() {
+  setAskMode('rail');
+  document.getElementById('askAiBtn').focus();
+}
+// Phones (max-width 700px): the open dock is a full-screen sheet, so it holds the
+// keyboard like a dialog. Tab and Shift+Tab wrap inside it and the page behind it is
+// inert; both end when it collapses, hides or the screen grows past 700px.
+var ASK_SHEET_MQ = window.matchMedia ? window.matchMedia('(max-width:700px)') : null;
+var ASK_BEHIND = ['#bar', '#factBand', '#chart', '#cmpMenu', '#msg'];
+function askSheetOpen() {
+  var dock = document.getElementById('askDock');
+  return !!(ASK_SHEET_MQ && ASK_SHEET_MQ.matches && dock && !dock.hidden && dock.getAttribute('data-mode') === 'open');
+}
+function updateAskSheet() {
+  var on = askSheetOpen();
+  ASK_BEHIND.forEach(function (sel) {
+    var el = document.querySelector(sel);
+    if (el && el.inert !== on) el.inert = on;
+  });
+}
+function trapAskFocus(event) {
+  if (!askSheetOpen()) return;
+  var dock = document.getElementById('askDock');
+  var focusable = Array.prototype.slice.call(dock.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]'))
+    .filter(function (el) { return el.getClientRects().length > 0; });   // skip the hidden rail and chips
+  if (!focusable.length) return;
+  var first = focusable[0], last = focusable[focusable.length - 1];
+  if (!dock.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+if (ASK_SHEET_MQ) {
+  if (ASK_SHEET_MQ.addEventListener) ASK_SHEET_MQ.addEventListener('change', updateAskSheet);
+  else if (ASK_SHEET_MQ.addListener) ASK_SHEET_MQ.addListener(updateAskSheet);
+}
+// --- answer building: DOM nodes with textContent only ---
+function askNode(tag, cls, text) {
+  var el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text != null) el.textContent = text;
+  return el;
+}
+function askHint() {
+  var box = document.getElementById('askAnswer');
+  box.replaceChildren(askNode('p', 'ask-hint', _askSym
+    ? 'Pick a quick question about ' + _askSym + ': those answers come straight from the facts above, with no AI. '
+      + 'Or type your own question below: an AI model answers it from the same facts.'
+    : 'Pick a ticker to ask about it.'));
+  setAskPressed(null);
+}
+function setAskPressed(chip) {
+  _askChip = chip;
+  document.querySelectorAll('#askDock .ask-chip').forEach(function (c) {
+    c.classList.toggle('is-active', c.getAttribute('data-chip') === chip);
+  });
+}
+// one answer card: a title (string or h3 node), paragraphs (strings or nodes) and
+// the source line last
+function askAnswer(title, parts, source) {
+  var card = askNode('div', 'ask-card');
+  card.appendChild(typeof title === 'string' ? askNode('h3', null, title) : title);
+  parts.forEach(function (p) { card.appendChild(typeof p === 'string' ? askNode('p', null, p) : p); });
+  card.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
+  document.getElementById('askAnswer').replaceChildren(card);
+}
+function askVerdictCls(v) { return v === 'UP' || v === 'BULLISH' ? 'is-up' : v === 'DOWN' || v === 'BEARISH' ? 'is-down' : v === 'MIXED' ? 'is-mixed' : ''; }
+function askCloseSource(f, withPayouts) {
+  return 'Tiingo daily closes' + (withPayouts ? ' and distributions' : '') + ' through ' + fbDay(f.asOf);
+}
+// "expected around" date for the next payout: the last ex-date plus one cadence
+// step, stepped past the as-of date. An estimate, never an announced date.
+// Weekly payers step 7 days at a time; the rest step whole months.
+var ASK_CADENCE_MONTHS = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12 };
+function askNextExDate(f) {
+  var months = ASK_CADENCE_MONTHS[f.cadence];
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f.lastExDate || '');
+  if (!m || (!months && f.cadence !== 'weekly')) return null;
+  var y = +m[1], mo = +m[2] - 1, d = +m[3], iso = '';
+  if (f.cadence === 'weekly') {
+    for (var w = 1; w <= 60; w++) {
+      iso = new Date(Date.UTC(y, mo, d + 7 * w)).toISOString().slice(0, 10);
+      if (iso > f.asOf) return iso;
+    }
+    return null;
+  }
+  for (var i = 1; i <= 24; i++) {
+    var t = new Date(Date.UTC(y, mo + months * i, 1));
+    var last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+    iso = t.getUTCFullYear() + '-' + String(t.getUTCMonth() + 1).padStart(2, '0') + '-' + String(Math.min(d, last)).padStart(2, '0');
+    if (iso > f.asOf) return iso;
+  }
+  return null;
+}
+var ASK_STEP_WORDS = { weekly: 'about a week', monthly: 'about a month', quarterly: 'about three months', semiannual: 'about six months', annual: 'about a year' };
+// Answers one chip into #askAnswer. Everything but "compare" is synchronous.
+function runAskChip(chip) {
+  var sym = _askSym, r = askFacts();
+  askAbort();   // a chip is a new question: stop a typed answer still streaming
+  var tok = ++_askToken;   // and drop any slower answer still on its way
+  setAskPressed(chip);
+  if (chip === 'buy') return askBuyAnswer(sym, r);
+  if (!r) return askAnswer(sym || 'Facts', ['Facts for ' + sym + ' are still loading. Try again in a moment.'], 'Tiingo daily closes');
+  if (!r.ok) return askAnswer(sym, ['Facts for ' + sym + ' did not load. Use Try again in the facts band above.'], 'Tiingo daily closes');
+  var f = r.facts;
+  if (!f) return askAnswer(sym, ['No facts for ' + sym + ': Tiingo has no daily prices for it.'], 'Tiingo daily closes');
+  var payouts = Array.isArray(f.payouts) ? f.payouts.length : 0;
+  if (chip === 'yield') {
+    if (!askPayer(f) || !fbNum(f.yield)) {
+      return askAnswer(sym + ': yield & cadence', [sym + ' paid no distributions in the last 12 months, so there is no yield or payout schedule to show.'],
+        askCloseSource(f, true));
+    }
+    var parts = [sym + ' has a trailing 12-month yield of ' + f.yield.toFixed(2) + '%: the distributions with an ex-date in the last 365 days, divided by the '
+      + fbDay(f.asOf) + ' close of ' + px2(f.close) + '.'];
+    parts.push(f.cadence === 'irregular'
+      ? 'It paid ' + payouts + ' times in 12 months, on no regular schedule.'
+      : 'It pays ' + f.cadence + ': ' + payouts + ' payout' + (payouts === 1 ? '' : 's') + ' in the last 12 months.');
+    if (f.lastExDate) parts.push('Last ex-date: ' + fbDay(f.lastExDate) + '.');
+    if (f.special) parts.push('The 12 months include a special payout (more than twice the usual amount), so the yield may overstate a typical year.');
+    return askAnswer(sym + ': yield & cadence', parts, askCloseSource(f, true));
+  }
+  if (chip === 'why') {
+    var wins = f.windows || {}, lines = [];
+    ['d21', 'm3', 'm6'].forEach(function (w) {
+      var win = wins[w];
+      lines.push(FB_WINDOW_WORDS[w][0] + ': ' + (win ? fbSigned(win.change) + ' (' + win.verdict + ')' : 'not enough history'));
+    });
+    var title = askNode('h3');
+    title.append('Why is ' + sym + ' ');
+    title.appendChild(askNode('span', askVerdictCls(f.overall), f.overall || 'without a verdict'));
+    title.append('?');
+    var list = askNode('p', null, 'Price change over ' + lines.join('; ') + '.');
+    var rule = f.overall
+      ? f.upCount + ' of 3 periods up, so the verdict is ' + f.overall + '. The rule: 3 of 3 periods up is UP, 0 of 3 is DOWN, anything else is MIXED.'
+      : 'The verdict needs all three periods, and ' + sym + ' does not have enough daily closes for every one.';
+    return askAnswer(title, [list, rule, 'This is price change only; distributions are not counted.'], askCloseSource(f, false));
+  }
+  if (chip === 'payout') {
+    var next = askNextExDate(f);
+    if (!next) {
+      return askAnswer(sym + ': next payout', [f.cadence === 'irregular'
+        ? sym + ' paid ' + payouts + ' times in 12 months on no regular schedule, so there is no expected ex-date to estimate.'
+        : 'There is not enough payout history to estimate the next one.',
+        f.lastExDate ? 'Last ex-date: ' + fbDay(f.lastExDate) + '.' : ''].filter(Boolean), askCloseSource(f, true));
+    }
+    return askAnswer(sym + ': next payout', ['Next ex-date expected around ' + fbDay(next) + ' (estimate from the ' + f.cadence + ' cadence; not an announced date).',
+      'How it is estimated: ' + sym + ' pays ' + f.cadence + ' and its last ex-date was ' + fbDay(f.lastExDate)
+        + ', so the next ex-date usually falls ' + ASK_STEP_WORDS[f.cadence] + ' later. Our data has no announced future payouts.'],
+      askCloseSource(f, true));
+  }
+  if (chip === 'compare') return askCompareAnswer(sym, f, tok);
+}
+// One sentence from the windows where sym did better, worse or the same as QQQ.
+// A tie counts as compared; "not enough history" only when no window could be.
+function askCompareSentence(sym, ahead, behind, same) {
+  if (!ahead.length && !behind.length) {
+    return same.length ? sym + ' and QQQ had the same price change over ' + xpList(same) + '.'
+      : 'There is not enough history to compare the two.';
+  }
+  var parts = [];
+  if (ahead.length) parts.push('did better than QQQ over ' + xpList(ahead));
+  if (behind.length) parts.push((parts.length ? 'worse over ' : 'did worse than QQQ over ') + xpList(behind));
+  if (same.length) parts.push('matched it over ' + xpList(same));
+  return sym + ' ' + (parts.length < 2 ? parts[0] : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1]) + '.';
+}
+function askCompareAnswer(sym, f, tok) {
+  askAnswer(sym + ' vs QQQ', ['Loading QQQ facts…'], askCloseSource(f, false));
+  tickerFacts('QQQ').then(function (q) { return q; }, function () { return undefined; }).then(function (q) {
+    if (tok !== _askToken) return;   // a newer chip, question or ticker took over meanwhile
+    if (!q) {
+      return askAnswer(sym + ' vs QQQ', [q === undefined ? 'QQQ facts did not load. Try again in a minute.' : 'No facts for QQQ right now.'],
+        askCloseSource(f, false));
+    }
+    var table = askNode('table'), head = askNode('tr');
+    ['Price change', sym, 'QQQ'].forEach(function (t) { head.appendChild(askNode('th', null, t)); });
+    table.appendChild(head);
+    var ahead = [], behind = [], same = [];
+    ['d21', 'm3', 'm6'].forEach(function (w) {
+      var a = f.windows && f.windows[w], b = q.windows && q.windows[w], tr = askNode('tr');
+      tr.appendChild(askNode('td', null, TREND_HL_NAMES[w]));
+      tr.appendChild(askNode('td', a ? askVerdictCls(a.verdict) : '', a ? fbSigned(a.change) : '—'));
+      tr.appendChild(askNode('td', b ? askVerdictCls(b.verdict) : '', b ? fbSigned(b.change) : '—'));
+      table.appendChild(tr);
+      if (!a || !b) return;
+      (a.change > b.change ? ahead : a.change < b.change ? behind : same).push(FB_WINDOW_WORDS[w][0]);
+    });
+    var sentence = askCompareSentence(sym, ahead, behind, same);
+    var src = askCloseSource(f, false) + (q.asOf !== f.asOf ? ' (QQQ through ' + fbDay(q.asOf) + ')' : ', both tickers');
+    askAnswer(sym + ' vs QQQ', [table, sentence, 'Price change only; distributions are not counted.'], src);
+  });
+}
+// the band's NEAREST BUY, from the same exportLeadPrice result
+function askBuyAnswer(sym, r) {
+  var buy = r && r.buy, title = sym + ': nearest buy';
+  if (!buy) return askAnswer(title, ['The nearest buy price for ' + sym + ' is still loading.'], 'Limit Buy Levels');
+  if (buy.lim) {
+    return askAnswer(title, ['Nearest buy for ' + sym + ': ' + px2(buy.lim.row.limit) + ', ' + pctBelowText(buy.lim.row) + ' the ' + closeLabel(buy.sec) + '.',
+      'It is the price the Limit Buy Levels dialog leads with for this ticker, using your settings there. It comes from past price levels; it is not a prediction or a recommendation.'],
+      'Limit Buy Levels, ' + (buy.sec.closeTime != null ? 'from ' : '') + closeLabel(buy.sec));
+  }
+  if (buy.sec) {
+    return askAnswer(title, ['No buy price for ' + sym + ' between ' + fmtPct(buy.range.min) + '% and ' + fmtPct(buy.range.depth) + '% below the close, the range set in Limit Buy Levels.',
+      'Widen that range in Limit Buy Levels to see deeper prices.'], 'Limit Buy Levels settings');
+  }
+  return askAnswer(title, ['No buy price for ' + sym + ': ' + (buy.reason === 'range' ? 'the Limit Buy range is not valid.'
+    : buy.reason === 'failed' ? 'its chart data did not load.' : 'this chart has no Limit Buy levels.')], 'Limit Buy Levels');
+}
+// --- typed questions: POST /api/ticker-assistant, answer streamed as plain text ---
+// The server writes the model's text, then its own "Source: ..." line last. A
+// failure after text started ends with an interrupted line instead; an answer
+// without the source line is treated as interrupted. Text only, never HTML.
+var ASK_FAIL_MSG = "Couldn't get an answer. Try again.";
+// the band's NEAREST BUY for sym, as the band shows it (2 decimals), or null
+function askNearestBuy(sym) {
+  var r = askFacts(), buy = r && r.sym === sym && r.buy;
+  if (!buy || !buy.lim || !buy.lim.row) return null;
+  var px = Number(px2(buy.lim.row.limit));
+  return isFinite(px) && px > 0 ? px : null;
+}
+function setAskBusy(on) {
+  var send = document.querySelector('#askDock .ask-send');
+  send.disabled = on;
+  send.setAttribute('aria-label', on ? 'Send question…' : 'Send question');
+  var box = document.getElementById('askAnswer');
+  if (on) box.setAttribute('aria-busy', 'true');   // screen readers read the answer once, when done
+  else box.removeAttribute('aria-busy');
+}
+// stops the typed question being answered, if any (ticker change, chip, new question)
+function askAbort() {
+  var req = _askReq;
+  if (!req) return;
+  _askReq = null;
+  if (req.ctl) req.ctl.abort();
+  setAskBusy(false);
+}
+// one POST with the CSRF token; one retry with a fresh token on 419 or a CSRF 403
+function postAskQuestion(body, retried, signal) {
+  return chartCsrfToken(retried).then(function (token) {
+    return fetch('/api/ticker-assistant', {
+      method: 'POST', credentials: 'same-origin', signal: signal,
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token },
+      body: body,
+    });
+  }).then(function (r) {
+    if (retried || (r.status !== 419 && r.status !== 403)) return r;
+    return r.clone().json().catch(function () { return {}; }).then(function (j) {
+      var csrf = r.status === 419 || j.code === 'CSRF_REFRESH_NEEDED' || /CSRF/.test(j.error || '');
+      return csrf ? postAskQuestion(body, true, signal) : r;
+    });
+  });
+}
+// Reads a streamed answer as text, chunk by chunk, into add(). Resolves true once
+// the whole body arrived, false when live() turned false (the reader is cancelled).
+// Shared by the dock and the Limit Buy assistant column.
+function readAskStream(r, live, add) {
+  if (!r.body || !r.body.getReader || !window.TextDecoder) return r.text().then(function (t) { add(t); return true; });
+  var reader = r.body.getReader(), dec = new TextDecoder();
+  var pump = function () {
+    return reader.read().then(function (step) {
+      if (!live()) { reader.cancel().catch(function () {}); return false; }
+      if (step.done) { add(dec.decode()); return true; }
+      add(dec.decode(step.value, { stream: true }));
+      return pump();
+    });
+  };
+  return pump();
+}
+// the card for a typed question: the question on top, then the answer
+function askTypedCard(question) {
+  var card = askNode('div', 'ask-card ask-typed');
+  card.appendChild(askNode('p', 'ask-q', question));
+  document.getElementById('askAnswer').replaceChildren(card);
+  return card;
+}
+// ends a typed question with a plain message; retry adds the Retry button
+function askTypedError(req, question, msg, retry) {
+  if (_askReq !== req) return;
+  _askReq = null;
+  setAskBusy(false);
+  var card = askTypedCard(question);
+  card.appendChild(askNode('p', 'ask-err', msg));
+  if (retry) {
+    var b = askNode('button', 'ask-retry', 'Retry');
+    b.type = 'button';
+    b.setAttribute('data-action', 'ask-retry');
+    b.addEventListener('click', function () {
+      if (!_askLast || _askLast.sym !== _askSym) return;
+      document.getElementById('askInput').focus();   // the button goes away with the old card
+      sendAskQuestion(_askLast.question);
+    });
+    card.appendChild(b);
+  }
+}
+function sendAskQuestion(question) {
+  var sym = _askSym;
+  question = String(question || '').trim();
+  if (!question || !sym) return;
+  askAbort();
+  setAskPressed(null);
+  _askLast = { sym: sym, question: question };
+  var req = { ctl: window.AbortController ? new AbortController() : null, tok: ++_askToken };
+  _askReq = req;
+  setAskBusy(true);
+  var card = askTypedCard(question);
+  // current only while it is the running question, holds the newest token and its
+  // card is still on the page: otherwise nothing more is written
+  var live = function () { return _askReq === req && req.tok === _askToken && card.isConnected; };
+  var wait = askNode('p', 'ask-hint', 'Writing an answer…');
+  var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
+  answer.appendChild(text);
+  card.appendChild(wait);
+  card.appendChild(answer);
+  var payload = { symbols: [sym], question: question };
+  var buyPx = askNearestBuy(sym);
+  if (buyPx) { payload.nearestBuy = {}; payload.nearestBuy[sym] = buyPx; }
+  // a superseded question that is somehow still marked running just stops
+  var drop = function () { if (_askReq === req) askAbort(); };
+  var fail = function (msg, retry) { if (!live()) return drop(); askTypedError(req, question, msg, retry); };
+  postAskQuestion(JSON.stringify(payload), false, req.ctl && req.ctl.signal).then(function (r) {
+    if (!live()) return drop();
+    if (r.status === 401) {
+      fail('Your session has ended. Sign in again to ask questions.', false);
+      return showSignupCta('Sign in to ask questions', 'Typed questions use your account. Sign in again to keep asking about ' + sym + '.');
+    }
+    if (r.status === 404) return fail('No facts for ' + sym + ': Tiingo has no daily prices for it, so there is nothing to explain.', false);
+    if (r.status === 429) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        var m = typeof j.error === 'string' && j.error.length <= 200 ? j.error : 'You have reached the question limit. Try again later.';
+        fail(m, false);
+      });
+    }
+    if (r.status === 400) return fail('This question could not be sent. Try a shorter question.', false);
+    if (!r.ok) return fail(ASK_FAIL_MSG, true);
+    var add = function (chunk) {
+      if (!live() || !chunk) return;
+      if (wait.parentNode) wait.remove();
+      text.data += chunk;
+    };
+    var finish = function () {
+      if (!live()) return drop();
+      var all = text.data;
+      var lines = all.replace(/\s+$/, '').split(/\r?\n/);
+      var last = lines.pop() || '';
+      if (/\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);
+      _askReq = null;
+      setAskBusy(false);
+      text.data = lines.join('\n').trim();
+      card.appendChild(askNode('p', 'ask-src', last));
+    };
+    return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
+  }).catch(function (e) {
+    if (e && e.name === 'AbortError') return;   // askAbort already moved on
+    fail(ASK_FAIL_MSG, true);
+  });
+}
+function initAskDock() {
+  var dock = document.getElementById('askDock'), btn = document.getElementById('askAiBtn');
+  if (!dock || !btn) return;
+  var mode = readAskMode();
+  // on phones the open dock is a full-screen sheet: the page opens on the chart and its
+  // band, with the dock as the rail (the saved choice still applies on wider screens)
+  if (mode === 'open' && window.matchMedia && window.matchMedia('(max-width:700px)').matches) mode = 'rail';
+  dock.setAttribute('data-mode', mode);
+  btn.setAttribute('aria-expanded', mode === 'open' ? 'true' : 'false');
+  btn.addEventListener('click', function () {
+    setAskMode(dock.getAttribute('data-mode') === 'open' ? 'rail' : 'open');
+  });
+  dock.querySelector('.ask-raillabel').addEventListener('click', function () { setAskMode('open'); });
+  dock.querySelector('.ask-collapse').addEventListener('click', collapseAskDock);
+  dock.querySelectorAll('.ask-chip').forEach(function (c) {
+    c.addEventListener('click', function () { runAskChip(c.getAttribute('data-chip')); });
+  });
+  dock.querySelectorAll('.ask-railbtn').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var k = b.getAttribute('data-rail');
+      if (k === 'ask') { setAskMode('open', document.getElementById('askInput')); return; }
+      var chip = k === 'trend' ? 'why' : k;
+      setAskMode('open', dock.querySelector('[data-chip="' + chip + '"]'));
+      runAskChip(chip);
+    });
+  });
+  // Enter or the send button: one question at a time (sending is off while one streams)
+  document.getElementById('askForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (_askReq) return;
+    var input = document.getElementById('askInput'), q = input.value.trim();
+    if (!q || !_askSym) return;
+    input.value = '';
+    sendAskQuestion(q);
+  });
+  // the dock handles its own keys: Esc collapses it, and no key typed here reaches
+  // the chart shortcuts (Backspace would otherwise delete a selected line)
+  dock.addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); collapseAskDock(); }
+    else if (e.key === 'Tab') trapAskFocus(e);
+  });
+  // the dock starts under the toolbar, which wraps to more rows on narrow screens
+  var bar = document.getElementById('bar');
+  function placeDock() { document.documentElement.style.setProperty('--askTop', Math.round(bar.getBoundingClientRect().bottom) + 'px'); }
+  placeDock();
+  if (window.ResizeObserver) new ResizeObserver(placeDock).observe(bar);
+  window.addEventListener('resize', placeDock);
+}
+initAskDock();
+
+// --- linked trend highlight (signed in) -----------------------------------------
+// A pressed trend cell shades its window on the chart: from the window's first bar
+// (the first candle on or after startDate, by New York date, on whatever timeframe is
+// shown) to the as-of bar. The overlay draws a straight line from startClose to the
+// as-of close, so the line and the verdict can never disagree. It is a DOM element over
+// #chart, re-projected through the chart's own scales on every pan, zoom, resize and
+// redraw. A second click, Clear, a ticker change or a timeframe change removes it.
+var _trendHl = null;    // { w, key, win, asOf, close } while a window is shown
+var _trendHlRaf = 0;
+var TREND_HL_NAMES = { d21: '21D', m3: '3M', m6: '6M' };
+var TREND_HL_WORDS = { d21: '21 days', m3: '3 months', m6: '6 months' };
+var _etDayFmt = null;
+// a candle time as its New York calendar date, "YYYY-MM-DD"
+function etDay(t) {
+  if (typeof t === 'string') return t.slice(0, 10);
+  if (t && typeof t === 'object') return t.year + '-' + String(t.month).padStart(2, '0') + '-' + String(t.day).padStart(2, '0');
+  if (!_etDayFmt) _etDayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: ET_TZ, year: 'numeric', month: '2-digit', day: '2-digit' });
+  return _etDayFmt.format(new Date(t * 1000));
+}
+// indices into current.candles of the window's first bar and the as-of bar (the last
+// candle dated asOf; if the chart ends earlier, its last candle before asOf), or null
+function trendHlBars(h) {
+  var c = current && current.candles, si = -1, ei = -1;
+  if (!c || !c.length) return null;
+  for (var i = 0; i < c.length; i++) {
+    var d = etDay(c[i].time);
+    if (si < 0 && d >= h.win.startDate) si = i;
+    if (d <= h.asOf) ei = i;
+    else break;
+  }
+  return si >= 0 && ei >= si ? { si: si, ei: ei } : null;
+}
+function trendHlEl() {
+  var el = document.getElementById('trendHighlight');
+  if (el) return el;
+  el = document.createElement('div');
+  el.id = 'trendHighlight';
+  el.hidden = true;
+  el.setAttribute('aria-hidden', 'true');   // the band's note says the same thing in words
+  el.innerHTML = '<span class="th-label"></span><span class="th-span"></span>'
+    + '<svg><line stroke-width="2"></line><circle r="6"></circle><circle r="6"></circle></svg>'
+    + '<span class="th-start"></span>';
+  document.getElementById('chart').appendChild(el);
+  return el;
+}
+// cell pressed state + the band's "Showing ... on the chart" note and its Clear button
+function setTrendHlCells() {
+  var on = _trendHl && _trendHl.w;
+  ['d21', 'm3', 'm6'].forEach(function (w) {
+    var cell = document.querySelector('#factBand [data-window="' + w + '"]');
+    if (cell) cell.setAttribute('aria-pressed', w === on ? 'true' : 'false');
+  });
+  var note = document.querySelector('#factBand .fb-hlnote');
+  if (!note) return;
+  note.querySelector('.fb-hltext').textContent = on
+    ? 'Showing ' + TREND_HL_NAMES[on] + ' on the chart: ' + fbSigned(_trendHl.win.change) + ' since the '
+      + fbDay(_trendHl.win.startDate) + ' close of ' + px2(_trendHl.win.startClose) + '.'
+    : '';
+  note.querySelector('.fb-hlclear').hidden = !on;
+}
+function clearTrendHighlight() {
+  _trendHl = null;
+  var el = document.getElementById('trendHighlight');
+  if (el) el.hidden = true;
+  setTrendHlCells();
+}
+// moves the view only as far as needed so both ends of the window are on screen,
+// zooming out when the window is wider than the current view
+function revealTrendWindow(si, ei) {
+  if (!chart) return;
+  var ts = chart.timeScale(), lr = ts.getVisibleLogicalRange();
+  if (!lr) return;
+  var span = ei - si, margin = Math.max(3, Math.round(span * 0.08));
+  if (lr.from <= si - margin && lr.to >= ei + margin) return;
+  var width = Math.max(lr.to - lr.from, span + 2 * margin);
+  var to = Math.max(lr.to, ei + margin), from = to - width;
+  if (from > si - margin) { from = si - margin; to = from + width; }
+  ts.setVisibleLogicalRange({ from: from, to: to });
+}
+function toggleTrendWindow(w) {
+  if (_trendHl && _trendHl.w === w) { clearTrendHighlight(); return; }
+  var f = _factSym ? _tickerFactsCache[_factSym] : null;
+  var win = f && f.windows && f.windows[w];
+  if (!win || !current || !chart) return;
+  var cur = currentSuper();
+  if (cur && cur.sym !== _factSym) return;   // the chart is still switching tickers
+  var h = { w: w, key: current.key, win: win, asOf: f.asOf, close: f.close };
+  var bars = trendHlBars(h);
+  if (!bars) {
+    clearTrendHighlight();
+    var note = document.querySelector('#factBand .fb-hltext');
+    if (note) note.textContent = 'This chart has no candles in the ' + TREND_HL_WORDS[w] + ' window.';
+    return;
+  }
+  _trendHl = h;
+  var el = trendHlEl();
+  el.className = win.verdict === 'BULLISH' ? 'is-up' : win.verdict === 'BEARISH' ? 'is-down' : 'is-flat';
+  el.setAttribute('data-window', w);
+  el.setAttribute('data-start-date', win.startDate);
+  el.setAttribute('data-start-close', String(win.startClose));
+  el.setAttribute('data-end-date', f.asOf);
+  el.setAttribute('data-end-close', String(f.close));
+  el.querySelector('.th-label').textContent = TREND_HL_NAMES[w] + ' ' + fbSigned(win.change) + ' ' + win.verdict;
+  el.querySelector('.th-start').textContent = px2(win.startClose);
+  setTrendHlCells();
+  revealTrendWindow(bars.si, bars.ei);
+  positionTrendHighlight();
+  scheduleTrendHighlight();   // again once the chart has painted the new range
+}
+// coalesces re-projection to one per frame, read after the chart's own update
+function scheduleTrendHighlight() {
+  if (_trendHlRaf || !_trendHl) return;
+  _trendHlRaf = requestAnimationFrame(function () { _trendHlRaf = 0; positionTrendHighlight(); });
+}
+function positionTrendHighlight() {
+  var el = document.getElementById('trendHighlight');
+  if (!el) return;
+  var h = _trendHl;
+  if (!h || !chart || !candleSeries || !current || current.key !== h.key) { el.hidden = true; return; }
+  var bars = trendHlBars(h);
+  if (!bars) { el.hidden = true; return; }
+  var ts = chart.timeScale();
+  var sx = ts.logicalToCoordinate(bars.si), ex = ts.logicalToCoordinate(bars.ei);
+  var paneW = ts.width(), paneH = document.getElementById('chart').clientHeight - ts.height();
+  el.hidden = false;
+  if (sx == null || ex == null || ex < 0 || sx > paneW || paneH <= 0) { el.style.visibility = 'hidden'; return; }
+  el.style.visibility = '';
+  var l = Math.max(0, sx), r = Math.min(paneW, ex), w = Math.max(1, r - l);
+  el.style.left = l + 'px';
+  el.style.width = w + 'px';
+  el.style.height = paneH + 'px';
+  el.classList.toggle('cut-l', sx < 0);
+  el.classList.toggle('cut-r', ex > paneW);
+  // label centred over the window, kept inside the pane
+  var lab = el.querySelector('.th-label'), lw = lab.offsetWidth;
+  var lx = Math.max(4, Math.min(paneW - lw - 4, (l + r) / 2 - lw / 2));
+  lab.style.left = (lx - l) + 'px';
+  // start-to-latest line in the overlay's own coordinates (the svg clips what is off screen)
+  var y1 = candleSeries.priceToCoordinate(h.win.startClose), y2 = candleSeries.priceToCoordinate(h.close);
+  var svg = el.querySelector('svg'), start = el.querySelector('.th-start');
+  if (y1 == null || y2 == null) { svg.style.display = 'none'; start.hidden = true; return; }
+  svg.style.display = '';
+  svg.setAttribute('width', w);
+  svg.setAttribute('height', paneH);
+  var x1 = sx - l, x2 = ex - l, col = getComputedStyle(el).getPropertyValue('--hl').trim() || getCss('--fg');
+  var line = svg.querySelector('line'), dots = svg.querySelectorAll('circle');
+  line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+  line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+  line.setAttribute('stroke', col);
+  dots[0].setAttribute('cx', x1); dots[0].setAttribute('cy', y1);
+  dots[1].setAttribute('cx', x2); dots[1].setAttribute('cy', y2);
+  dots[0].setAttribute('fill', col); dots[1].setAttribute('fill', col);
+  start.hidden = sx < 0;
+  start.style.left = (x1 + 6) + 'px';
+  start.style.top = Math.max(36, y1 - 26) + 'px';
+}
+document.querySelector('#factBand .fb-cells').addEventListener('click', function (e) {
+  var cell = e.target.closest('button.fb-cell');
+  if (!cell || cell.getAttribute('aria-disabled') === 'true') return;
+  toggleTrendWindow(cell.getAttribute('data-window'));
+});
+document.querySelector('#factBand .fb-hlclear').addEventListener('click', function () {
+  var w = _trendHl && _trendHl.w;
+  clearTrendHighlight();
+  var cell = w && document.querySelector('#factBand [data-window="' + w + '"]');
+  if (cell) cell.focus();   // the Clear button just hid itself: keep focus in the band
+});
+// series primitive with nothing to paint: the chart calls updateAllViews on every
+// repaint (autoscale, price-axis drag, log toggle), which re-projects the overlay
+var trendHlPrimitive = {
+  updateAllViews: function () { if (_trendHl) scheduleTrendHighlight(); },
+  paneViews: function () { return []; }
+};
 
 // Data-dependent site setup, run once chart data has loaded (buildDropdown).
 function applySiteMode() {
@@ -3710,10 +5112,25 @@ function markExportClusters(rows) {
   }
   return rows;
 }
+// The rows Download CSV exports: every row, or while the up-in-all-three filter
+// is on, only the rows of the tickers the table shows (the matches, plus the
+// tickers listed under "Close: down in one period").
+function exportCsvRows() {
+  if (!_exportRows) return [];
+  if (!(_xpFilter && _exportView === 'table')) return _exportRows;
+  var shown = _xpFilter.up.concat(_xpFilter.close);
+  return _exportRows.filter(function (row) { return shown.indexOf(row.sym) >= 0; });
+}
+// The button is off while the table is out of date or shows no ticker.
+function syncExportCsvButton() {
+  document.getElementById('exportCsv').disabled = !(_exportCsvReady && exportCsvRows().length);
+}
 function downloadExportCsv() {
   if (!_exportCsvReady || !_exportRows || !_exportRows.length) return;
+  var rows = exportCsvRows();
+  if (!rows.length) return;
   var lines = ['Ticker,Limit price,Signal,Times tested,Timeframe relevance,Gap zone,Below close %,Last close'];
-  _exportRows.forEach(function (row) {
+  rows.forEach(function (row) {
     var dist = (((row.close - row.limit) / row.close) * 100).toFixed(1);
     lines.push([
       row.sym, row.limit,
@@ -4106,17 +5523,21 @@ function updateExportPickCount() {
   document.getElementById('exportSaveGroup').disabled = !on || _exportGroupsLocked;
   // a group tab is already a saved group; its own edit button changes it (user, 2026-10-11)
   document.getElementById('exportSaveGroup').hidden = _exportActive !== 'all';
+  renderXpAssist();   // selection count; a changed selection drops the filter and the old answer
 }
 
 // --- live build -----------------------------------------------------------------
 var _exportTimer = null;
 var _exportCsvReady = false;   // true only while the shown table matches the current inputs
+var _exportBuilt = false;      // true once a build finished for the current inputs (even with no rows)
 function scheduleExportBuild(delay) {
   clearTimeout(_exportTimer);
   _exportGen++;   // a build still loading belongs to the old inputs: drop its result
   // the table on screen is about to go stale: never let Download hand out the old rows
   _exportCsvReady = false;
+  _exportBuilt = false;
   document.getElementById('exportCsv').disabled = true;
+  refreshXpBuyAnswer();   // its prices are about to go stale too
   _exportTimer = setTimeout(buildExportTable, delay == null ? 250 : delay);
 }
 // The range the inputs show, or an error to show instead. Never builds with
@@ -4131,6 +5552,7 @@ function readExportRange() {
 }
 function buildExportTable() {
   var gen = ++_exportGen;
+  _exportBuilt = false;
   var syms = checkedExportSymbols();
   var msg = document.getElementById('exportMsg');
   var main = document.getElementById('exportMain');
@@ -4141,6 +5563,7 @@ function buildExportTable() {
     _exportSecs = {};
     closeWhyPanel(false);
     hideExportLoading();
+    stopXpFactRows();
     msg.textContent = '';
     main.removeAttribute('aria-busy');
     document.getElementById('exportResult').innerHTML =
@@ -4174,13 +5597,9 @@ function buildExportTable() {
     var rows = [], failed = [], sections = [];
     loaded.forEach(function (item) {
       if (item.failed) { failed.push(item.sym); return; }
-      var mine = exportCandidates(item.sym, item.candles, item.ov, range.depth, range.min, _exportStrength);
-      var extra = _exportStrength === 'any' ? 0
-        : exportCandidates(item.sym, item.candles, item.ov, range.depth, range.min, 'any').length - mine.length;
-      var close = item.candles.length ? r2(item.candles[item.candles.length - 1].close) : null;
-      var closeTime = item.candles.length ? item.candles[item.candles.length - 1].time : null;
-      sections.push({ sym: item.sym, rows: mine, weaker: Math.max(0, extra), close: close, closeTime: closeTime, candles: item.candles });
-      rows = rows.concat(mine);
+      var sec = exportSectionFor(item, range, _exportStrength);
+      sections.push(sec);
+      rows = rows.concat(sec.rows);
     });
     markExportClusters(rows);
     _exportRows = rows;
@@ -4188,9 +5607,51 @@ function buildExportTable() {
     msg.classList.toggle('error', !!failed.length);
     renderExportTable(sections);
     updateExportFooter(rows, sections.length);
+    _exportBuilt = true;
+    refreshXpBuyAnswer();   // answer again from the new prices
   }, function (i, n) {
     if (gen === _exportGen) updateExportLoading(syms[i], i + 1, n);
   }, function () { return gen !== _exportGen; });
+}
+// One ticker's section of the results: its limit candidates for the range and
+// strength, how many weaker ones that strength hides, and its latest close.
+function exportSectionFor(item, range, strength) {
+  var mine = exportCandidates(item.sym, item.candles, item.ov, range.depth, range.min, strength);
+  var extra = strength === 'any' ? 0
+    : exportCandidates(item.sym, item.candles, item.ov, range.depth, range.min, 'any').length - mine.length;
+  var close = item.candles.length ? r2(item.candles[item.candles.length - 1].close) : null;
+  var closeTime = item.candles.length ? item.candles[item.candles.length - 1].time : null;
+  return { sym: item.sym, rows: mine, weaker: Math.max(0, extra), close: close, closeTime: closeTime, candles: item.candles };
+}
+// The lead price the cards view shows for one ticker, built by the same code
+// (exportSectionFor, markExportClusters, exportLimits, nearestStrongIndex) with
+// the settings the dialog opens with: range inputs, saved strength, saved
+// combine setting and saved gap placement. The /charts fact band shows it as
+// NEAREST BUY, so the band and the dialog give the same price.
+// done({ lim, sec, range }) with lim null when no price qualifies, or
+// done({ reason: 'none' | 'range' | 'failed' }).
+function exportLeadPrice(sym, done) {
+  if (!superMap[sym]) return done({ reason: 'none' });
+  var range = readExportRange();
+  if (range.error) return done({ reason: 'range' });
+  var saved = null;
+  try { saved = localStorage.getItem('kf-export-strength'); } catch (e) {}
+  var strength = STRENGTH_HINTS[saved] ? saved : _exportStrength;
+  if (!document.getElementById('exportDialog').classList.contains('open')) {
+    // what openExportDialog reads first; while it is open its own values stand
+    readExportCombine();
+    var gap = null;
+    try { gap = localStorage.getItem(GAP_PLACEMENT_KEY); } catch (e) {}
+    if (GAP_PLACEMENT_HINTS[gap]) _gapPlacement = gap;
+  }
+  collectExportData([sym], function (loaded) {
+    var item = loaded[0];
+    if (!item || item.failed) return done({ reason: 'failed' });
+    var sec = exportSectionFor(item, range, strength);
+    markExportClusters(sec.rows);
+    var limits = exportLimits(sec.rows);
+    done({ sec: sec, range: range, lim: limits.length ? limits[nearestStrongIndex(limits)] : null });
+  });
 }
 var _exportBeam = null;
 function showExportLoading(sym, i, n) {
@@ -4297,6 +5758,7 @@ function readExportView() {
 }
 function setExportView(v) {
   _exportView = v === 'table' ? 'table' : 'cards';
+  if (_exportView === 'cards') clearXpFilter();   // the filter belongs to the table
   try { localStorage.setItem(EXPORT_VIEW_KEY, _exportView); } catch (e) {}
   renderViewSwitch();
   if (_exportLastSections.length) renderExportTable(_exportLastSections);   // else keep the "pick tickers" prompt
@@ -4313,6 +5775,8 @@ function renderExportTable(sections) {
   if (!sections.length) { wrap.innerHTML = ''; return; }
   sections.forEach(function (sec) { _exportSecs[sec.sym] = sec; });
   wrap.innerHTML = _exportView === 'table' ? exportTableHtml(sections) : exportCardsHtml(sections);
+  applyXpFilter();       // a rebuilt table keeps the assistant filter (same selection)
+  observeXpFactRows();   // table view: lazy fact cells; cards view: stops watching
   renderCombineExample(sections);
   if (_whyOpen) refreshWhyPanel();
   if (_exportGoPending) { var go = _exportGoPending; _exportGoPending = null; if (_exportSecs[go]) goToExportTicker(go); }
@@ -4332,10 +5796,22 @@ function goToExportTicker(sym) {
     return;
   }
   if (!document.querySelector('#exportResult [data-sec="' + sym + '"]')) { _exportGoPending = sym; return; }
+  // With the up-in-all-three filter on, the jump lands on something visible: a
+  // ticker under "Close: down in one period" opens the price that section shows;
+  // a ticker the filter hides clears the filter first, then jumps as usual.
+  var copy = document.querySelector('#xpCloseSection tbody[data-sec="' + sym + '"]');
+  if (copy) {
+    openCloseSectionPrice(sym, copy.querySelector('[data-first]'));
+    copy.scrollIntoView({ block: 'start' });
+    return;
+  }
+  var tb = document.querySelector('#exportResult .xp-tablewrap tbody[data-sec="' + sym + '"]');
+  if (tb && tb.hidden) { clearXpFilter(); setXpCheckActive(null); }
   openFirstPrice(sym, true);
 }
 function openFirstPrice(sym, scroll) {
   var sec = _exportSecs[sym], limits = sec ? exportLimits(sec.rows) : [];
+  xpFactWant(sym, true);   // selecting a ticker loads its facts first (table view only)
   if (limits.length) {
     var idx = _exportView === 'table' ? 0 : nearestStrongIndex(limits);
     openWhyPanel(sym, idx, document.querySelector('#exportResult [data-why="' + sym + '|' + idx + '"]'));
@@ -4343,14 +5819,720 @@ function openFirstPrice(sym, scroll) {
   var head = document.querySelector('#exportResult [data-sec="' + sym + '"]');
   if (scroll && head) head.scrollIntoView({ block: 'start' });
 }
+// A ticker heading under "Close: down in one period" opens the one price that
+// section shows for it (its lead, the nearest Strong price), never the first row
+// of the hidden table above. Focus returns to that shown price row, which sits
+// right under the heading and, unlike the heading, can take focus.
+function openCloseSectionPrice(sym, head) {
+  var sec = _exportSecs[sym], limits = sec ? exportLimits(sec.rows) : [];
+  xpFactWant(sym, true);
+  if (!limits.length) return;
+  var idx = nearestStrongIndex(limits);
+  var row = document.querySelector('#xpCloseSection [data-why="' + sym + '|' + idx + '"]');
+  openWhyPanel(sym, idx, row || head);
+}
 function nearestStrongIndex(limits) {
   for (var i = 0; i < limits.length; i++) if (limitStrength(limits[i]) === 'strong') return i;
   return 0;
 }
+// --- table view: ticker facts columns (signed in only) -------------------------------
+// YIELD, CADENCE, 21D, 3M, 6M sit on each ticker's heading row. Facts load
+// lazily: opening the dialog fetches nothing; a ticker's facts load when its
+// rows come near the visible part of the scroller (IntersectionObserver) or
+// when the visitor selects it. Queued tickers go out together, up to
+// TICKER_FACTS_BATCH per request, into the page cache shared with the fact band;
+// at most XP_FACT_MAX requests at once, never twice for one ticker. A ticker that leaves the area before its turn comes is taken off the
+// queue, so scrolling past a row costs nothing.
+// The shared Tiingo key allows 50 calls an hour for the whole site, and every
+// uncached ticker costs one. So rows coming into view load at most XP_TABLE_CAP
+// tickers that are not cached and fresh per opening of the dialog; past that, a
+// row's cells show "—" and a Load facts button for that row. Selecting a ticker
+// (its heading, a price, its checkbox, the ticker list) or its Load facts button
+// always loads it.
+var XP_FACT_KEYS = ['yield', 'cadence', 'd21', 'm3', 'm6'];
+var XP_FACT_HEADS = {
+  yield: ['Yield', 'distributions in the last 12 months ÷ latest close'],
+  cadence: ['Cadence', 'how often it paid in the last 12 months'],
+  d21: ['21D', 'price change over 21 trading days'],
+  m3: ['3M', 'price change over 3 months (63 trading days)'],
+  m6: ['6M', 'price change over 6 months (126 trading days)']
+};
+var XP_FACT_MAX = 3;
+var _xpFactQueue = [];                       // symbols waiting for a request slot, front first
+var _xpFactRunning = 0;                      // requests this queue has in flight
+var _xpFactState = Object.create(null);      // SYM -> 'queued' | 'loading' | 'error'; facts themselves live in _tickerFactsCache
+var _xpFactObserver = null;
+var XP_TABLE_CAP = 10;
+var _xpTableLeft = XP_TABLE_CAP;               // uncached tickers rows coming into view may still load in this opening
+var _xpTableSpent = Object.create(null);     // SYM -> true while it waits in the queue on that allowance
+function xpFactsOn() { return SITE && siteUser === true; }
+// One fact cell's look: { state, text, cls, tip }.
+function xpFactView(sym, key) {
+  var st = _xpFactState[sym];
+  if (!factsCachedFresh(sym)) {   // past 18:30 New York counts as not loaded
+    if (st === 'error') return { state: 'error', text: '—', cls: 'is-none', tip: 'Could not load ' + sym + ' facts · click the ticker to try again' };
+    if (!st && _xpTableLeft <= 0) {
+      return { state: 'capped', text: '—', cls: 'is-none',
+        tip: 'Not loaded: the table loads facts for ' + XP_TABLE_CAP + ' tickers each time it opens · Load facts gets ' + sym };
+    }
+    return { state: 'pending', text: '', cls: 'is-pending', tip: '' };
+  }
+  var f = _tickerFactsCache[sym];
+  if (!f) return { state: 'ready', text: '—', cls: 'is-none', tip: 'No price or payout data for ' + sym };
+  var payer = !!(f.cadence && f.cadence !== 'none');
+  if (key === 'yield') {
+    return payer && fbNum(f.yield)
+      ? { state: 'ready', text: f.yield.toFixed(2) + '%', cls: '', tip: 'Yield ' + f.yield.toFixed(2) + '% · distributions with an ex-date in the last 12 months ÷ latest close' }
+      : { state: 'ready', text: '—', cls: 'is-none', tip: sym + ' paid no distributions in the last 12 months' };
+  }
+  if (key === 'cadence') {
+    var n = Array.isArray(f.payouts) ? f.payouts.length : 0;
+    return payer
+      ? { state: 'ready', text: f.cadence, cls: '', tip: 'Paid ' + f.cadence + (n ? ' · ' + n + ' payout' + (n === 1 ? '' : 's') + ' in the last 12 months' : '')
+          + (f.lastExDate ? (n ? ', last ex-date ' : ' · last ex-date ') + fbDay(f.lastExDate) : '') }
+      : { state: 'ready', text: '—', cls: 'is-none', tip: sym + ' paid no distributions in the last 12 months' };
+  }
+  var win = f.windows && f.windows[key], words = FB_WINDOW_WORDS[key];
+  if (!win || !fbNum(win.change)) return { state: 'ready', text: '—', cls: 'is-none', tip: words[0] + ': not enough history (needs ' + (words[1] + 1) + ' daily closes)' };
+  return { state: 'ready', text: fbSigned(win.change), cls: win.change > 0 ? 'is-up' : win.change < 0 ? 'is-down' : 'is-flat',
+    tip: words[0] + ' ' + fbSigned(win.change) + ' · price change since the ' + fbDay(win.startDate) + ' close of ' + px2(win.startClose) + ', not total return' };
+}
+function xpFactCellHtml(sym, key) {
+  var v = xpFactView(sym, key);
+  return '<td class="xp-fact ' + v.cls + '" data-xp-fact="' + key + '" data-state="' + v.state + '"'
+    + (v.tip ? ' data-tip="' + escHtml(v.tip) + '"' : '') + '>'
+    + (v.state === 'pending' ? '<span class="xp-fpend" aria-hidden="true">···</span><span class="xp-vh">loading</span>'
+      : v.state === 'capped' && key === 'yield'   // one button per row, in its first fact cell
+        ? '<button type="button" class="xp-link xp-fload" data-xp-load="' + escHtml(sym) + '" aria-label="Load facts for ' + escHtml(sym) + '">Load facts</button>'
+        : escHtml(v.text))
+    + '</td>';
+}
+// Redraw a ticker's fact cells in place, in every copy of its rows: the table
+// (which may have been rebuilt since the request started) and the copy under
+// "Close: down in one period". Focus inside a redrawn cell (its Load facts
+// button) moves to that row's new button, else its first price, else its heading.
+function fillXpFactCells(sym) {
+  Array.prototype.forEach.call(document.querySelectorAll('#exportResult tbody[data-sec="' + sym + '"]'), function (sec) {
+    var act = document.activeElement, had = !!(act && sec.contains(act) && act.closest('.xp-fact'));
+    XP_FACT_KEYS.forEach(function (key) {
+      var cell = sec.querySelector('[data-xp-fact="' + key + '"]');
+      if (cell) cell.outerHTML = xpFactCellHtml(sym, key);
+    });
+    if (!had) return;
+    var to = sec.querySelector('[data-xp-load]') || sec.querySelector('tr.xp-trow');
+    if (!to) { to = sec.querySelector('.xp-tgroup th'); if (to) to.setAttribute('tabindex', '-1'); }
+    if (to) to.focus();
+  });
+}
+// Ask for a ticker's facts. urgent (the visitor selected it) jumps the queue
+// and retries a failed request; otherwise a failed ticker stays "—" until the
+// dialog is opened again. Facts past their 18:30 New York expiry are fetched
+// again, and their cells go back to the placeholder until the new ones arrive.
+function xpFactWant(sym, urgent) {
+  if (!xpFactsOn() || _exportView !== 'table') return;
+  var expired = sym in _tickerFactsCache;
+  if (factsCachedFresh(sym)) { fillXpFactCells(sym); return; }
+  var st = _xpFactState[sym];
+  if (st === 'loading' || (st === 'error' && !urgent)) return;
+  if (st === 'queued') {
+    if (urgent) { _xpFactQueue.splice(_xpFactQueue.indexOf(sym), 1); _xpFactQueue.unshift(sym); delete _xpTableSpent[sym]; }
+    return;
+  }
+  // a row coming into view uses the allowance unless its facts are already on
+  // their way (the fact band asked); with none left its cells offer Load facts
+  var ranOut = false;
+  if (urgent || _tickerFactsPending[sym]) delete _xpTableSpent[sym];
+  else {
+    if (_xpTableLeft <= 0) { fillXpFactCells(sym); return; }
+    _xpTableSpent[sym] = true;
+    ranOut = --_xpTableLeft === 0;
+  }
+  _xpFactState[sym] = 'queued';
+  if (urgent) _xpFactQueue.unshift(sym); else _xpFactQueue.push(sym);
+  // back to the dim placeholder: a failed, expired or Load facts row
+  if (st === 'error' || expired || urgent) fillXpFactCells(sym);
+  if (ranOut) xpRedrawCapped();
+  pumpXpFacts();
+}
+// A row left the area before its request started: take it off the queue.
+function xpFactDrop(sym) {
+  if (_xpFactState[sym] !== 'queued') return;
+  if (xpRunNeeds(sym)) return;   // a running quick check still waits for it
+  _xpFactQueue.splice(_xpFactQueue.indexOf(sym), 1);
+  delete _xpFactState[sym];
+  xpTableRefund(sym);
+}
+// A queued ticker left before its request started: it gives its share of the
+// table's allowance back.
+function xpTableRefund(sym) {
+  if (!_xpTableSpent[sym]) return;
+  delete _xpTableSpent[sym];
+  _xpTableLeft++;
+}
+// The allowance just ran out: rows not loaded and not on their way switch from
+// the loading dots to "—" and Load facts.
+function xpRedrawCapped() {
+  Array.prototype.forEach.call(document.querySelectorAll('#exportResult .xp-tablewrap tbody[data-sec]'), function (tb) {
+    var sym = tb.getAttribute('data-sec');
+    if (!_xpFactState[sym] && !factsCachedFresh(sym)) fillXpFactCells(sym);
+  });
+}
+// Start queued requests while fewer than XP_FACT_MAX run. Each request carries
+// up to TICKER_FACTS_BATCH tickers from the front of the queue and holds one
+// slot until it settles, so at most XP_FACT_MAX are ever in flight from here.
+// A ticker already cached or on its way (the fact band asked for it) shares
+// that answer and takes no slot. The pump runs after the current task, so the
+// rows that come into view together go out in one request.
+var _xpFactPumpSoon = false;
+function pumpXpFacts() {
+  if (_xpFactPumpSoon) return;
+  _xpFactPumpSoon = true;
+  Promise.resolve().then(function () { _xpFactPumpSoon = false; pumpXpFactsNow(); });
+}
+function pumpXpFactsNow() {
+  while (_xpFactRunning < XP_FACT_MAX && _xpFactQueue.length) {
+    var batch = [];
+    while (batch.length < TICKER_FACTS_BATCH && _xpFactQueue.length) {
+      var sym = _xpFactQueue.shift();
+      _xpFactState[sym] = 'loading';
+      if (tickerFactsNeedsRequest(sym)) batch.push(sym);
+      else xpFactTrack(sym, tickerFacts(sym)).then(xpRunTick);
+    }
+    if (!batch.length) continue;
+    _xpFactRunning++;
+    var asks = fetchTickerFacts(batch);
+    Promise.all(batch.map(function (s, i) { return xpFactTrack(s, asks[i]); })).then(function () {
+      _xpFactRunning--;
+      pumpXpFacts();
+      xpRunTick();
+    });
+  }
+}
+// One ticker's request settled: its state, then its cells.
+function xpFactTrack(sym, ask) {
+  return ask.then(function () {
+    delete _xpFactState[sym];
+  }, function () {
+    _xpFactState[sym] = 'error';
+  }).then(function () {
+    fillXpFactCells(sym);
+  });
+}
+// Stop watching rows and forget queued tickers (cards view, dialog closed,
+// table rebuilt). Requests already in flight finish and fill the page cache.
+// Tickers a running quick check waits for stay queued.
+function stopXpFactRows() {
+  if (_xpFactObserver) { _xpFactObserver.disconnect(); _xpFactObserver = null; }
+  var keep = [];
+  _xpFactQueue.forEach(function (sym) {
+    if (xpRunNeeds(sym)) keep.push(sym);
+    else { delete _xpFactState[sym]; xpTableRefund(sym); }
+  });
+  _xpFactQueue = keep;
+}
+// Watch every ticker section of a freshly rendered table. The root is the
+// element that scrolls the results: #exportMain, or the dialog body under
+// 900px where #exportMain grows instead. A row counts as near once it is
+// within half a screen of the visible area.
+function observeXpFactRows() {
+  stopXpFactRows();
+  if (!xpFactsOn() || _exportView !== 'table' || typeof IntersectionObserver !== 'function') return;
+  var main = document.getElementById('exportMain');
+  var root = main;
+  if (!/auto|scroll/.test(getComputedStyle(main).overflowY)) root = document.querySelector('#exportDialog .xp-body');
+  _xpFactObserver = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      var sym = e.target.getAttribute('data-sec');
+      if (e.isIntersecting) xpFactWant(sym, false); else xpFactDrop(sym);
+    });
+  }, { root: root, rootMargin: '50% 0px' });
+  Array.prototype.forEach.call(document.querySelectorAll('#exportResult tbody[data-sec]'), function (el) {
+    _xpFactObserver.observe(el);
+  });
+}
+// --- Limit Buy: assistant column (signed in only) -----------------------------------
+// #xpAssist sits right of the results. Its quick checks answer from ticker facts
+// and the dialog's own lead prices, never from the model. A check that needs the
+// whole selection loads the facts it still lacks only when tapped, through the
+// same queue as the table cells (up to TICKER_FACTS_BATCH tickers per request),
+// with a progress line. One tap fetches at most XP_CHECK_CAP uncached tickers; its
+// answer covers the tickers with facts and says how many were not checked, and
+// the next tap fetches the next ones. The question box sends every selected ticker to
+// POST /api/ticker-assistant (at most XP_ASK_MAX) and streams the answer as text.
+var XP_ASK_MAX = 40;          // the assistant route takes 1 to 40 symbols
+var XP_CHECK_CAP = 10;        // uncached tickers one quick-check tap may fetch (shared Tiingo key: 50 calls an hour)
+var XP_WINDOW_NAMES = { d21: '21D', m3: '3M', m6: '6M' };
+var _xpRun = null;            // { kind, syms, need } while a quick check waits for facts
+var _xpFilter = null;         // { up, close } while the table shows only tickers up in all three periods
+var _xpSelKey = null;         // the selection the column last showed
+var _xpAskReq = null;         // { ctl } while a typed question is answered
+var _xpAskLast = null;        // the last typed question, for Retry
+// Every quick check and typed question takes a new token, and so does a selection
+// change or a reset; an older one still waiting neither writes nor overwrites.
+var _xpToken = 0;
+function xpRunNeeds(sym) { return !!(_xpRun && _xpRun.need[sym]); }
+function xpAnswerBox() { return document.getElementById('xpAssistAnswer'); }
+function xpList(syms) {   // "A", "A and B", "A, B and C"
+  return syms.length < 2 ? syms.join('') : syms.slice(0, -1).join(', ') + ' and ' + syms[syms.length - 1];
+}
+function setXpBusy(on) {
+  var box = document.getElementById('xpAssist');
+  if (on) box.setAttribute('data-busy', 'true'); else box.removeAttribute('data-busy');
+}
+function setXpCheckActive(kind) {
+  Array.prototype.forEach.call(document.querySelectorAll('#xpAssist .xp-check'), function (b) {
+    b.classList.toggle('is-active', b.getAttribute('data-xp-check') === kind);
+  });
+}
+// one answer card, text only: a title, paragraphs (strings or nodes; null skipped)
+// and the source line last. tag, when given, is { kind, keepSame }: kind marks the
+// card (data-xp-answer) so it can be found and refreshed later; keepSame leaves an
+// existing card of that kind with the same text in place, so a refresh that changes
+// nothing is not announced again.
+function xpAnswerCard(title, parts, source, tag) {
+  var card = askNode('div', 'ask-card');
+  card.appendChild(askNode('h3', null, title));
+  parts.forEach(function (p) { if (p) card.appendChild(typeof p === 'string' ? askNode('p', null, p) : p); });
+  if (source) card.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
+  var box = xpAnswerBox(), old = box.firstElementChild;
+  if (tag) {
+    card.setAttribute('data-xp-answer', tag.kind);
+    if (tag.keepSame && old && old.getAttribute('data-xp-answer') === tag.kind && old.textContent === card.textContent) return;
+  }
+  box.replaceChildren(card);
+}
+// Shows the column for signed-in visitors with the selection count. A changed
+// selection drops the filter, any check or question still running, and the answer.
+function renderXpAssist() {
+  var box = document.getElementById('xpAssist'), on = xpFactsOn();
+  box.hidden = !on;
+  document.getElementById('exportBody').classList.toggle('has-assist', on);
+  if (!on) return;
+  var syms = checkedExportSymbols(), key = syms.join(',');
+  document.getElementById('xpAssistCount').textContent = '(' + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + ' selected)';
+  if (key === _xpSelKey) return;
+  _xpSelKey = key;
+  _xpToken++;
+  xpCheckAbort();
+  xpAskAbort();
+  clearXpFilter();
+  xpAnswerBox().replaceChildren();
+  setXpCheckActive(null);
+}
+// The account check answered while Limit Buy was open: a signed-in visitor gets
+// the assistant column and the table's fact cells now, not on the next opening.
+// The fact cells load within this opening's XP_TABLE_CAP, untouched until now.
+// Results not drawn yet (opening cleared them) get the fact columns from their build.
+function xpAccountKnown() {
+  if (!xpFactsOn() || !document.getElementById('exportDialog').classList.contains('open')) return;
+  renderXpAssist();
+  if (_exportView === 'table' && document.querySelector('#exportResult [data-sec]')) renderExportTable(_exportLastSections);
+}
+// dialog opened or closed: nothing carries over
+function resetXpAssist() {
+  _xpToken++;
+  xpCheckAbort();
+  xpAskAbort();
+  clearXpFilter();
+  _xpSelKey = null;
+  xpAnswerBox().replaceChildren();
+  setXpCheckActive(null);
+  renderXpAssist();
+}
+function xpCheckAbort() {
+  _xpRun = null;
+  setXpBusy(false);
+  document.getElementById('xpAssistProgress').textContent = '';
+}
+// A quick check. "Closest to a buy price" needs only the dialog's prices; the
+// others first load the facts the selection still lacks (a ticker that failed
+// before gets one more request), then answer once every ticker has settled.
+function runXpCheck(kind) {
+  if (!xpFactsOn()) return;
+  xpAskAbort();
+  xpCheckAbort();
+  var tok = ++_xpToken;
+  setXpCheckActive(kind);
+  var syms = checkedExportSymbols();
+  if (!syms.length) return xpAnswerCard('No tickers selected', ['Tick one or more tickers on the left first.'], null);
+  if (kind === 'buy') return xpBuyAnswer(syms);
+  // check: the tickers this tap answers for; skipped: uncached ones past the
+  // XP_CHECK_CAP this tap may fetch, left for the next tap
+  var run = { kind: kind, syms: syms, check: [], skipped: [], need: Object.create(null), tok: tok };
+  var fetching = 0;
+  _xpRun = run;
+  syms.forEach(function (sym) {
+    if (factsCachedFresh(sym)) { run.check.push(sym); return; }   // past 18:30 New York it was dropped: fetched again below
+    var st = _xpFactState[sym];
+    if (st === 'loading' || st === 'queued') { run.check.push(sym); run.need[sym] = true; return; }   // already on its way: never a second request
+    var costs = !_tickerFactsPending[sym];   // one the fact band is fetching costs no new call
+    if (costs && fetching >= XP_CHECK_CAP) { run.skipped.push(sym); return; }
+    if (costs) fetching++;
+    run.check.push(sym);
+    run.need[sym] = true;
+    _xpFactState[sym] = 'queued';
+    _xpFactQueue.push(sym);
+    fillXpFactCells(sym);   // back to the dim placeholder (failed, expired or Load facts cells)
+  });
+  pumpXpFacts();
+  xpRunTick();
+}
+// After each settled request: the progress line, or the answer once nothing is left.
+// A ticker counts as settled when its facts are cached, its request failed, or
+// its request ended without facts to cache.
+function xpRunTick() {
+  var run = _xpRun;
+  if (!run || run.tok !== _xpToken) return;
+  var done = run.check.filter(function (s) {
+    return (s in _tickerFactsCache) || !_xpFactState[s] || _xpFactState[s] === 'error';
+  }).length;
+  if (done < run.check.length) {
+    setXpBusy(true);
+    document.getElementById('xpAssistProgress').textContent = 'Checking ' + done + ' of ' + run.check.length + ' tickers…';
+    return;
+  }
+  _xpRun = null;
+  setXpBusy(false);
+  document.getElementById('xpAssistProgress').textContent = '';
+  xpCheckAnswer(run.kind, run.check, run.skipped);
+}
+// The selection's facts: { facts: [{ sym, f }], failed, none }.
+function xpFactsOf(syms) {
+  var out = { facts: [], failed: [], none: [] };
+  syms.forEach(function (sym) {
+    if (!(sym in _tickerFactsCache)) { out.failed.push(sym); return; }
+    var f = _tickerFactsCache[sym];
+    if (!f) { out.none.push(sym); return; }
+    out.facts.push({ sym: sym, f: f });
+  });
+  return out;
+}
+// The as-of part of a source line, naming every distinct date so no ticker's
+// figures sit under a date that is not theirs: " through Oct 22" when all agree,
+// else " through Oct 22; IWM through Jan 2" (the date most tickers share first,
+// unnamed, then each other date with its tickers, newest first).
+function xpThrough(r) {
+  var by = Object.create(null);
+  r.facts.forEach(function (x) { if (x.f.asOf) (by[x.f.asOf] = by[x.f.asOf] || []).push(x.sym); });
+  var days = Object.keys(by).sort(function (a, b) { return by[b].length - by[a].length || (a < b ? 1 : a > b ? -1 : 0); });
+  if (!days.length) return '';
+  var rest = days.slice(1).sort().reverse();
+  return ' through ' + fbDay(days[0]) + rest.map(function (d) { return '; ' + xpList(by[d]) + ' through ' + fbDay(d); }).join('');
+}
+function xpPartialNote(r) {
+  var parts = [];
+  if (r.failed.length) parts.push('could not check ' + xpList(r.failed) + ' (facts did not load; tap the check again to retry)');
+  if (r.none.length) parts.push('no price data for ' + xpList(r.none));
+  return parts.length ? askNode('p', 'xp-partial', 'Partial answer: ' + parts.join('; ') + '.') : null;
+}
+// The tickers a tap left for the next one (XP_CHECK_CAP per tap), or null.
+function xpSkippedNote(skipped) {
+  if (!skipped || !skipped.length) return null;
+  return askNode('p', 'xp-partial', skipped.length + ' not checked: facts load ' + XP_CHECK_CAP + ' at a time; tap again to check more.');
+}
+// syms: the tickers this tap answers for; skipped: the ones it left for the next tap.
+function xpCheckAnswer(kind, syms, skipped) {
+  var r = xpFactsOf(syms), partial = xpPartialNote(r), n = r.facts.length;
+  var more = xpSkippedNote(skipped);
+  var through = xpThrough(r);
+  if (kind === 'monthly') {
+    var monthly = r.facts.filter(function (x) { return x.f.cadence === 'monthly'; });
+    var named = monthly.map(function (x) { return x.sym + (fbNum(x.f.yield) ? ' (' + x.f.yield.toFixed(2) + '% yield)' : ''); });
+    return xpAnswerCard(monthly.length ? monthly.length + ' of ' + n + (monthly.length === 1 ? ' pays' : ' pay') + ' monthly' : 'None pay monthly', [
+      partial, more,
+      monthly.length ? 'Paid monthly in the last 12 months: ' + named.join(', ') + '.'
+        : 'None of the ' + n + ' checked tickers paid monthly in the last 12 months.'
+    ], 'Tiingo distributions, last 12 months' + through);
+  }
+  if (kind === 'yield') {
+    var payers = r.facts.filter(function (x) { return askPayer(x.f) && fbNum(x.f.yield); })
+      .sort(function (a, b) { return b.f.yield - a.f.yield; });
+    if (!payers.length) {
+      return xpAnswerCard('No payers', [partial, more, 'None of the ' + n + ' checked tickers paid distributions in the last 12 months.'],
+        'Tiingo distributions, last 12 months' + through);
+    }
+    var top = payers[0], next = payers.slice(1, 4), non = n - payers.length;
+    return xpAnswerCard('Highest yield: ' + top.sym, [
+      partial, more,
+      top.sym + ' yields ' + top.f.yield.toFixed(1) + '%, paid ' + top.f.cadence + '.',
+      next.length ? 'Next: ' + next.map(function (x) { return x.sym + ' ' + x.f.yield.toFixed(1) + '%'; }).join(', ') + '.' : null,
+      non ? non + ' of the checked tickers paid nothing in the last 12 months.' : null
+    ], 'Tiingo distributions in the last 12 months ÷ latest close' + through);
+  }
+  if (kind === 'up3') {
+    // Up means above 0 in all three windows; a missing window never counts as up.
+    // Close means exactly one window below 0 and the other two above it.
+    var up = [], close = [];
+    r.facts.forEach(function (x) {
+      var w = x.f.windows || {};
+      var c = ['d21', 'm3', 'm6'].map(function (k) { return w[k] ? w[k].change : undefined; });
+      if (!c.every(function (v) { return fbNum(v); })) return;
+      var pos = c.filter(function (v) { return v > 0; }).length, neg = c.filter(function (v) { return v < 0; }).length;
+      if (pos === 3) up.push(x.sym);
+      else if (pos === 2 && neg === 1) {
+        var k = ['d21', 'm3', 'm6'][c.findIndex(function (v) { return v < 0; })];
+        close.push({ sym: x.sym, text: x.sym + ' (' + XP_WINDOW_NAMES[k] + ' ' + fbSigned(w[k].change) + ')' });
+      }
+    });
+    var rest = n - up.length - close.length;
+    _xpFilter = { up: up, close: close.map(function (x) { return x.sym; }) };
+    if (_exportView !== 'table') setExportView('table'); else applyXpFilter();
+    return xpAnswerCard(up.length ? up.length + (up.length === 1 ? ' ticker matches' : ' tickers match') : 'No ticker matches', [
+      partial, more,
+      up.length ? xpList(up) + (up.length === 1 ? ' is' : ' are') + ' up in all three periods (21D, 3M and 6M).'
+        : 'None of the ' + n + ' checked tickers is up in all three periods.',
+      close.length ? 'Close, down in one period: ' + close.map(function (x) { return x.text; }).join(', ') + '.' : null,
+      rest ? 'The other ' + rest + ' ' + (rest === 1 ? 'is' : 'are') + ' not up in all three periods.' : null,
+      'The table now shows only the matches. Clear the filter above it to see every ticker.'
+    ], 'Tiingo daily closes' + through + '; price change, not total return');
+  }
+}
+// Why the dialog's prices can't be used right now, or null when its last build
+// matches the inputs on screen: { range: message } while Min/Max is not valid,
+// { pending: true } while the build for the current inputs has not finished.
+function xpPriceProblem() {
+  var range = readExportRange();
+  if (range.error) return { range: range.error };
+  return _exportBuilt ? null : { pending: true };
+}
+// Each selected ticker's lead price: the one its card leads with (nearest
+// Strong price, else the nearest), from the dialog's current build. None while
+// that build is stale (xpPriceProblem), so no old price is shown or sent.
+function xpLeadPrices(syms) {
+  var out = [];
+  if (xpPriceProblem()) return out;
+  syms.forEach(function (sym) {
+    var sec = _exportSecs[sym], limits = sec ? exportLimits(sec.rows) : [];
+    if (!limits.length) return;
+    var lim = limits[nearestStrongIndex(limits)];
+    out.push({ sym: sym, sec: sec, lim: lim, pct: pctBelow(lim.row) });
+  });
+  return out;
+}
+// refresh: called by refreshXpBuyAnswer for a rebuild, not by a tap on the check
+function xpBuyAnswer(syms, refresh) {
+  var tag = { kind: 'buy', keepSame: !!refresh };
+  var problem = xpPriceProblem();
+  if (problem && problem.range) {
+    return xpAnswerCard('Fix the Min/Max range first', ['The Min/Max range above is not valid. ' + problem.range,
+      'Buy prices show here again once the range is fixed.'], 'Limit Buy Levels settings', tag);
+  }
+  if (problem) {
+    return xpAnswerCard('Prices are updating', ['Buy prices for the current settings are still being built. This answer updates when they are ready.'],
+      'Limit Buy Levels settings', tag);
+  }
+  var leads = xpLeadPrices(syms).sort(function (a, b) { return a.pct - b.pct; });
+  var noPrice = syms.filter(function (s) { return _exportSecs[s] && !exportLimits(_exportSecs[s].rows).length; });
+  var notBuilt = syms.filter(function (s) { return !_exportSecs[s]; });
+  var src = 'the lead buy prices in this dialog (the price each card leads with), at the current filters';
+  var missing = notBuilt.length ? askNode('p', 'xp-partial', 'Partial answer: prices for ' + xpList(notBuilt) + ' are not loaded.') : null;
+  if (!leads.length) {
+    return xpAnswerCard('No buy prices', [missing, notBuilt.length === syms.length
+      ? 'Prices are still loading. Try again in a moment.'
+      : 'None of the selected tickers has a buy price in this range at this strength.'], src, tag);
+  }
+  var top = leads[0], next = leads.slice(1, 5);
+  return xpAnswerCard('Closest to a buy price: ' + top.sym, [
+    missing,
+    top.sym + ': ' + px2(top.lim.row.limit) + ', ' + pctBelowText(top.lim.row) + ' the '
+      + closeLabel(top.sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(top.sec.close) + '.',
+    next.length ? 'Next: ' + next.map(function (x) { return x.sym + ' ' + pctBelowText(x.lim.row); }).join(', ') + '.' : null,
+    noPrice.length ? 'No buy price in this range: ' + xpList(noPrice) + '.' : null
+  ], src, tag);
+}
+// A shown "Closest to a buy price" answer follows the prices: when a setting
+// change starts a rebuild it turns into "Prices are updating" (or the range
+// message), and when the build finishes it answers again from the new prices.
+// Other answers are left alone.
+function refreshXpBuyAnswer() {
+  if (!xpFactsOn() || !xpAnswerBox().querySelector('[data-xp-answer="buy"]')) return;
+  xpBuyAnswer(checkedExportSymbols(), true);
+}
+// The up-in-all-three filter on the table: matches stay, the rest hide, the chip
+// shows, and tickers down in exactly one window are listed under the table.
+// Runs after every table render, so a rebuild with the same selection keeps it.
+function clearXpFilter() {
+  _xpFilter = null;
+  applyXpFilter();
+}
+function applyXpFilter() {
+  var res = document.getElementById('exportResult');
+  ['xpCloseSection', 'xpFilterEmpty'].forEach(function (id) { var el = document.getElementById(id); if (el) el.remove(); });
+  var wrap = res.querySelector('.xp-tablewrap');
+  var on = !!(_xpFilter && _exportView === 'table' && wrap);
+  document.getElementById('xpFilterChip').hidden = !on;
+  Array.prototype.forEach.call(res.querySelectorAll('tbody[data-sec]'), function (tb) {
+    tb.hidden = on && _xpFilter.up.indexOf(tb.getAttribute('data-sec')) < 0;
+  });
+  syncExportCsvButton();   // the CSV follows the filter
+  if (!on) return;
+  var after = wrap;
+  if (!_xpFilter.up.length) {
+    var empty = askNode('p', 'xp-filterempty', 'None of the selected tickers is up in all three periods.');
+    empty.id = 'xpFilterEmpty';
+    after.after(empty);
+    after = empty;
+  }
+  var rows = _xpFilter.close.map(function (sym) { return wrap.querySelector('tbody[data-sec="' + sym + '"]'); }).filter(Boolean);
+  if (!rows.length) return;
+  var sec = document.createElement('section');
+  sec.id = 'xpCloseSection';
+  sec.setAttribute('aria-labelledby', 'xpCloseTitle');
+  var h = askNode('h3', null, 'Close: down in one period');
+  h.id = 'xpCloseTitle';
+  var tw = askNode('div', 'xp-tablewrap'), table = document.createElement('table');
+  table.className = wrap.querySelector('table').className;
+  // each ticker as its heading row (close and facts) plus its lead price, the one Cards view leads with
+  rows.forEach(function (tb) {
+    var c = tb.cloneNode(true), sym = tb.getAttribute('data-sec');
+    var limits = _exportSecs[sym] ? exportLimits(_exportSecs[sym].rows) : [];
+    var keep = limits.length ? sym + '|' + nearestStrongIndex(limits) : null;
+    Array.prototype.forEach.call(c.querySelectorAll('tr.xp-trow, tr.xp-tnote'), function (tr) {
+      if (tr.getAttribute('data-why') !== keep) tr.remove();
+    });
+    c.hidden = false;
+    table.appendChild(c);
+  });
+  tw.appendChild(table);
+  sec.appendChild(h);
+  sec.appendChild(tw);
+  after.after(sec);
+}
+// --- assistant column: typed questions about the whole selection ---
+function setXpAskBusy(on) {
+  var send = document.querySelector('#xpAssist .ask-send');
+  send.disabled = on;
+  send.setAttribute('aria-label', on ? 'Send question…' : 'Send question');
+  if (on) xpAnswerBox().setAttribute('aria-busy', 'true');   // read once, when done
+  else xpAnswerBox().removeAttribute('aria-busy');
+}
+function xpAskAbort() {
+  var req = _xpAskReq;
+  if (!req) return;
+  _xpAskReq = null;
+  if (req.ctl) req.ctl.abort();
+  setXpAskBusy(false);
+}
+function xpTypedCard(question) {
+  var card = askNode('div', 'ask-card ask-typed');
+  card.appendChild(askNode('p', 'ask-q', question));
+  xpAnswerBox().replaceChildren(card);
+  return card;
+}
+function xpTypedError(req, question, msg, retry) {
+  if (_xpAskReq !== req) return;
+  _xpAskReq = null;
+  setXpAskBusy(false);
+  var card = xpTypedCard(question);
+  card.appendChild(askNode('p', 'ask-err', msg));
+  if (retry) {
+    var b = askNode('button', 'ask-retry', 'Retry');
+    b.type = 'button';
+    b.setAttribute('data-action', 'xp-ask-retry');
+    b.addEventListener('click', function () {
+      document.getElementById('xpAskInput').focus();   // the button goes away with the old card
+      if (_xpAskLast) sendXpQuestion(_xpAskLast);
+    });
+    card.appendChild(b);
+  }
+}
+// Posts { symbols: every selected ticker, question, nearestBuy } and streams the
+// answer in as text. Over XP_ASK_MAX tickers nothing is sent. Returns true when sent.
+function sendXpQuestion(question) {
+  question = String(question || '').trim();
+  if (!question || !xpFactsOn()) return false;
+  var syms = checkedExportSymbols();
+  xpCheckAbort();
+  xpAskAbort();
+  setXpCheckActive(null);
+  if (!syms.length) { xpAnswerCard('No tickers selected', ['Tick one or more tickers on the left, then ask about them.'], null); return false; }
+  if (syms.length > XP_ASK_MAX) {
+    xpAnswerCard('Too many tickers for one question', [syms.length + ' tickers are selected. Narrow the selection to '
+      + XP_ASK_MAX + ' or fewer, then ask again.'], null);
+    return false;
+  }
+  _xpAskLast = question;
+  var req = { ctl: window.AbortController ? new AbortController() : null, tok: ++_xpToken };
+  _xpAskReq = req;
+  setXpAskBusy(true);
+  var card = xpTypedCard(question);
+  var wait = askNode('p', 'ask-hint', 'Writing an answer about ' + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + '…');
+  var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
+  answer.appendChild(text);
+  card.appendChild(wait);
+  card.appendChild(answer);
+  var payload = { symbols: syms, question: question }, buy = {}, anyBuy = false;
+  xpLeadPrices(syms).forEach(function (x) {
+    var px = Number(px2(x.lim.row.limit));
+    if (isFinite(px) && px > 0) { buy[x.sym] = px; anyBuy = true; }
+  });
+  if (anyBuy) payload.nearestBuy = buy;
+  // current only while it is the running question, holds the newest token and its
+  // card is still on the page; a superseded one still marked running just stops
+  var live = function () { return _xpAskReq === req && req.tok === _xpToken && card.isConnected; };
+  var drop = function () { if (_xpAskReq === req) xpAskAbort(); };
+  var fail = function (msg, retry) { if (!live()) return drop(); xpTypedError(req, question, msg, retry); };
+  postAskQuestion(JSON.stringify(payload), false, req.ctl && req.ctl.signal).then(function (r) {
+    if (!live()) return drop();
+    if (r.status === 401) return fail('Your session has ended. Sign in again to ask questions.', false);
+    if (r.status === 404) return fail('No facts for these tickers: Tiingo has no daily prices for them, so there is nothing to explain.', false);
+    if (r.status === 429) {
+      return r.json().catch(function () { return {}; }).then(function (j) {
+        fail(typeof j.error === 'string' && j.error.length <= 200 ? j.error : 'You have reached the question limit. Try again later.', false);
+      });
+    }
+    if (r.status === 400) return fail('This question could not be sent. Try a shorter question.', false);
+    if (!r.ok) return fail(ASK_FAIL_MSG, true);
+    var add = function (chunk) {
+      if (!live() || !chunk) return;
+      if (wait.parentNode) wait.remove();
+      text.data += chunk;
+    };
+    var finish = function () {
+      if (!live()) return drop();
+      var all = text.data;
+      var lines = all.replace(/\s+$/, '').split(/\r?\n/);
+      var last = lines.pop() || '';
+      if (/\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);
+      _xpAskReq = null;
+      setXpAskBusy(false);
+      text.data = lines.join('\n').trim();
+      card.appendChild(askNode('p', 'ask-src', last));
+    };
+    return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
+  }).catch(function (e) {
+    if (e && e.name === 'AbortError') return;
+    fail(ASK_FAIL_MSG, true);
+  });
+  return true;
+}
+function wireXpAssist() {
+  Array.prototype.forEach.call(document.querySelectorAll('#xpAssist .xp-check'), function (b) {
+    b.addEventListener('click', function () { runXpCheck(b.getAttribute('data-xp-check')); });
+  });
+  document.querySelector('#xpFilterChip [data-action="clear-xp-filter"]').addEventListener('click', function () {
+    clearXpFilter();
+    setXpCheckActive(null);
+    document.querySelector('#xpAssist [data-xp-check="up3"]').focus();   // the chip and its button just went away
+  });
+  // Enter or the send button; one question at a time. Over the limit the text stays to edit.
+  document.getElementById('xpAskForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (_xpAskReq) return;
+    var input = document.getElementById('xpAskInput'), q = input.value.trim();
+    if (q && sendXpQuestion(q)) input.value = '';
+  });
+}
 function exportTableHtml(sections) {
   // no strength column: the price colour already says Strong / Medium / Weaker,
   // and the row's label and tooltip still name it
-  var html = '<table class="xp-table"><thead><tr><th scope="col">Price</th><th scope="col">% below close</th></tr></thead>';
+  var facts = xpFactsOn(), cols = facts ? 2 + XP_FACT_KEYS.length : 2;
+  var html = '<div class="xp-tablewrap"><table class="xp-table' + (facts ? ' has-facts' : '') + '"><thead><tr><th scope="col">Price</th><th scope="col">% below close</th>'
+    + (facts ? XP_FACT_KEYS.map(function (key) {
+      return '<th scope="col" class="xp-fhead" data-tip="' + escHtml(XP_FACT_HEADS[key][0] + ' · ' + XP_FACT_HEADS[key][1]) + '">' + XP_FACT_HEADS[key][0]
+        + '<span class="xp-vh">: ' + XP_FACT_HEADS[key][1] + '</span></th>';
+    }).join('') : '')
+    + '</tr></thead>';
   sections.forEach(function (sec, idx) {
     var hue = Math.round((idx * 137.508) % 360);
     var limits = exportLimits(sec.rows);
@@ -4358,21 +6540,29 @@ function exportTableHtml(sections) {
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
       + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
-      + '</th></tr>';
-    if (!limits.length) html += '<tr><td colspan="2" class="xp-none">No buy prices in this range at this strength.</td></tr>';
+      + '</th>'
+      + (facts ? XP_FACT_KEYS.map(function (key) { return xpFactCellHtml(sec.sym, key); }).join('') : '')
+      + '</tr>';
+    if (!limits.length) html += '<tr><td colspan="' + cols + '" class="xp-none">No buy prices in this range at this strength.</td></tr>';
     limits.forEach(function (lim, k) {
       var t = limitStrength(lim);
       html += '<tr class="xp-trow tier-' + t + '" tabindex="0"' + limitAttrs(sec.sym, lim, k) + '>'
         + '<td class="xp-tpx">' + px2(lim.row.limit) + '</td>'
-        + '<td class="xp-tpct">' + pctBelowText(lim.row) + '</td></tr>';
+        + '<td class="xp-tpct">' + pctBelowText(lim.row) + '</td>'
+        + (facts ? '<td colspan="' + (cols - 2) + '"></td>' : '') + '</tr>';
     });
     if (sec.weaker) {
-      html += '<tr class="xp-tnote"><td colspan="2">' + sec.weaker + ' weaker price' + (sec.weaker === 1 ? '' : 's') + ' hidden'
+      html += '<tr class="xp-tnote"><td colspan="' + cols + '">' + sec.weaker + ' weaker price' + (sec.weaker === 1 ? '' : 's') + ' hidden'
         + ' <button type="button" class="xp-link" data-strength-set="any">show</button></td></tr>';
     }
     html += '</tbody>';
   });
-  return html + '</table>';
+  html += '</table></div>';
+  if (facts) {
+    html += '<p class="xp-factnote">21D, 3M, 6M: price change (not total return) from daily closes. '
+      + 'Yield: distributions with an ex-date in the last 12 months ÷ latest close. Source: Tiingo.</p>';
+  }
+  return html;
 }
 function exportCardsHtml(sections) {
   var html = '<div class="xp-grid">';
@@ -4611,7 +6801,7 @@ function renderCombineExample(sections) {
 }
 function updateExportFooter(rows, tickerCount) {
   _exportCsvReady = !!rows.length;
-  document.getElementById('exportCsv').disabled = !rows.length;
+  syncExportCsvButton();
 }
 var STRENGTH_HINTS = {
   any: 'Every support level, weak ones included.',
@@ -4923,6 +7113,12 @@ function openExportDialog() {
     document.getElementById('exportAddMsg').classList.remove('error');
   }
   document.getElementById('exportResult').innerHTML = '';
+  resetXpAssist();
+  stopXpFactRows();
+  _xpTableLeft = XP_TABLE_CAP;   // each opening may load XP_TABLE_CAP uncached tickers as rows come into view
+  _xpTableSpent = Object.create(null);
+  // tickers whose facts failed last time get one more try in this opening
+  Object.keys(_xpFactState).forEach(function (sym) { if (_xpFactState[sym] === 'error') delete _xpFactState[sym]; });
   document.getElementById('exportPicks').innerHTML = '';
   document.getElementById('exportGroupTabs').innerHTML = '';
   document.getElementById('exportCsv').disabled = true;
@@ -4958,11 +7154,16 @@ function closeExportDialog() {
   _exportGen++;
   hideExportLoading();
   hideExportTip();
+  resetXpAssist();
+  stopXpFactRows();
   dialog.classList.remove('open');
   dialog.setAttribute('aria-hidden', 'true');
   document.getElementById('exportBtn').setAttribute('aria-expanded', 'false');
   if (_exportReturnFocus && _exportReturnFocus.focus) _exportReturnFocus.focus();
   _exportReturnFocus = null;
+  // settings changed in the dialog move its lead price: the band's NEAREST BUY
+  // follows. Only that tile is rebuilt, so an active trend highlight stays.
+  refreshFactBandBuy();
 }
 // Escape closes the group editor first, then the dialog.
 function onExportEscape() {
@@ -4991,6 +7192,7 @@ function trapExportFocus(event) {
   else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
 }
 function wireExportDialog() {
+  wireXpAssist();
   document.getElementById('exportBtn').onclick = openExportDialog;
   document.getElementById('exportClose').onclick = closeExportDialog;
   document.getElementById('exportAll').onclick = function () { setAllExportPicks(true); };
@@ -5010,6 +7212,8 @@ function wireExportDialog() {
     b.onclick = function () { setGapPlacement(b.getAttribute('data-gap'), true); };
   });
   document.getElementById('exportResult').addEventListener('click', function (e) {
+    var load = e.target.closest && e.target.closest('[data-xp-load]');
+    if (load) { xpFactWant(load.getAttribute('data-xp-load'), true); return; }   // past the table's allowance: this row only
     var b = e.target.closest && e.target.closest('[data-strength-set]');
     if (b) { setExportStrength(b.getAttribute('data-strength-set'), true); document.getElementById('strengthAny').focus(); return; }
     var more = e.target.closest && e.target.closest('[data-more]');
@@ -5026,11 +7230,14 @@ function wireExportDialog() {
     var why = e.target.closest && e.target.closest('[data-why]');
     if (why) {
       var parts = why.getAttribute('data-why').split('|');
+      xpFactWant(parts[0], true);   // picking a price loads its ticker's facts (table view only)
       openWhyPanel(parts[0], Number(parts[1]), why);
       return;
     }
     var head = e.target.closest && e.target.closest('[data-first]');
-    if (head) openFirstPrice(head.getAttribute('data-first'), false);
+    if (!head) return;
+    if (head.closest('#xpCloseSection')) openCloseSectionPrice(head.getAttribute('data-first'), head);
+    else openFirstPrice(head.getAttribute('data-first'), false);
   });
   document.getElementById('exportPicks').addEventListener('click', function (e) {
     var go = e.target.closest && e.target.closest('[data-go]');
@@ -5069,6 +7276,7 @@ function wireExportDialog() {
     if (!row || row !== e.target) return;
     e.preventDefault();
     var parts = row.getAttribute('data-why').split('|');
+    xpFactWant(parts[0], true);
     openWhyPanel(parts[0], Number(parts[1]), row);
   });
   document.getElementById('exportCombineToggle').onclick = function () {
@@ -5758,6 +7966,8 @@ function wireTickerSearch(input, host, onPick) {
 var current = null;  // {candles, overlays}
 function show(c, jumpToLatest) {
   try { localStorage.setItem(SEL_KEY, c.key); } catch (e) {}   // remember selection for next reload
+  factBandShow(c.sym);   // signed in: facts for the ticker now on screen
+  clearTrendHighlight();  // a ticker or timeframe change drops any shaded trend window
   sysHidden = {}; selSys = null;   // temp-hides + system selection are per-view: clear on every combo load
   setHint('loading ' + c.key + ' …');
   loadOnce(window.FEARLAB_REG, 'data-', c.key, function (payload) {
@@ -6033,6 +8243,7 @@ function redraw() {
   candleSeries = cs;                         // used by the draw tool to read click prices
   tipItems = []; hideTip();                  // hover-tip registry rebuilds with the marks below
   cs.attachPrimitive(rayPrimitive);          // draws each visible line's forward RAY to the right edge
+  cs.attachPrimitive(trendHlPrimitive);      // re-projects a shaded trend window on every repaint
   chart.subscribeClick(placeClick);          // no-op unless draw mode is armed
   chart.subscribeCrosshairMove(previewMove); // rubber-band preview while placing
   if (drawMode) chart.applyOptions({ handleScroll: false, handleScale: false });  // freeze persists across redraw
@@ -6367,6 +8578,7 @@ function redraw() {
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });  // block arrows/labels + level badges re-project on pan/zoom
   chart.subscribeCrosshairMove(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });  // ...and stay glued during any interaction (incl vertical price drag)
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (_tourActive) requestAnimationFrame(positionTourCard); });
+  chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleTrendHighlight);   // a shaded trend window follows pan/zoom
   sizeOverlay();
   syncMine();
   // set meta FIRST — it can wrap the toolbar to a 2nd line, shrinking #chart — then
@@ -6396,13 +8608,13 @@ function redraw() {
   ro = new ResizeObserver(function () {
     if (!chart) return;
     chart.resize(el.clientWidth, el.clientHeight);
-    sizeOverlay(); positionHandles(); positionTourCard();
+    sizeOverlay(); positionHandles(); positionTourCard(); positionTrendHighlight();
   });
   ro.observe(el);
   requestAnimationFrame(function () {
     if (!chart) return;
     chart.resize(el.clientWidth, el.clientHeight);
-    sizeOverlay(); syncMine(); positionTourCard();
+    sizeOverlay(); syncMine(); positionTourCard(); positionTrendHighlight();
   });
 }
 
