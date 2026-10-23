@@ -946,14 +946,94 @@
                         white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
   #askDock .ask-collapse { flex:0 0 auto; min-width:36px; min-height:36px; padding:0 8px; color:var(--mut); }
   #askDock .ask-collapse:hover { color:var(--fg); }
-  #askDock .ask-chips { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
-  #askDock .ask-chip { display:flex; align-items:center; gap:10px; min-height:44px; padding:8px 10px;
-                       text-align:left; border-color:var(--grid); background:var(--bg); }
-  #askDock .ask-chip svg { color:var(--sup); }
-  #askDock .ask-chip:hover { border-color:var(--sup); }
-  #askDock .ask-chip.is-active { border-color:var(--sup); background:rgba(38,198,218,.10); }
+  /* quick answers: a slim tab strip; the chosen answer fills the panel under it */
+  #askDock .ask-chips { display:flex; border-bottom:1px solid var(--grid); margin:0 -14px; padding:0 8px; }
+  #askDock .ask-chip { flex:1 1 auto; min-height:40px; padding:0 3px; border:0; border-bottom:2px solid transparent;
+                       background:none; color:var(--mut); font-size:13px; font-weight:bold; letter-spacing:.03em; white-space:nowrap; }
+  #askDock .ask-chip:hover { color:var(--fg); }
+  #askDock .ask-chip.is-active { color:var(--sup); border-bottom-color:var(--sup); }
   #askDock .ask-chip[hidden] { display:none; }
-  #askAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #askAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; font-size:15px; }
+  #askAnswer .ask-view { min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; gap:16px; padding:4px 0 2px; }
+  #askAnswer .ask-hero-top { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; }
+  #askAnswer .ask-hero-v { font-size:36px; font-weight:bold; line-height:1.1; font-variant-numeric:tabular-nums; }
+  #askAnswer .ask-hero-l { margin-top:4px; color:var(--mut); }
+  #askAnswer .ask-tag { padding:2px 7px; border:1px solid var(--thr); color:var(--thr); font-size:13px; font-weight:bold; letter-spacing:.08em; }
+  #askAnswer .ask-tag.is-tier { border-color:currentColor; }
+  #askAnswer .ask-tag.is-plain { color:var(--fg); }
+  #askAnswer .ask-foot { margin-top:auto; display:flex; flex-direction:column; gap:10px; }
+  #askAnswer .ask-headline { margin:0; font-size:19px; font-weight:bold; line-height:1.35; }
+  #askAnswer .ask-sec { color:var(--mut); font-size:13px; font-weight:bold; letter-spacing:.08em; text-transform:uppercase; }
+  #askAnswer .ask-cells { display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:8px; }
+  #askAnswer .ask-cell { display:flex; flex-direction:column; gap:3px; padding:9px 11px; border:1px solid var(--grid); background:var(--bg); }
+  #askAnswer .ask-cell-l { color:var(--mut); font-size:13px; }
+  #askAnswer .ask-cell-v { font-size:17px; font-weight:bold; }
+  #askAnswer .ask-chart { display:flex; flex-direction:column; gap:8px; }
+  /* a fixed height (scaled to the screen) so each column's % height has something to resolve against */
+  #askAnswer .ask-cols { height:clamp(110px, 26vh, 300px); display:flex; align-items:flex-end; gap:4px;
+                         border-bottom:1px solid var(--mut); }
+  #askAnswer .ask-col { flex:1 1 0; min-width:3px; background:var(--cbuy); opacity:.85; }
+  #askAnswer .ask-axis { display:flex; justify-content:space-between; gap:8px; color:var(--mut); font-size:13px; }
+  #askAnswer .ask-axis-mid { color:var(--fg); }
+  #askAnswer .ask-bars { display:flex; flex-direction:column; gap:clamp(16px, 3vh, 34px); margin-top:-6px; }
+  #askAnswer .ask-pairs { display:flex; flex-direction:column; gap:clamp(14px, 2.6vh, 30px); }
+  #askAnswer .ask-pair { display:flex; flex-direction:column; gap:6px; }
+  #askAnswer .ask-bar { display:grid; grid-template-columns:3.6em minmax(0, 1fr) minmax(4.4em, auto); align-items:center; column-gap:10px; row-gap:2px; }
+  #askAnswer .ask-bar-l { font-weight:bold; }
+  #askAnswer .ask-track { position:relative; height:clamp(16px, 2.6vh, 28px); }
+  #askAnswer .ask-track::before { content:''; position:absolute; left:50%; top:-4px; bottom:-4px; border-left:1px solid var(--mut); }
+  #askAnswer .ask-fill { position:absolute; top:0; bottom:0; }
+  #askAnswer .ask-fill.is-pos { left:50%; background:var(--cbuy); }
+  #askAnswer .ask-fill.is-neg { right:50%; background:var(--csell); }
+  #askAnswer .ask-bar-v { text-align:right; font-size:19px; font-weight:bold; font-variant-numeric:tabular-nums; }
+  #askAnswer .ask-bar-n { grid-column:2 / 4; color:var(--mut); font-size:13px; }
+  #askAnswer .ask-bar-n.ask-better { grid-column:3; grid-row:2; text-align:right; color:var(--sup); font-weight:bold; }
+  #askAnswer .ask-legend { display:flex; flex-wrap:wrap; gap:6px 16px; color:var(--mut); font-size:13px; }
+  #askAnswer .ask-key { display:inline-flex; align-items:center; gap:6px; }
+  #askAnswer .ask-dot { width:10px; height:10px; border-radius:50%; background:currentColor; }
+  #askAnswer .is-est { color:var(--thr); }
+  #askAnswer .is-weak { color:var(--mut); }
+  #askAnswer .ask-tl { position:relative; display:flex; justify-content:space-between; margin:0; padding:0; list-style:none; }
+  #askAnswer .ask-tl::before { content:''; position:absolute; left:7px; right:7px; top:7px; border-top:1px solid var(--grid); }
+  #askAnswer .ask-tl li { position:relative; display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; }
+  #askAnswer .ask-tl-dot { width:14px; height:14px; box-sizing:border-box; border-radius:50%; background:var(--sup); }
+  #askAnswer .ask-tl .is-est .ask-tl-dot { background:var(--panel); border:2px dashed var(--thr); }
+  #askAnswer .ask-tl-d { display:flex; flex-direction:column; align-items:center; font-size:13px; line-height:1.3; }
+  #askAnswer .ask-tl-d span:first-child { color:var(--mut); }
+  #askAnswer .ask-tl .is-est .ask-tl-d span { color:var(--thr); }
+  #askAnswer .ask-sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
+  #askAnswer .ask-tiles { flex:1 1 auto; display:flex; flex-direction:column; gap:8px; }
+  #askDock .ask-tile { flex:1 1 0; min-height:64px; display:grid; grid-template-columns:max-content 1fr; grid-template-areas:"l l" "v s";
+                       align-content:center; align-items:end; gap:2px 12px; padding:10px 14px; text-align:left;
+                       border:1px solid var(--grid); background:var(--bg); color:var(--fg); cursor:pointer; }
+  #askDock .ask-tile:hover { border-color:var(--sup); }
+  #askAnswer .ask-tile-l { grid-area:l; color:var(--mut); font-size:13px; font-weight:bold; letter-spacing:.08em; }
+  #askAnswer .ask-tile-v { grid-area:v; font-size:28px; font-weight:bold; line-height:1.15; white-space:nowrap; font-variant-numeric:tabular-nums; }
+  #askAnswer .ask-tile-s { grid-area:s; padding-bottom:4px; color:var(--mut); font-size:14px; text-align:right; }
+  #askAnswer .ask-rulerbox { flex:1 1 auto; display:flex; gap:16px; min-height:200px; }
+  #askAnswer .ask-scale { position:relative; flex:0 0 34px; margin:10px 0; border-left:2px solid var(--mut); }
+  #askAnswer .ask-band { position:absolute; left:0; right:0; bottom:0; background:rgba(38,198,218,.12); border-top:1px dashed var(--sup); }
+  #askAnswer .ask-tick { position:absolute; left:-2px; width:20px; height:3px; transform:translateY(-50%); background:var(--fg); }
+  #askAnswer .ask-tick.tier-strong { background:var(--cbuy); }
+  #askAnswer .ask-tick.tier-light { background:var(--mut); opacity:.7; }
+  #askAnswer .ask-tick.is-lead { width:34px; height:5px; }
+  #askAnswer .ask-levels { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:8px; }
+  #askAnswer .ask-level-end { color:var(--mut); font-size:13px; }
+  #askAnswer .ask-level-bot { margin-top:auto; }
+  #askAnswer .ask-level-none, #askAnswer .ask-level-more { color:var(--mut); }
+  #askAnswer .ask-level-list { display:flex; flex-direction:column; gap:4px; margin:0; padding:0; list-style:none; }
+  #askAnswer .ask-level { display:grid; grid-template-columns:auto 1fr auto; align-items:baseline; gap:10px; padding:5px 8px; border:1px solid transparent; }
+  #askAnswer .ask-level.is-lead { border-color:var(--sup); }
+  #askAnswer .ask-level-px { font-size:17px; font-weight:bold; font-variant-numeric:tabular-nums; }
+  #askAnswer .ask-level-pct, #askAnswer .ask-level-st { color:var(--mut); }
+  #askAnswer .ask-actions { display:flex; flex-wrap:wrap; gap:8px; }
+  #askAnswer .ask-btn { min-height:40px; padding:0 14px; border:1px solid var(--sup); background:none; color:var(--sup); font:inherit; cursor:pointer; }
+  #askAnswer .ask-btn:hover { background:rgba(38,198,218,.10); }
+  #askAnswer .ask-btn.is-primary { background:var(--sup); color:#03181c; }
+  #askAnswer .ask-how summary { color:var(--sup); cursor:pointer; }
+  #askAnswer .ask-how ul { margin:8px 0 0; padding-left:18px; color:var(--mut); }
+  #askAnswer .ask-how li { margin:0 0 4px; }
+  #askAnswer .ask-view .ask-src { margin:0; font-size:13px; }
   #askAnswer .ask-card, #xpAssistAnswer .ask-card { padding:12px 14px; border:1px solid var(--grid); background:var(--bg); line-height:1.55; }
   #askAnswer .ask-card h3, #exportDialog #xpAssistAnswer .ask-card h3 { margin:0 0 6px; font-size:15px; letter-spacing:.03em; color:var(--fg); }
   #askAnswer .ask-card p, #xpAssistAnswer .ask-card p { margin:0 0 8px; }
@@ -967,10 +1047,6 @@
   #askDock .ask-web input, #xpAssist .ask-web input { width:18px; height:18px; margin:0; accent-color:var(--sup); }
   #askDock .ask-web input:focus-visible, #xpAssist .ask-web input:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
   @media (max-width:600px) { #askDock .ask-web, #xpAssist .ask-web { min-height:44px; } }
-  #askAnswer table { border-collapse:collapse; margin:4px 0 10px; }
-  #askAnswer th, #askAnswer td { padding:3px 14px 3px 0; text-align:right; font-variant-numeric:tabular-nums; }
-  #askAnswer th:first-child, #askAnswer td:first-child { text-align:left; }
-  #askAnswer th { color:var(--mut); font-weight:normal; }
   #askAnswer .is-up { color:var(--cbuy); }
   #askAnswer .is-down { color:var(--csell); }
   #askAnswer .is-mixed { color:var(--thr); }
@@ -1055,7 +1131,7 @@
   @media (max-width:600px) {
     #topActions #askAiBtn { min-height:44px; }
     #askDock .ask-collapse { min-width:44px; min-height:44px; }
-    #askAnswer .ask-retry { min-height:44px; }
+    #askAnswer .ask-retry, #askDock .ask-chip, #askAnswer .ask-btn { min-height:44px; }
   }
 </style>
 </head>
@@ -1163,10 +1239,10 @@
 <aside id="askDock" aria-label="Ask about this ticker" data-mode="rail" hidden>
   <div class="ask-rail">
     <button type="button" class="ask-raillabel" aria-label="Open Ask AI"><span>ASK</span><span>AI</span></button>
-    <button type="button" class="ask-railbtn" data-rail="yield" aria-label="Yield and cadence" data-tip="Yield and cadence" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7M10 20V6M15 20v-9M20 20V4"/></svg></button>
-    <button type="button" class="ask-railbtn" data-rail="trend" aria-label="Why this trend?" data-tip="Why this trend?"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="yield" aria-label="Yield" data-tip="Yield" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7M10 20V6M15 20v-9M20 20V4"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="trend" aria-label="Trend" data-tip="Trend"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></button>
     <button type="button" class="ask-railbtn" data-rail="payout" aria-label="Next payout" data-tip="Next payout" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg></button>
-    <button type="button" class="ask-railbtn" data-rail="compare" aria-label="Compare with QQQ" data-tip="Compare with QQQ" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg></button>
+    <button type="button" class="ask-railbtn" data-rail="compare" aria-label="Versus QQQ" data-tip="Vs QQQ" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg></button>
     <button type="button" class="ask-railbtn" data-rail="buy" aria-label="Nearest buy" data-tip="Nearest buy"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg></button>
     <button type="button" class="ask-railbtn" data-rail="ask" aria-label="Ask a question" data-tip="Ask a question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5h16v11H10l-6 4z"/></svg></button>
   </div>
@@ -1175,12 +1251,13 @@
       <h2 class="ask-title" id="askTitle">ASK ABOUT —</h2>
       <button type="button" class="ask-collapse" aria-label="Collapse to the side rail" title="Collapse (Esc)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 6l6 6-6 6M13 6l6 6-6 6"/></svg></button>
     </div>
-    <div class="ask-chips" role="group" aria-label="Quick questions">
-      <button type="button" class="ask-chip" data-chip="yield"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20v-7M10 20V6M15 20v-9M20 20V4"/></svg><span>Yield &amp; cadence</span></button>
-      <button type="button" class="ask-chip" data-chip="why"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg><span class="ask-chiplabel">Why this trend?</span></button>
-      <button type="button" class="ask-chip" data-chip="payout" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16v14H4zM4 10h16M8 3v5M16 3v5"/></svg><span>Next payout</span></button>
-      <button type="button" class="ask-chip" data-chip="compare" hidden><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 8h15l-4-4M20 16H5l4 4"/></svg><span>Compare with QQQ</span></button>
-      <button type="button" class="ask-chip" data-chip="buy"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="3.5"/></svg><span>Nearest buy</span></button>
+    <div class="ask-chips" role="group" aria-label="Quick answers">
+      <button type="button" class="ask-chip" data-chip="summary" aria-pressed="false">SUMMARY</button>
+      <button type="button" class="ask-chip" data-chip="yield" aria-pressed="false" hidden>YIELD</button>
+      <button type="button" class="ask-chip" data-chip="why" aria-pressed="false">TREND</button>
+      <button type="button" class="ask-chip" data-chip="payout" aria-pressed="false" hidden>PAYOUT</button>
+      <button type="button" class="ask-chip" data-chip="compare" aria-pressed="false" hidden>VS QQQ</button>
+      <button type="button" class="ask-chip" data-chip="buy" aria-pressed="false">BUY</button>
     </div>
     <div id="askAnswer" aria-live="polite"></div>
     <form class="ask-form" id="askForm">
@@ -3203,7 +3280,7 @@ function refreshFactBandBuy() {
     if (gen !== _factGen || _factReady !== r) return;   // the band moved on meanwhile
     r.buy = buy;
     setNearestBuyTile(buy);
-    if (_askChip === 'buy' && _askSym === r.sym) runAskChip('buy');
+    if ((_askChip === 'buy' || _askChip === 'summary') && _askSym === r.sym) runAskChip(_askChip);
   });
 }
 // The account's gap placement (shared with /alerts and the emails), loaded at page start
@@ -3278,10 +3355,6 @@ function renderAskDock() {
   document.getElementById('askTitle').textContent = 'ASK ABOUT ' + (sym || '—');
   document.getElementById('askInput').placeholder = sym ? 'Ask about ' + sym + '…' : 'Ask about this ticker…';
   var r = askFacts(), f = r && r.facts, known = !!(r && r.ok && f), payer = askPayer(f);
-  var overall = f && f.overall;
-  dock.querySelector('[data-chip="why"] .ask-chiplabel').textContent = overall ? 'Why ' + overall + '?' : 'Why this trend?';
-  dock.querySelector('[data-rail="trend"]').setAttribute('data-tip', overall ? 'Why ' + overall + '?' : 'Why this trend?');
-  dock.querySelector('[data-rail="trend"]').setAttribute('aria-label', overall ? 'Why ' + overall + '?' : 'Why this trend?');
   // payers get yield and payout; a non-payer (known from facts) gets Compare with QQQ
   // instead. While facts load (or when they failed) neither shows: a yield chip that
   // vanishes once a non-payer's facts arrive would offer something it cannot answer
@@ -3346,20 +3419,22 @@ function askNode(tag, cls, text) {
   return el;
 }
 function askHint() {
-  // with a ticker on screen the chips and the question box speak for themselves
+  // with a ticker on screen the dock opens on its summary board
   var box = document.getElementById('askAnswer');
-  if (_askSym) box.replaceChildren();
-  else box.replaceChildren(askNode('p', 'ask-hint', 'Pick a ticker to ask about it.'));
+  if (_askSym) { runAskChip('summary'); return; }
+  box.replaceChildren(askNode('p', 'ask-hint', 'Pick a ticker to ask about it.'));
   setAskPressed(null);
 }
 function setAskPressed(chip) {
   _askChip = chip;
   document.querySelectorAll('#askDock .ask-chip').forEach(function (c) {
-    c.classList.toggle('is-active', c.getAttribute('data-chip') === chip);
+    var on = c.getAttribute('data-chip') === chip;
+    c.classList.toggle('is-active', on);
+    c.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
 }
 // one answer card: a title (string or h3 node), paragraphs (strings or nodes) and
-// the source line last
+// the source line last. Loading, failed and empty states use it.
 function askAnswer(title, parts, source) {
   var card = askNode('div', 'ask-card');
   card.appendChild(typeof title === 'string' ? askNode('h3', null, title) : title);
@@ -3367,9 +3442,104 @@ function askAnswer(title, parts, source) {
   card.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
   document.getElementById('askAnswer').replaceChildren(card);
 }
+// One quick answer as a view that fills the panel: its parts (nodes), then the
+// method and caveats behind a closed "How this is worked out", and the source line last.
+function askView(parts, how, source) {
+  var view = askNode('div', 'ask-view');
+  var foot = askNode('div', 'ask-foot');   // pinned to the bottom of the panel
+  parts.forEach(function (p) { if (p) view.appendChild(p); });
+  if (how && how.length) {
+    var d = askNode('details', 'ask-how'), ul = askNode('ul');
+    d.appendChild(askNode('summary', null, 'How this is worked out'));
+    how.forEach(function (t) { ul.appendChild(askNode('li', null, t)); });
+    d.appendChild(ul);
+    foot.appendChild(d);
+  }
+  foot.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
+  view.appendChild(foot);
+  document.getElementById('askAnswer').replaceChildren(view);
+  return view;
+}
+// The answer's key number or word, large and coloured, its label under it and an
+// optional tag (ESTIMATE, SPECIAL PAYOUT, STRONG) beside it, amber unless tagCls
+// gives it the value's colour
+function askHero(value, cls, label, tag, tagCls) {
+  var el = askNode('div', 'ask-hero'), top = askNode('div', 'ask-hero-top');
+  top.appendChild(askNode('span', 'ask-hero-v' + (cls ? ' ' + cls : ''), value));
+  if (tag) top.appendChild(askNode('span', 'ask-tag' + (tagCls ? ' ' + tagCls : ''), tag));
+  el.appendChild(top);
+  if (label) el.appendChild(askNode('div', 'ask-hero-l', label));
+  return el;
+}
+// labelled cells in one row: [[label, value], ...]
+function askCells(cells) {
+  var row = askNode('div', 'ask-cells');
+  cells.forEach(function (c) {
+    var cell = askNode('div', 'ask-cell');
+    cell.appendChild(askNode('span', 'ask-cell-l', c[0]));
+    cell.appendChild(askNode('span', 'ask-cell-v', c[1]));
+    row.appendChild(cell);
+  });
+  return row;
+}
+function askLabel(text) { return askNode('div', 'ask-sec', text); }
+function askCap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+// "Oct 2", with the year when it is not this year ("Dec 2, 2025")
+function askDay(iso) {
+  var d = fbDay(iso), y = /^(\d{4})-/.exec(iso || '');
+  return d && y && +y[1] !== new Date().getFullYear() ? d + ', ' + y[1] : d;
+}
+// a payout's cash amount per share: 3 decimals under 1, else 2
+function askAmt(v) { return Number(v).toFixed(v < 1 ? 3 : 2); }
+// ", about 10 days away" from today to an estimated date
+function askDaysAway(iso) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''), now = new Date();
+  if (!m) return '';
+  var days = Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 864e5);
+  return days > 1 ? 'about ' + days + ' days away' : days === 1 ? 'about a day away' : 'due about now';
+}
+// buttons in a row: [[label, onClick, primary], ...]
+function askActions(list) {
+  var row = askNode('div', 'ask-actions');
+  list.forEach(function (a) {
+    var b = askNode('button', 'ask-btn' + (a[2] ? ' is-primary' : ''), a[0]);
+    b.type = 'button';
+    b.addEventListener('click', a[1]);
+    row.appendChild(b);
+  });
+  return row;
+}
+// one labelled bar from a centre zero line: left and red below zero, right and green
+// above, its length a share of the largest change shown (max), the value large after it
+function askBarRow(label, v, max, note, noteCls) {
+  var row = askNode('div', 'ask-bar'), track = askNode('span', 'ask-track');
+  row.appendChild(askNode('span', 'ask-bar-l', label));
+  if (v != null && v !== 0 && max > 0) {
+    var fill = askNode('span', 'ask-fill ' + (v < 0 ? 'is-neg' : 'is-pos'));
+    fill.style.width = Math.max(1, Math.abs(v) / max * 50) + '%';
+    track.appendChild(fill);
+  }
+  track.setAttribute('aria-hidden', 'true');
+  row.appendChild(track);
+  row.appendChild(askNode('span', 'ask-bar-v' + (v > 0 ? ' is-up' : v < 0 ? ' is-down' : ''), v == null ? '—' : fbSigned(v)));
+  if (note) row.appendChild(askNode('span', 'ask-bar-n' + (noteCls ? ' ' + noteCls : ''), note));
+  return row;
+}
+// the verdict rule as three coloured dots
+function askLegend() {
+  var el = askNode('div', 'ask-legend');
+  [['is-up', '3 up = UP'], ['is-down', '0 up = DOWN'], ['is-mixed', 'else MIXED']].forEach(function (x) {
+    var item = askNode('span', 'ask-key');
+    item.appendChild(askNode('span', 'ask-dot ' + x[0]));
+    item.append(x[1]);
+    el.appendChild(item);
+  });
+  return el;
+}
 function askVerdictCls(v) { return v === 'UP' || v === 'BULLISH' ? 'is-up' : v === 'DOWN' || v === 'BEARISH' ? 'is-down' : v === 'MIXED' ? 'is-mixed' : ''; }
+function askTrendTag(f) { return f.overall ? f.upCount + ' of 3 periods up' : 'not enough history'; }
 function askCloseSource(f, withPayouts) {
-  return 'Tiingo daily closes' + (withPayouts ? ' and distributions' : '') + ' through ' + fbDay(f.asOf);
+  return 'Tiingo daily closes' + (withPayouts ? ' and distributions' : '') + ' through ' + askDay(f.asOf);
 }
 // "expected around" date for the next payout: the last ex-date plus one cadence
 // step, stepped past the as-of date. An estimate, never an announced date.
@@ -3396,10 +3566,11 @@ function askNextExDate(f) {
   return null;
 }
 var ASK_STEP_WORDS = { weekly: 'about a week', monthly: 'about a month', quarterly: 'about three months', semiannual: 'about six months', annual: 'about a year' };
-// Answers one chip into #askAnswer. Everything but "compare" is synchronous.
+// Answers one tab into #askAnswer. Everything but "compare" (and the summary's
+// VS QQQ tile) is synchronous.
 function runAskChip(chip) {
   var sym = _askSym, r = askFacts();
-  askAbort();   // a chip is a new question: stop a typed answer still streaming
+  askAbort();   // a tab is a new question: stop a typed answer still streaming
   var tok = ++_askToken;   // and drop any slower answer still on its way
   setAskPressed(chip);
   if (chip === 'buy') return askBuyAnswer(sym, r);
@@ -3407,52 +3578,146 @@ function runAskChip(chip) {
   if (!r.ok) return askAnswer(sym, ['Facts for ' + sym + ' did not load. Use Try again in the facts band above.'], 'Tiingo daily closes');
   var f = r.facts;
   if (!f) return askAnswer(sym, ['No facts for ' + sym + ': Tiingo has no daily prices for it.'], 'Tiingo daily closes');
-  var payouts = Array.isArray(f.payouts) ? f.payouts.length : 0;
-  if (chip === 'yield') {
-    if (!askPayer(f) || !fbNum(f.yield)) {
-      return askAnswer(sym + ': yield & cadence', [sym + ' paid no distributions in the last 12 months, so there is no yield or payout schedule to show.'],
-        askCloseSource(f, true));
-    }
-    var parts = [sym + ' has a trailing 12-month yield of ' + f.yield.toFixed(2) + '%: the distributions with an ex-date in the last 365 days, divided by the '
-      + fbDay(f.asOf) + ' close of ' + px2(f.close) + '.'];
-    parts.push(f.cadence === 'irregular'
-      ? 'It paid ' + payouts + ' times in 12 months, on no regular schedule.'
-      : 'It pays ' + f.cadence + ': ' + payouts + ' payout' + (payouts === 1 ? '' : 's') + ' in the last 12 months.');
-    if (f.lastExDate) parts.push('Last ex-date: ' + fbDay(f.lastExDate) + '.');
-    if (f.special) parts.push('The 12 months include a special payout (more than twice the usual amount), so the yield may overstate a typical year.');
-    return askAnswer(sym + ': yield & cadence', parts, askCloseSource(f, true));
-  }
-  if (chip === 'why') {
-    var wins = f.windows || {}, lines = [];
-    ['d21', 'm3', 'm6'].forEach(function (w) {
-      var win = wins[w];
-      lines.push(FB_WINDOW_WORDS[w][0] + ': ' + (win ? fbSigned(win.change) + ' (' + win.verdict + ')' : 'not enough history'));
-    });
-    var title = askNode('h3');
-    title.append('Why is ' + sym + ' ');
-    title.appendChild(askNode('span', askVerdictCls(f.overall), f.overall || 'without a verdict'));
-    title.append('?');
-    var list = askNode('p', null, 'Price change over ' + lines.join('; ') + '.');
-    var rule = f.overall
-      ? f.upCount + ' of 3 periods up, so the verdict is ' + f.overall + '. The rule: 3 of 3 periods up is UP, 0 of 3 is DOWN, anything else is MIXED.'
-      : 'The verdict needs all three periods, and ' + sym + ' does not have enough daily closes for every one.';
-    return askAnswer(title, [list, rule, 'This is price change only; distributions are not counted.'], askCloseSource(f, false));
-  }
-  if (chip === 'payout') {
-    var next = askNextExDate(f);
-    if (!next) {
-      return askAnswer(sym + ': next payout', [f.cadence === 'irregular'
-        ? sym + ' paid ' + payouts + ' times in 12 months on no regular schedule, so there is no expected ex-date to estimate.'
-        : 'There is not enough payout history to estimate the next one.',
-        f.lastExDate ? 'Last ex-date: ' + fbDay(f.lastExDate) + '.' : ''].filter(Boolean), askCloseSource(f, true));
-    }
-    return askAnswer(sym + ': next payout', ['Next ex-date expected around ' + fbDay(next) + ' (estimate from the ' + f.cadence + ' cadence; not an announced date).',
-      'How it is estimated: ' + sym + ' pays ' + f.cadence + ' and its last ex-date was ' + fbDay(f.lastExDate)
-        + ', so the next ex-date usually falls ' + ASK_STEP_WORDS[f.cadence] + ' later. Our data has no announced future payouts.'],
-      askCloseSource(f, true));
-  }
+  if (chip === 'summary') return askSummaryView(sym, f, r.buy, tok);
+  if (chip === 'yield') return askYieldView(f);
+  if (chip === 'why') return askTrendView(f);
+  if (chip === 'payout') return askPayoutView(f);
   if (chip === 'compare') return askCompareAnswer(sym, f, tok);
 }
+// YIELD: the yield large, how often it pays, and a column per recent payout
+function askYieldView(f) {
+  var payouts = Array.isArray(f.payouts) ? f.payouts : [];
+  if (!askPayer(f) || !fbNum(f.yield)) {
+    return askView([askHero('None', '', 'no distributions in the last 12 months')], [], askCloseSource(f, true));
+  }
+  var parts = [
+    askHero(f.yield.toFixed(2) + '%', 'is-up', 'trailing 12-month yield', f.special ? 'SPECIAL PAYOUT' : ''),
+    askCells([['Pays', askCap(f.cadence)], ['Last ex-date', f.lastExDate ? askDay(f.lastExDate) : '—']]),
+  ];
+  var shown = payouts.slice(-12), count = payouts.length + ' payout' + (payouts.length === 1 ? '' : 's') + ' in 12 months';
+  if (shown.length) parts.push(askPayoutBars(shown, shown.length === payouts.length ? count : count + ', last ' + shown.length + ' shown'));
+  var how = ['Yield: the payouts with an ex-date in the last 365 days, divided by the ' + askDay(f.asOf) + ' close of ' + px2(f.close) + '.',
+    'How often it pays comes from the usual gap between payouts.'];
+  if (f.special) how.push('The 12 months include a special payout (more than twice the usual amount), so the yield may overstate a typical year.');
+  return askView(parts, how, askCloseSource(f, true));
+}
+// a column per payout, height by cash amount, oldest left; each amount is in the
+// chart's label for screen readers and on hover
+function askPayoutBars(list, title) {
+  var box = askNode('div', 'ask-chart'), cols = askNode('div', 'ask-cols');
+  var max = Math.max.apply(null, list.map(function (p) { return p.amount; }));
+  box.appendChild(askLabel(title));
+  cols.setAttribute('role', 'img');
+  cols.setAttribute('aria-label', 'Payouts per share: ' + list.map(function (p) { return askDay(p.exDate) + ' ' + askAmt(p.amount); }).join(', '));
+  list.forEach(function (p) {
+    var c = askNode('span', 'ask-col');
+    c.style.height = (max > 0 ? Math.max(4, p.amount / max * 100) : 4) + '%';
+    c.title = askDay(p.exDate) + ': ' + askAmt(p.amount) + ' per share';
+    cols.appendChild(c);
+  });
+  box.appendChild(cols);
+  var axis = askNode('div', 'ask-axis');
+  axis.appendChild(askNode('span', null, askDay(list[0].exDate)));
+  axis.appendChild(askNode('span', 'ask-axis-mid', 'latest ' + askAmt(list[list.length - 1].amount) + ' per share'));
+  axis.appendChild(askNode('span', null, askDay(list[list.length - 1].exDate)));
+  box.appendChild(axis);
+  return box;
+}
+// TREND: the verdict large, then the three price changes as bars from zero
+function askTrendView(f) {
+  var wins = f.windows || {}, keys = ['d21', 'm3', 'm6'], max = 0;
+  keys.forEach(function (w) { if (wins[w]) max = Math.max(max, Math.abs(wins[w].change)); });
+  var bars = askNode('div', 'ask-bars');
+  keys.forEach(function (w) {
+    var win = wins[w];
+    bars.appendChild(askBarRow(TREND_HL_NAMES[w], win ? win.change : null, max, win ? 'since ' + askDay(win.startDate) : 'not enough history'));
+  });
+  return askView([
+    f.overall ? askHero(f.overall, askVerdictCls(f.overall), askTrendTag(f)) : askHero('—', '', 'not enough history for all three periods'),
+    askLabel('Price change'), bars, askLegend(),
+  ], ['Each bar is the price change from the close on its start date to the ' + askDay(f.asOf) + ' close.',
+    'The verdict counts how many of the three periods are up.', 'Price change only; distributions are not counted.'], askCloseSource(f, false));
+}
+// PAYOUT: the estimated next ex-date large, then recent ex-dates on a line ending
+// in the estimate
+function askPayoutView(f) {
+  var payouts = Array.isArray(f.payouts) ? f.payouts : [], next = askNextExDate(f), parts = [];
+  if (next) parts.push(askHero('around ' + askDay(next), 'is-est', 'next ex-date, ' + askDaysAway(next), 'ESTIMATE'));
+  else if (f.cadence === 'irregular') parts.push(askHero('No schedule', '', 'it pays on no regular schedule, so there is no date to estimate'));
+  else parts.push(askHero('—', '', 'not enough payout history to estimate the next one'));
+  var recent = payouts.slice(-6);
+  if (recent.length) parts.push(askTimeline(recent, next));
+  parts.push(askCells([['Pays', askCap(f.cadence)], ['Last ex-date', f.lastExDate ? askDay(f.lastExDate) : '—']]));
+  return askView(parts, next
+    ? ['The last ex-date (' + askDay(f.lastExDate) + ') plus ' + ASK_STEP_WORDS[f.cadence] + ', from how often it pays.',
+      'It is not an announced date: our data has no announced future payouts.']
+    : ['Our data has no announced future payouts.'], askCloseSource(f, true));
+}
+// past ex-dates as filled dots, oldest left, then the estimate as a hollow dot;
+// month over day so seven fit the narrowest dock
+function askTimeline(list, next) {
+  var box = askNode('div', 'ask-chart'), line = askNode('ol', 'ask-tl');
+  box.appendChild(askLabel('Recent ex-dates'));
+  list.forEach(function (p) { line.appendChild(askTlDot(p.exDate, false)); });
+  if (next) line.appendChild(askTlDot(next, true));
+  box.appendChild(line);
+  return box;
+}
+function askTlDot(iso, est) {
+  var li = askNode('li', est ? 'is-est' : ''), d = askDay(iso).split(/[ ,]+/);
+  li.appendChild(askNode('span', 'ask-tl-dot'));
+  var t = askNode('span', 'ask-tl-d');
+  d.forEach(function (part) { t.appendChild(askNode('span', null, part)); });
+  if (est) t.appendChild(askNode('span', 'ask-sr', ', estimate'));
+  li.appendChild(t);
+  return li;
+}
+// SUMMARY: one tile per tab with its headline, each opening its tab
+function askSummaryView(sym, f, buy, tok) {
+  var tiles = askNode('div', 'ask-tiles'), payer = askPayer(f);
+  if (payer && fbNum(f.yield)) tiles.appendChild(askTile('yield', 'YIELD', f.yield.toFixed(2) + '%', 'is-up', askCap(f.cadence)));
+  tiles.appendChild(askTile('why', 'TREND', f.overall || '—', askVerdictCls(f.overall), askTrendTag(f)));
+  if (payer) {
+    var next = askNextExDate(f);
+    tiles.appendChild(askTile('payout', 'NEXT PAYOUT', next ? '~' + askDay(next) : '—', next ? 'is-est' : '',
+      next ? 'estimate, ' + askDaysAway(next) : f.cadence === 'irregular' ? 'no regular schedule' : 'not enough history'));
+  } else {
+    var cmp = askTile('compare', 'VS QQQ', '…', '', 'loading QQQ');
+    tiles.appendChild(cmp);
+    tickerFacts('QQQ').then(function (q) { return q; }, function () { return null; }).then(function (q) {
+      if (tok !== _askToken) return;   // a newer tab, question or ticker took over meanwhile
+      var c = q ? askCompareWindows(f, q) : null, n = c ? c.ahead.length + c.behind.length + c.same.length : 0;
+      cmp.querySelector('.ask-tile-v').textContent = n ? c.ahead.length + ' of ' + n : '—';
+      cmp.querySelector('.ask-tile-s').textContent = !q ? 'QQQ facts did not load' : n ? 'periods ahead of QQQ' : 'not enough history';
+      // QQQ's facts can end on another day than the ticker's: name it, as VS QQQ does
+      if (q && q.asOf !== f.asOf) src.textContent = 'Source: ' + askCloseSource(f, payer) + ' (QQQ through ' + askDay(q.asOf) + ')' + buyNote;
+    });
+  }
+  tiles.appendChild(askBuyTile(buy));
+  var buyNote = '; NEAREST BUY from Limit Buy Levels';
+  var src = askView([tiles], [], askCloseSource(f, payer) + buyNote).querySelector('.ask-src');
+}
+function askTile(chip, label, value, cls, sub) {
+  var b = askNode('button', 'ask-tile');
+  b.type = 'button';
+  b.setAttribute('data-open', chip);
+  b.appendChild(askNode('span', 'ask-tile-l', label));
+  b.appendChild(askNode('span', 'ask-tile-v' + (cls ? ' ' + cls : ''), value));
+  b.appendChild(askNode('span', 'ask-tile-s', sub));
+  b.addEventListener('click', function () {
+    runAskChip(chip);
+    var tab = document.querySelector('#askDock [data-chip="' + chip + '"]');
+    if (tab) tab.focus();   // the tile is gone; keep the keyboard on its tab
+  });
+  return b;
+}
+function askBuyTile(buy) {
+  if (!buy) return askTile('buy', 'NEAREST BUY', '…', '', 'loading');
+  if (buy.lim) return askTile('buy', 'NEAREST BUY', px2(buy.lim.row.limit), ASK_TIER_CLS[limitStrength(buy.lim)], pctBelowText(buy.lim.row));
+  if (buy.sec) return askTile('buy', 'NEAREST BUY', 'None', '', 'none ' + fmtPct(buy.range.min) + '–' + fmtPct(buy.range.depth) + '% below');
+  return askTile('buy', 'NEAREST BUY', '—', '', buy.reason === 'range' ? 'range not valid' : buy.reason === 'failed' ? 'chart data did not load' : 'no levels for this chart');
+}
+var ASK_TIER_CLS = { strong: 'is-up', mid: '', light: 'is-weak' };
 // One sentence from the windows where sym did better, worse or the same as QQQ.
 // A tie counts as compared; "not enough history" only when no window could be.
 function askCompareSentence(sym, ahead, behind, same) {
@@ -3466,6 +3731,32 @@ function askCompareSentence(sym, ahead, behind, same) {
   if (same.length) parts.push('matched it over ' + xpList(same));
   return sym + ' ' + (parts.length < 2 ? parts[0] : parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1]) + '.';
 }
+// "QQQ did better in all 3 periods", "IAU did better in 2 of 3 periods"; a tie or an
+// even split falls back to the full sentence
+function askCompareHeadline(sym, ahead, behind, same) {
+  var n = ahead.length + behind.length;
+  if (same.length || !n || ahead.length === behind.length) return askCompareSentence(sym, ahead, behind, same);
+  var k = Math.max(ahead.length, behind.length);
+  return (ahead.length > behind.length ? sym : 'QQQ') + ' did better in ' + (k === n ? (n === 1 ? 'the one period compared' : 'all ' + n + ' periods') : k + ' of ' + n + ' periods');
+}
+// sym against QQQ per window: each pair of changes, which was larger, and the
+// windows sym was ahead, behind or level in
+function askCompareWindows(f, q) {
+  var out = { rows: [], ahead: [], behind: [], same: [], max: 0 };
+  ['d21', 'm3', 'm6'].forEach(function (w) {
+    var a = f.windows && f.windows[w], b = q.windows && q.windows[w];
+    var x = { w: w, a: a ? a.change : null, b: b ? b.change : null, better: '' };
+    if (a) out.max = Math.max(out.max, Math.abs(a.change));
+    if (b) out.max = Math.max(out.max, Math.abs(b.change));
+    if (a && b) {
+      x.better = a.change > b.change ? 'a' : a.change < b.change ? 'b' : '';
+      (a.change > b.change ? out.ahead : a.change < b.change ? out.behind : out.same).push(FB_WINDOW_WORDS[w][0]);
+    }
+    out.rows.push(x);
+  });
+  return out;
+}
+// VS QQQ: a headline, then per period a pair of bars from one zero line
 function askCompareAnswer(sym, f, tok) {
   askAnswer(sym + ' vs QQQ', ['Loading QQQ facts…'], askCloseSource(f, false));
   tickerFacts('QQQ').then(function (q) { return q; }, function () { return undefined; }).then(function (q) {
@@ -3474,39 +3765,93 @@ function askCompareAnswer(sym, f, tok) {
       return askAnswer(sym + ' vs QQQ', [q === undefined ? 'QQQ facts did not load. Try again in a minute.' : 'No facts for QQQ right now.'],
         askCloseSource(f, false));
     }
-    var table = askNode('table'), head = askNode('tr');
-    ['Price change', sym, 'QQQ'].forEach(function (t) { head.appendChild(askNode('th', null, t)); });
-    table.appendChild(head);
-    var ahead = [], behind = [], same = [];
-    ['d21', 'm3', 'm6'].forEach(function (w) {
-      var a = f.windows && f.windows[w], b = q.windows && q.windows[w], tr = askNode('tr');
-      tr.appendChild(askNode('td', null, TREND_HL_NAMES[w]));
-      tr.appendChild(askNode('td', a ? askVerdictCls(a.verdict) : '', a ? fbSigned(a.change) : '—'));
-      tr.appendChild(askNode('td', b ? askVerdictCls(b.verdict) : '', b ? fbSigned(b.change) : '—'));
-      table.appendChild(tr);
-      if (!a || !b) return;
-      (a.change > b.change ? ahead : a.change < b.change ? behind : same).push(FB_WINDOW_WORDS[w][0]);
+    var c = askCompareWindows(f, q), pairs = askNode('div', 'ask-pairs');
+    c.rows.forEach(function (x) {
+      var g = askNode('div', 'ask-pair');
+      g.appendChild(askLabel(TREND_HL_NAMES[x.w]));
+      g.appendChild(askBarRow(sym, x.a, c.max, x.better === 'a' ? 'better' : '', 'ask-better'));
+      g.appendChild(askBarRow('QQQ', x.b, c.max, x.better === 'b' ? 'better' : '', 'ask-better'));
+      pairs.appendChild(g);
     });
-    var sentence = askCompareSentence(sym, ahead, behind, same);
-    var src = askCloseSource(f, false) + (q.asOf !== f.asOf ? ' (QQQ through ' + fbDay(q.asOf) + ')' : ', both tickers');
-    askAnswer(sym + ' vs QQQ', [table, sentence, 'Price change only; distributions are not counted.'], src);
+    var src = askCloseSource(f, false) + (q.asOf !== f.asOf ? ' (QQQ through ' + askDay(q.asOf) + ')' : ', both tickers');
+    askView([askNode('p', 'ask-headline', askCompareHeadline(sym, c.ahead, c.behind, c.same)), pairs],
+      ['Each bar is the price change over its period, up to the latest close.', 'Price change only; distributions are not counted.'], src);
   });
 }
-// the band's NEAREST BUY, from the same exportLeadPrice result
+// opens Limit Buy Levels as its toolbar button does; with focusRange, the range's
+// Max field takes the focus once it is open. The dialog gives focus back to whatever
+// had it when it opened, and closing it redraws BUY (removing this answer's buttons),
+// so the BUY tab takes focus first; on a phone the full-screen dock collapses and the
+// ASK AI button takes it instead.
+function askOpenLimitBuy(focusRange) {
+  if (askSheetOpen()) {
+    setAskMode('rail');
+    document.getElementById('askAiBtn').focus();
+  } else {
+    document.querySelector('#askDock [data-chip="buy"]').focus();
+  }
+  document.getElementById('exportBtn').click();
+  if (focusRange) {
+    var max = document.getElementById('exportDepth');
+    if (max) { max.focus(); max.select(); }
+  }
+}
+// BUY: the band's NEAREST BUY large, then a ruler from the close down to the range's
+// depth with every level in range, coloured by strength
 function askBuyAnswer(sym, r) {
   var buy = r && r.buy, title = sym + ': nearest buy';
+  var open = askActions([['Open Limit Buy Levels', function () { askOpenLimitBuy(false); }]]);
   if (!buy) return askAnswer(title, ['The nearest buy price for ' + sym + ' is still loading.'], 'Limit Buy Levels');
+  if (!buy.sec) {
+    return askAnswer(title, ['No buy price for ' + sym + ': ' + (buy.reason === 'range' ? 'the Limit Buy range is not valid.'
+      : buy.reason === 'failed' ? 'its chart data did not load.' : 'this chart has no Limit Buy levels.'), buy.reason === 'range' ? open : null].filter(Boolean), 'Limit Buy Levels');
+  }
+  var range = fmtPct(buy.range.min) + '–' + fmtPct(buy.range.depth) + '%', parts = [];
   if (buy.lim) {
-    return askAnswer(title, ['Nearest buy for ' + sym + ': ' + px2(buy.lim.row.limit) + ', ' + pctBelowText(buy.lim.row) + ' the ' + closeLabel(buy.sec) + '.',
-      'It is the price the Limit Buy Levels dialog leads with for this ticker, using your settings there. It comes from past price levels; it is not a prediction or a recommendation.'],
-      'Limit Buy Levels, ' + (buy.sec.closeTime != null ? 'from ' : '') + closeLabel(buy.sec));
+    var tier = limitStrength(buy.lim);
+    parts.push(askHero(px2(buy.lim.row.limit), ASK_TIER_CLS[tier], pctBelowText(buy.lim.row) + ' the ' + closeLabel(buy.sec).replace(/^Latest close$/, 'latest close'), STRENGTH_WORD[tier].toUpperCase(), 'is-tier ' + (ASK_TIER_CLS[tier] || 'is-plain')));
+  } else {
+    parts.push(askHero('None', '', 'no buy price ' + range + ' below the ' + closeLabel(buy.sec).replace(/^Latest close$/, 'latest close')));
   }
-  if (buy.sec) {
-    return askAnswer(title, ['No buy price for ' + sym + ' between ' + fmtPct(buy.range.min) + '% and ' + fmtPct(buy.range.depth) + '% below the close, the range set in Limit Buy Levels.',
-      'Widen that range in Limit Buy Levels to see deeper prices.'], 'Limit Buy Levels settings');
-  }
-  return askAnswer(title, ['No buy price for ' + sym + ': ' + (buy.reason === 'range' ? 'the Limit Buy range is not valid.'
-    : buy.reason === 'failed' ? 'its chart data did not load.' : 'this chart has no Limit Buy levels.')], 'Limit Buy Levels');
+  parts.push(askRuler(buy));
+  parts.push(buy.lim ? open : askActions([['Widen range', function () { askOpenLimitBuy(true); }, true], ['Open Limit Buy Levels', function () { askOpenLimitBuy(false); }]]));
+  var how = ['It is the price the Limit Buy Levels dialog leads with for this ticker, using your settings there (range ' + range + ' below the close).'];
+  if (buy.skipped) how.push('It passed over ' + buy.skipped + ' closer, weaker price' + (buy.skipped === 1 ? '' : 's') + ' for a stronger one.');
+  how.push('It comes from past price levels; it is not a prediction or a recommendation.');
+  return askView(parts, how, 'Limit Buy Levels, ' + (buy.sec.closeTime != null ? 'from ' : '') + closeLabel(buy.sec));
+}
+// The close at the top, the range's depth at the bottom, the searched range shaded,
+// each level in it a tick coloured by strength; beside it the nearest levels as rows
+var ASK_RULER_ROWS = 6;
+function askRuler(buy) {
+  var depth = buy.range.depth, limits = buy.limits || (buy.lim ? [buy.lim] : []);
+  var box = askNode('div', 'ask-rulerbox'), scale = askNode('div', 'ask-scale');
+  scale.setAttribute('aria-hidden', 'true');
+  var band = askNode('span', 'ask-band');
+  band.style.top = Math.min(100, buy.range.min / depth * 100) + '%';
+  scale.appendChild(band);
+  limits.forEach(function (lim) {
+    var t = askNode('span', 'ask-tick tier-' + limitStrength(lim) + (lim === buy.lim ? ' is-lead' : ''));
+    t.style.top = Math.max(0, Math.min(100, pctBelow(lim.row) / depth * 100)) + '%';
+    scale.appendChild(t);
+  });
+  box.appendChild(scale);
+  var side = askNode('div', 'ask-levels');
+  side.appendChild(askNode('div', 'ask-level-end', closeLabel(buy.sec) + ' ' + px2(buy.sec.close)));
+  if (!limits.length) side.appendChild(askNode('div', 'ask-level-none', 'No levels in ' + fmtPct(buy.range.min) + '–' + fmtPct(depth) + '% below'));
+  var list = askNode('ul', 'ask-level-list');
+  limits.slice(0, ASK_RULER_ROWS).forEach(function (lim) {
+    var tier = limitStrength(lim), li = askNode('li', 'ask-level' + (lim === buy.lim ? ' is-lead' : ''));
+    li.appendChild(askNode('span', 'ask-level-px ' + ASK_TIER_CLS[tier], px2(lim.row.limit)));
+    li.appendChild(askNode('span', 'ask-level-pct', pctBelowText(lim.row)));
+    li.appendChild(askNode('span', 'ask-level-st', STRENGTH_WORD[tier]));
+    list.appendChild(li);
+  });
+  if (limits.length) side.appendChild(list);
+  if (limits.length > ASK_RULER_ROWS) side.appendChild(askNode('div', 'ask-level-more', (limits.length - ASK_RULER_ROWS) + ' more in Limit Buy Levels'));
+  side.appendChild(askNode('div', 'ask-level-end ask-level-bot', fmtPct(depth) + '% below'));
+  box.appendChild(side);
+  return box;
 }
 // --- typed questions: POST /api/ticker-assistant, answer streamed as plain text ---
 // The server writes the model's text, then its own "Source: ..." line last. A
@@ -5907,7 +6252,7 @@ function exportLeadPrice(sym, done) {
     var sec = exportSectionFor(item, range, strength);
     markExportClusters(sec.rows);
     var limits = exportLimits(sec.rows), idx = limits.length ? nearestStrongIndex(limits) : 0;
-    done({ sec: sec, range: range, lim: limits.length ? limits[idx] : null, skipped: idx });
+    done({ sec: sec, range: range, lim: limits.length ? limits[idx] : null, skipped: idx, limits: limits });
   });
 }
 var _exportBeam = null;
