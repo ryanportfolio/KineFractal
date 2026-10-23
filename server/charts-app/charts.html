@@ -5446,7 +5446,7 @@ function doAddTicker(from) {
           if ((_chartAccess.curated || []).indexOf(relow) < 0 &&
               (_chartAccess.mine || []).indexOf(relow) < 0) {
             (_chartAccess.mine = _chartAccess.mine || []).push(relow);
-            noteTickerAdded(relow);
+            if (res.dated) noteTickerAdded(relow);
             applyTickerAccess();
             applyTickerOrder(withTickerSlotted(e.sym));
             persistTickerOrder();
@@ -5483,7 +5483,7 @@ function doAddTicker(from) {
             if ((_chartAccess.curated || []).indexOf(low) < 0 &&
                 (_chartAccess.mine || []).indexOf(low) < 0) {
               _chartAccess.mine.push(low);
-              noteTickerAdded(low);
+              if (res.dated) noteTickerAdded(low);
             }
             applyTickerAccess();
           }

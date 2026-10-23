@@ -918,7 +918,8 @@ function registerChartSymbolRoutes(app: Express): void {
 
       // Fast path: the chart already exists (curated, or built for any user
       // earlier). Curated symbols need no account row; a user-built one does
-      // (that row is what makes its button show for THIS account).
+      // (that row is what makes its button show for THIS account). dated:
+      // the account has that row, so the ticker sorts under "Newest added first".
       const existing = entryOf(combos);
       if (existing) {
         const reqRow = await db
@@ -929,7 +930,7 @@ function registerChartSymbolRoutes(app: Express): void {
         if (reqRow.length && !alreadyMine) {
           await db.insert(chartSymbols).values({ userId: u.id, symbol: sym }).onConflictDoNothing();
         }
-        return res.json({ ok: true, entry: existing });
+        return res.json({ ok: true, entry: existing, dated: reqRow.length > 0 });
       }
 
       // New symbol -> live build.
@@ -965,7 +966,7 @@ function registerChartSymbolRoutes(app: Express): void {
             .set({ status: "built", error: null, updatedAt: new Date() })
             .where(eq(symbolRequests.symbol, sym));
           invalidateExtra();
-          return res.json({ ok: true, entry: built.entry });
+          return res.json({ ok: true, entry: built.entry, dated: true });
         }
         if (built.transport) {
           // Build may still land, and the nightly run is the safety net.
@@ -985,7 +986,7 @@ function registerChartSymbolRoutes(app: Express): void {
               .update(symbolRequests)
               .set({ status: "built", error: null, updatedAt: new Date() })
               .where(eq(symbolRequests.symbol, sym));
-            return res.json({ ok: true, entry });
+            return res.json({ ok: true, entry, dated: true });
           }
         }
         // Definitive rejection (bad ticker / no data): don't hold a slot.
