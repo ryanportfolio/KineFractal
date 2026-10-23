@@ -53,8 +53,11 @@ export function createTickerAssistantAdapter(
   return createOpenRouterRatioAdapter({
     ...opts,
     model: TICKER_ASSISTANT_MODEL,
-    maxTokens: 400,
-    reasoning: { enabled: false },
+    // High reasoning effort, kept out of the stream (only the answer is sent). The
+    // reasoning counts toward max_tokens, so the cap leaves room for it: a measured
+    // answer used about 140 reasoning and 150 answer tokens and took about 0.5 s longer.
+    maxTokens: 2000,
+    reasoning: { effort: "high", exclude: true },
     // Ask OpenRouter to route only to providers that do not keep prompts.
     provider: { data_collection: "deny" },
   });

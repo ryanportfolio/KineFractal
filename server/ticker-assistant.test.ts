@@ -302,7 +302,7 @@ test("answer with no text after the browser left ends quietly", async () => {
   assert.deepEqual(out, []);
 });
 
-test("adapter sends the pinned model, 400 tokens, no reasoning, no data collection, streaming", async () => {
+test("adapter sends the pinned model, 2000 tokens, high hidden reasoning, no data collection, streaming", async () => {
   let body: Record<string, unknown> | undefined;
   const adapter = createTickerAssistantAdapter({
     env: { OPENROUTER_API: "test-openrouter-key" },
@@ -314,8 +314,8 @@ test("adapter sends the pinned model, 400 tokens, no reasoning, no data collecti
   await collect(adapter.stream({ systemPrompt: "s", userPrompt: "u" }));
   assert.equal(body?.model, TICKER_ASSISTANT_MODEL);
   assert.equal(TICKER_ASSISTANT_MODEL, "deepseek/deepseek-v4.1-flash-1017");
-  assert.equal(body?.max_tokens, 400);
-  assert.deepEqual(body?.reasoning, { enabled: false });
+  assert.equal(body?.max_tokens, 2000);
+  assert.deepEqual(body?.reasoning, { effort: "high", exclude: true });
   assert.deepEqual(body?.provider, { data_collection: "deny" });
   assert.equal(body?.stream, true);
 });
