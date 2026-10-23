@@ -42,7 +42,7 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import express, { type Express, type Request, type Response } from "express";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { chartLines, chartPreferences, chartSymbols, symbolRequests } from "@shared/schema";
 import { DEFAULT_GAP_PLACEMENT, isGapPlacement, normalizeGapPlacement } from "@shared/gap-placement";
@@ -642,8 +642,8 @@ function registerChartSymbolRoutes(app: Express): void {
   // GET /api/chart-symbols — what the visitor's /charts button row should
   // show: curated = published symbols nobody user-requested (the owner's
   // watchlist + the board indexes) minus this account's hides, mine = this
-  // account's added tickers. Signed out => mine is empty (page then shows
-  // the full curated row).
+  // account's added tickers, recent = the same adds newest first. Signed out
+  // => mine is empty (page then shows the full curated row).
   app.get("/api/chart-symbols", async (req: Request, res: Response) => {
     try {
       const combos = await publishedCombos();
@@ -655,6 +655,7 @@ function registerChartSymbolRoutes(app: Express): void {
       let requested = new Set<string>();
       let hidden = new Set<string>();
       let mine: string[] = [];
+      let recent: string[] = [];
       let order: string[] | null = null;
       let account = false;
       if (db) {
@@ -667,7 +668,8 @@ function registerChartSymbolRoutes(app: Express): void {
             db
               .select({ symbol: chartSymbols.symbol })
               .from(chartSymbols)
-              .where(eq(chartSymbols.userId, u.id)),
+              .where(eq(chartSymbols.userId, u.id))
+              .orderBy(desc(chartSymbols.createdAt)),
             db
               .select({
                 tickerOrder: chartPreferences.tickerOrder,
@@ -680,7 +682,8 @@ function registerChartSymbolRoutes(app: Express): void {
               // before the additive preference migration is applied.
               .catch(() => []),
           ]);
-          mine = rows.map((r) => r.symbol).sort();
+          recent = rows.map((r) => r.symbol);
+          mine = recent.slice().sort();
           if (prefRows.length) {
             order = normalizeTickerOrder(prefRows[0].tickerOrder);
             hidden = new Set(normalizeTickerOrder(prefRows[0].hiddenTickers));
@@ -692,7 +695,7 @@ function registerChartSymbolRoutes(app: Express): void {
         .sort();
       if (order !== null) order = reconcileTickerOrder(order, [...curated, ...mine]);
       res.set("Cache-Control", "no-store");
-      res.json({ curated, mine, order, account });
+      res.json({ curated, mine, recent, order, account });
     } catch (e: any) {
       console.error("[FearLab charts] chart-symbols get failed:", e?.message ?? e);
       res.status(500).json({ error: "failed to load chart symbols" });
@@ -915,7 +918,8 @@ function registerChartSymbolRoutes(app: Express): void {
 
       // Fast path: the chart already exists (curated, or built for any user
       // earlier). Curated symbols need no account row; a user-built one does
-      // (that row is what makes its button show for THIS account).
+      // (that row is what makes its button show for THIS account). dated:
+      // the account has that row, so the ticker sorts under "Newest added first".
       const existing = entryOf(combos);
       if (existing) {
         const reqRow = await db
@@ -926,7 +930,7 @@ function registerChartSymbolRoutes(app: Express): void {
         if (reqRow.length && !alreadyMine) {
           await db.insert(chartSymbols).values({ userId: u.id, symbol: sym }).onConflictDoNothing();
         }
-        return res.json({ ok: true, entry: existing });
+        return res.json({ ok: true, entry: existing, dated: reqRow.length > 0 });
       }
 
       // New symbol -> live build.
@@ -962,7 +966,7 @@ function registerChartSymbolRoutes(app: Express): void {
             .set({ status: "built", error: null, updatedAt: new Date() })
             .where(eq(symbolRequests.symbol, sym));
           invalidateExtra();
-          return res.json({ ok: true, entry: built.entry });
+          return res.json({ ok: true, entry: built.entry, dated: true });
         }
         if (built.transport) {
           // Build may still land, and the nightly run is the safety net.
@@ -982,7 +986,7 @@ function registerChartSymbolRoutes(app: Express): void {
               .update(symbolRequests)
               .set({ status: "built", error: null, updatedAt: new Date() })
               .where(eq(symbolRequests.symbol, sym));
-            return res.json({ ok: true, entry });
+            return res.json({ ok: true, entry, dated: true });
           }
         }
         // Definitive rejection (bad ticker / no data): don't hold a slot.

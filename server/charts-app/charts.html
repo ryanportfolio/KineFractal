@@ -378,7 +378,7 @@
   .ticker-reorder-controls .reorder-delete { border-color:var(--csell); color:var(--csell); }
   .ticker-reorder-controls .reorder-delete:hover { background:rgba(255,91,91,.1); }
   .ticker-reorder-foot { display:flex; align-items:center; gap:10px; padding:13px 20px 16px; border-top:1px solid var(--grid); }
-  #tickerReorderReset, #tickerReorderAlpha { color:var(--fg); }
+  #tickerReorderReset, #tickerReorderAlpha, #tickerReorderRecent { color:var(--fg); }
   #tickerReorderAlpha { font-weight:bold; }
   /* SITE: the button row stays invisible until per-account access answers,
      so visitors never see the every-published-ticker flash (2.5s fail-open) */
@@ -813,6 +813,7 @@
     <div id="tickerReorderList" role="list" aria-label="Ticker order"></div>
     <div class="ticker-reorder-foot">
       <button id="tickerReorderAlpha" type="button">Sort A to Z</button>
+      <button id="tickerReorderRecent" type="button" title="Your added tickers first, newest at the top">Newest added first</button>
       <button id="tickerReorderReset" type="button">Reset to default order</button>
       <span id="tickerReorderMessage"></span>
       <button id="tickerReorderRetry" type="button">Retry sync</button>
@@ -3032,7 +3033,7 @@ function confirmTickerRemoval() {
         redraw();
       }
       if (_chartAccess) {
-        ['mine', 'curated'].forEach(function (k) {
+        ['mine', 'curated', 'recent'].forEach(function (k) {
           var list = _chartAccess[k];
           if (!list) return;
           var i = list.indexOf(state.symbol.toLowerCase());
@@ -3379,6 +3380,8 @@ function renderTickerReorderList(focusSymbol, focusAction) {
   var list = document.getElementById('tickerReorderList');
   if (!list) return;
   var order = visibleTickerSymbols();
+  var recentBtn = document.getElementById('tickerReorderRecent');
+  if (recentBtn) recentBtn.style.display = recentTickerSymbols().length ? '' : 'none';
   list.innerHTML = '';
   order.forEach(function (symbol, index) {
     var row = document.createElement('div');
@@ -3472,6 +3475,37 @@ function alphabetizeTickerOrder() {
   renderTickerReorderList(order[0]);
   persistTickerOrder();
   announceTickerOrder('Tickers ordered alphabetically');
+}
+// This account's added tickers that are on the row, newest first. Curated
+// tickers carry no add date, so the sort below leaves them in place after these.
+function recentTickerSymbols() {
+  if (!(SITE && _chartAccess && _chartAccess.account)) return [];
+  var visible = visibleTickerSymbols();
+  return normalizeTickerSymbols(_chartAccess.recent || []).filter(function (symbol) {
+    return visible.indexOf(symbol) >= 0;
+  });
+}
+// Adds made this session, keyed by when the add was clicked. The server dates
+// the account row when the request arrives, so two adds that overlap (toolbar
+// build still running, dialog add finishing first) keep click order here too.
+var _tickerAddedAt = {};
+function noteTickerAdded(low, at) {
+  _tickerAddedAt[low] = at;
+  var rest = (_chartAccess.recent || []).filter(function (s) { return s !== low; });
+  var session = rest.filter(function (s) { return _tickerAddedAt[s] != null; }).concat(low)
+    .sort(function (a, b) { return _tickerAddedAt[b] - _tickerAddedAt[a]; });
+  _chartAccess.recent = session.concat(rest.filter(function (s) { return _tickerAddedAt[s] == null; }));
+}
+function recentTickerOrder() {
+  var recent = recentTickerSymbols();
+  if (!recent.length) return;
+  var order = recent.concat(visibleTickerSymbols().filter(function (symbol) {
+    return recent.indexOf(symbol) < 0;
+  }));
+  applyTickerOrder(order);
+  renderTickerReorderList(order[0]);
+  persistTickerOrder();
+  announceTickerOrder('Your added tickers moved to the top, newest first');
 }
 function openTickerReorder() {
   var dialog = document.getElementById('tickerReorderDialog');
@@ -5191,6 +5225,7 @@ function buildDropdown() {
   document.getElementById('tickerReorderBtn').onclick = openTickerReorder;
   document.getElementById('tickerReorderClose').onclick = closeTickerReorder;
   document.getElementById('tickerReorderAlpha').onclick = alphabetizeTickerOrder;
+  document.getElementById('tickerReorderRecent').onclick = recentTickerOrder;
   document.getElementById('tickerReorderReset').onclick = resetTickerOrder;
   document.getElementById('tickerReorderRetry').onclick = retryTickerOrderSave;
   var tickerReorderDialog = document.getElementById('tickerReorderDialog');
@@ -5419,6 +5454,7 @@ function doAddTicker(from) {
           if ((_chartAccess.curated || []).indexOf(relow) < 0 &&
               (_chartAccess.mine || []).indexOf(relow) < 0) {
             (_chartAccess.mine = _chartAccess.mine || []).push(relow);
+            if (res.dated) noteTickerAdded(relow, started);
             applyTickerAccess();
             applyTickerOrder(withTickerSlotted(e.sym));
             persistTickerOrder();
@@ -5455,6 +5491,7 @@ function doAddTicker(from) {
             if ((_chartAccess.curated || []).indexOf(low) < 0 &&
                 (_chartAccess.mine || []).indexOf(low) < 0) {
               _chartAccess.mine.push(low);
+              if (res.dated) noteTickerAdded(low, started);
             }
             applyTickerAccess();
           }
