@@ -3033,7 +3033,7 @@ function confirmTickerRemoval() {
         redraw();
       }
       if (_chartAccess) {
-        ['mine', 'curated'].forEach(function (k) {
+        ['mine', 'curated', 'recent'].forEach(function (k) {
           var list = _chartAccess[k];
           if (!list) return;
           var i = list.indexOf(state.symbol.toLowerCase());
@@ -3485,8 +3485,16 @@ function recentTickerSymbols() {
     return visible.indexOf(symbol) >= 0;
   });
 }
-function noteTickerAdded(low) {
-  _chartAccess.recent = [low].concat((_chartAccess.recent || []).filter(function (s) { return s !== low; }));
+// Adds made this session, keyed by when the add was clicked. The server dates
+// the account row when the request arrives, so two adds that overlap (toolbar
+// build still running, dialog add finishing first) keep click order here too.
+var _tickerAddedAt = {};
+function noteTickerAdded(low, at) {
+  _tickerAddedAt[low] = at;
+  var rest = (_chartAccess.recent || []).filter(function (s) { return s !== low; });
+  var session = rest.filter(function (s) { return _tickerAddedAt[s] != null; }).concat(low)
+    .sort(function (a, b) { return _tickerAddedAt[b] - _tickerAddedAt[a]; });
+  _chartAccess.recent = session.concat(rest.filter(function (s) { return _tickerAddedAt[s] == null; }));
 }
 function recentTickerOrder() {
   var recent = recentTickerSymbols();
@@ -5446,7 +5454,7 @@ function doAddTicker(from) {
           if ((_chartAccess.curated || []).indexOf(relow) < 0 &&
               (_chartAccess.mine || []).indexOf(relow) < 0) {
             (_chartAccess.mine = _chartAccess.mine || []).push(relow);
-            if (res.dated) noteTickerAdded(relow);
+            if (res.dated) noteTickerAdded(relow, started);
             applyTickerAccess();
             applyTickerOrder(withTickerSlotted(e.sym));
             persistTickerOrder();
@@ -5483,7 +5491,7 @@ function doAddTicker(from) {
             if ((_chartAccess.curated || []).indexOf(low) < 0 &&
                 (_chartAccess.mine || []).indexOf(low) < 0) {
               _chartAccess.mine.push(low);
-              if (res.dated) noteTickerAdded(low);
+              if (res.dated) noteTickerAdded(low, started);
             }
             applyTickerAccess();
           }
