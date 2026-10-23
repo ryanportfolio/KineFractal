@@ -410,7 +410,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(503).json({ error: "ticker assistant unavailable" });
     }
     const user = (req as any).kfUser as SessionUser;
-    if (!tickerAssistantQuota.tryConsume(user.id)) {
+    // The reservation refunds the New York day it was taken from, even when the
+    // question fails after midnight.
+    const reservation = tickerAssistantQuota.tryConsume(user.id);
+    if (!reservation) {
       return res.status(429).json({
         error: `Daily limit of ${TICKER_ASSISTANT_DAILY_LIMIT} questions reached. Try again tomorrow.`,
       });
@@ -433,12 +436,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (step.done) {
         // Aborted before the model call (a finished answer always ends with the
         // source line): nothing reached the model, so the question does not count.
-        tickerAssistantQuota.release(user.id);
+        tickerAssistantQuota.release(user.id, reservation);
         return;
       }
     } catch (error) {
       // Nothing reached the model's output: the question does not count.
-      tickerAssistantQuota.release(user.id);
+      tickerAssistantQuota.release(user.id, reservation);
       if (error instanceof TickerAssistantNoFactsError) {
         return res.status(404).json({ error: "no data for these tickers" });
       }

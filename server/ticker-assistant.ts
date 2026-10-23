@@ -316,22 +316,31 @@ export function newYorkDay(now: Date): string {
   return nyDate.format(now);
 }
 
+/** One reserved question: the New York day whose count it took a slot from. */
+export interface QuestionReservation {
+  readonly day: string;
+}
+
 /**
  * Per-user count of accepted questions per New York calendar day, in memory
- * (resets on deploy; one web instance). tryConsume reserves a slot; release
- * returns it when the question never reached the model.
+ * (resets on deploy; one web instance). tryConsume reserves a slot and returns
+ * the reservation, or false when the day's cap is reached; release returns that
+ * reservation's slot when the question never reached the model. A reservation
+ * refunds only its own day, so a question reserved before New York midnight that
+ * fails after it never frees a slot of the new day, and it refunds at most once.
  */
 export function createDailyQuestionCounter(
   limit = TICKER_ASSISTANT_DAILY_LIMIT,
   now: () => Date = () => new Date(),
 ) {
   const counts = new Map<string, { day: string; count: number }>();
+  const released = new WeakSet<QuestionReservation>();
   const current = (userId: string, day: string) => {
     const entry = counts.get(userId);
     return entry && entry.day === day ? entry.count : 0;
   };
   return {
-    tryConsume(userId: string): boolean {
+    tryConsume(userId: string): QuestionReservation | false {
       const day = newYorkDay(now());
       const count = current(userId, day);
       if (count >= limit) return false;
@@ -340,12 +349,13 @@ export function createDailyQuestionCounter(
       if (counts.size > 10_000) {
         for (const [id, entry] of Array.from(counts)) if (entry.day !== day) counts.delete(id);
       }
-      return true;
+      return { day };
     },
-    release(userId: string): void {
-      const day = newYorkDay(now());
-      const count = current(userId, day);
-      if (count > 0) counts.set(userId, { day, count: count - 1 });
+    release(userId: string, reservation: QuestionReservation): void {
+      if (released.has(reservation)) return;
+      released.add(reservation);
+      const count = current(userId, reservation.day);
+      if (count > 0) counts.set(userId, { day: reservation.day, count: count - 1 });
     },
     remaining(userId: string): number {
       return Math.max(0, limit - current(userId, newYorkDay(now())));

@@ -709,3 +709,97 @@ test("Download CSV follows the up-in-all-three filter and turns off when no tick
   assert.match(fnBody("applyXpFilter"), /syncExportCsvButton\(\);/);
   assert.match(fnBody("updateExportFooter"), /syncExportCsvButton\(\);/);
 });
+
+test("Limit Buy: a shown buy-price answer follows a rebuild and never keeps the old prices", () => {
+  assert.match(fnBody("scheduleExportBuild"), /_exportBuilt = false;[\s\S]*refreshXpBuyAnswer\(\);/, "stale as soon as a rebuild starts");
+  assert.match(fnBody("buildExportTable"), /_exportBuilt = true;\s*refreshXpBuyAnswer\(\);/, "answered again from the new build");
+  const buy = fnBody("xpBuyAnswer");
+  assert.equal((buy.match(/xpAnswerCard\(/g) || []).length, (buy.match(/, tag\);/g) || []).length, "every buy card is tagged");
+
+  const prelude = `
+    function node(tag, cls, text) {
+      return { attrs: {}, kids: [], text: text || '',
+        setAttribute: function (k, v) { this.attrs[k] = v; },
+        getAttribute: function (k) { return k in this.attrs ? this.attrs[k] : null; },
+        appendChild: function (c) { this.kids.push(c); },
+        get textContent() { return this.text + this.kids.map(function (c) { return c.textContent; }).join(' '); } };
+    }
+    var box = { kids: [], writes: 0,
+      get firstElementChild() { return this.kids[0] || null; },
+      replaceChildren: function () { this.kids = Array.prototype.slice.call(arguments); this.writes++; },
+      querySelector: function (sel) {
+        var kind = /data-xp-answer="([a-z]+)"/.exec(sel)[1];
+        return this.kids.filter(function (c) { return c.getAttribute('data-xp-answer') === kind; })[0] || null;
+      } };
+    var askNode = node, _exportBuilt = true, _range = { depth: 40, min: 0 }, _leads = [], _exportSecs = {};
+    function xpAnswerBox() { return box; }
+    function xpFactsOn() { return true; }
+    function checkedExportSymbols() { return ['AAA', 'BBB']; }
+    function readExportRange() { return _range; }
+    function xpLeadPrices() { return _exportBuilt ? _leads.slice() : []; }
+    function exportLimits(rows) { return rows; }
+    function xpList(s) { return s.join(', '); }
+    function px2(v) { return Number(v).toFixed(2); }
+    function pctBelowText(row) { return row.pct.toFixed(1) + '% below'; }
+    function closeLabel() { return 'Latest close'; }`;
+  const page = new Function(`${prelude}\n${["xpAnswerCard", "xpPriceProblem", "xpBuyAnswer", "refreshXpBuyAnswer"].map((n) => fnBody(n)).join("\n")}\nreturn {
+    box: box, xpBuyAnswer: xpBuyAnswer, xpAnswerCard: xpAnswerCard, refresh: refreshXpBuyAnswer,
+    set: function (o) { if ('built' in o) _exportBuilt = o.built; if ('range' in o) _range = o.range; if ('leads' in o) _leads = o.leads;
+      if ('secs' in o) _exportSecs = o.secs; } };`)();
+  const lead = (sym, limit, pct) => ({ sym, pct, sec: { close: 100 }, lim: { row: { limit, pct } } });
+  const text = () => page.box.kids[0].textContent;
+  const secs = { AAA: { rows: [1] }, BBB: { rows: [1] } };
+
+  page.set({ secs, leads: [lead("AAA", 97.25, 2.75), lead("BBB", 90.5, 9.5)] });
+  page.xpBuyAnswer(["AAA", "BBB"]);
+  assert.match(text(), /Closest to a buy price: AAA/);
+  assert.match(text(), /97\.25/);
+
+  page.set({ built: false });   // Min moved: the rebuild starts
+  page.refresh();
+  assert.match(text(), /Prices are updating/);
+  assert.doesNotMatch(text(), /\d+\.\d\d/, "no price from the old build while the new one loads");
+  const writes = page.box.writes;
+  page.refresh();
+  assert.equal(page.box.writes, writes, "a refresh that changes nothing is not announced again");
+
+  page.set({ built: true, leads: [lead("BBB", 90.5, 9.5)] });   // the new build dropped AAA's lead
+  page.refresh();
+  assert.match(text(), /Closest to a buy price: BBB/);
+  assert.doesNotMatch(text(), /97\.25/);
+
+  page.set({ range: { error: "Set min below max." } });
+  page.refresh();
+  assert.match(text(), /Fix the Min\/Max range first/);
+  page.set({ range: { depth: 40, min: 5 } });
+
+  page.xpAnswerCard("Highest yield: AAA", ["AAA yields 5.0%."], "Tiingo");   // another check's answer
+  page.set({ built: false });
+  page.refresh();
+  assert.match(text(), /Highest yield: AAA/, "other answers are left alone");
+});
+
+test("Limit Buy: a Close-section ticker heading opens the price that section shows", () => {
+  const click = html.slice(html.indexOf("var head = e.target.closest && e.target.closest('[data-first]');"));
+  assert.match(click.slice(0, 400), /if \(head\.closest\('#xpCloseSection'\)\) openCloseSectionPrice\(head\.getAttribute\('data-first'\), head\);\s*else openFirstPrice\(head\.getAttribute\('data-first'\), false\);/,
+    "main table and Cards headings keep openFirstPrice");
+  const prelude = `
+    var opened = null, wanted = [], rows = {};
+    var _exportSecs = { SPY: { rows: ['weak', 'weak', 'strong', 'strong'] }, QQQ: { rows: ['weak'] }, IWM: { rows: [] } };
+    function exportLimits(r) { return r.map(function (s) { return { members: s === 'strong' ? [1] : [], row: { s: s } }; }); }
+    function exportTier() { return 'weak'; }
+    function xpFactWant(sym) { wanted.push(sym); }
+    function openWhyPanel(sym, idx, opener) { opened = { sym: sym, idx: idx, opener: opener }; }
+    var document = { querySelector: function (sel) { return rows[sel] || null; } };`;
+  const page = new Function(`${prelude}\n${["limitStrength", "nearestStrongIndex", "openCloseSectionPrice"].map((n) => fnBody(n)).join("\n")}\nreturn {
+    open: openCloseSectionPrice, rows: rows, opened: function () { return opened; }, wanted: wanted };`)();
+  const head = { name: "SPY heading" }, shown = { name: "SPY shown row" };
+  page.rows['#xpCloseSection [data-why="SPY|2"]'] = shown;
+  page.open("SPY", head);
+  assert.deepEqual(page.opened(), { sym: "SPY", idx: 2, opener: shown }, "the nearest Strong price, with the visible row the section shows");
+  page.open("QQQ", head);
+  assert.deepEqual(page.opened(), { sym: "QQQ", idx: 0, opener: head }, "no Strong price: the nearest, falling back to the heading");
+  page.open("IWM", head);
+  assert.equal(page.opened().sym, "QQQ", "no price in range: nothing opens");
+  assert.deepEqual(page.wanted, ["SPY", "QQQ", "IWM"], "selecting a ticker still loads its facts");
+});

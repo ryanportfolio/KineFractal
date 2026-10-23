@@ -5482,6 +5482,7 @@ function scheduleExportBuild(delay) {
   _exportCsvReady = false;
   _exportBuilt = false;
   document.getElementById('exportCsv').disabled = true;
+  refreshXpBuyAnswer();   // its prices are about to go stale too
   _exportTimer = setTimeout(buildExportTable, delay == null ? 250 : delay);
 }
 // The range the inputs show, or an error to show instead. Never builds with
@@ -5552,6 +5553,7 @@ function buildExportTable() {
     renderExportTable(sections);
     updateExportFooter(rows, sections.length);
     _exportBuilt = true;
+    refreshXpBuyAnswer();   // answer again from the new prices
   }, function (i, n) {
     if (gen === _exportGen) updateExportLoading(syms[i], i + 1, n);
   }, function () { return gen !== _exportGen; });
@@ -5751,6 +5753,18 @@ function openFirstPrice(sym, scroll) {
   var head = document.querySelector('#exportResult [data-sec="' + sym + '"]');
   if (scroll && head) head.scrollIntoView({ block: 'start' });
 }
+// A ticker heading under "Close: down in one period" opens the one price that
+// section shows for it (its lead, the nearest Strong price), never the first row
+// of the hidden table above. Focus returns to that shown price row, which sits
+// right under the heading and, unlike the heading, can take focus.
+function openCloseSectionPrice(sym, head) {
+  var sec = _exportSecs[sym], limits = sec ? exportLimits(sec.rows) : [];
+  xpFactWant(sym, true);
+  if (!limits.length) return;
+  var idx = nearestStrongIndex(limits);
+  var row = document.querySelector('#xpCloseSection [data-why="' + sym + '|' + idx + '"]');
+  openWhyPanel(sym, idx, row || head);
+}
 function nearestStrongIndex(limits) {
   for (var i = 0; i < limits.length; i++) if (limitStrength(limits[i]) === 'strong') return i;
   return 0;
@@ -5948,13 +5962,21 @@ function setXpCheckActive(kind) {
   });
 }
 // one answer card, text only: a title, paragraphs (strings or nodes; null skipped)
-// and the source line last
-function xpAnswerCard(title, parts, source) {
+// and the source line last. tag, when given, is { kind, keepSame }: kind marks the
+// card (data-xp-answer) so it can be found and refreshed later; keepSame leaves an
+// existing card of that kind with the same text in place, so a refresh that changes
+// nothing is not announced again.
+function xpAnswerCard(title, parts, source, tag) {
   var card = askNode('div', 'ask-card');
   card.appendChild(askNode('h3', null, title));
   parts.forEach(function (p) { if (p) card.appendChild(typeof p === 'string' ? askNode('p', null, p) : p); });
   if (source) card.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
-  xpAnswerBox().replaceChildren(card);
+  var box = xpAnswerBox(), old = box.firstElementChild;
+  if (tag) {
+    card.setAttribute('data-xp-answer', tag.kind);
+    if (tag.keepSame && old && old.getAttribute('data-xp-answer') === tag.kind && old.textContent === card.textContent) return;
+  }
+  box.replaceChildren(card);
 }
 // Shows the column for signed-in visitors with the selection count. A changed
 // selection drops the filter, any check or question still running, and the answer.
@@ -6142,15 +6164,17 @@ function xpLeadPrices(syms) {
   });
   return out;
 }
-function xpBuyAnswer(syms) {
+// refresh: called by refreshXpBuyAnswer for a rebuild, not by a tap on the check
+function xpBuyAnswer(syms, refresh) {
+  var tag = { kind: 'buy', keepSame: !!refresh };
   var problem = xpPriceProblem();
   if (problem && problem.range) {
     return xpAnswerCard('Fix the Min/Max range first', ['The Min/Max range above is not valid. ' + problem.range,
-      'Buy prices show here again once the range is fixed.'], 'Limit Buy Levels settings');
+      'Buy prices show here again once the range is fixed.'], 'Limit Buy Levels settings', tag);
   }
   if (problem) {
-    return xpAnswerCard('Prices are updating', ['Buy prices for the current settings are still being built. Try again in a moment.'],
-      'Limit Buy Levels settings');
+    return xpAnswerCard('Prices are updating', ['Buy prices for the current settings are still being built. This answer updates when they are ready.'],
+      'Limit Buy Levels settings', tag);
   }
   var leads = xpLeadPrices(syms).sort(function (a, b) { return a.pct - b.pct; });
   var noPrice = syms.filter(function (s) { return _exportSecs[s] && !exportLimits(_exportSecs[s].rows).length; });
@@ -6160,7 +6184,7 @@ function xpBuyAnswer(syms) {
   if (!leads.length) {
     return xpAnswerCard('No buy prices', [missing, notBuilt.length === syms.length
       ? 'Prices are still loading. Try again in a moment.'
-      : 'None of the selected tickers has a buy price in this range at this strength.'], src);
+      : 'None of the selected tickers has a buy price in this range at this strength.'], src, tag);
   }
   var top = leads[0], next = leads.slice(1, 5);
   return xpAnswerCard('Closest to a buy price: ' + top.sym, [
@@ -6169,7 +6193,15 @@ function xpBuyAnswer(syms) {
       + closeLabel(top.sec).replace(/^Latest close$/, 'latest close') + ' of ' + px2(top.sec.close) + '.',
     next.length ? 'Next: ' + next.map(function (x) { return x.sym + ' ' + pctBelowText(x.lim.row); }).join(', ') + '.' : null,
     noPrice.length ? 'No buy price in this range: ' + xpList(noPrice) + '.' : null
-  ], src);
+  ], src, tag);
+}
+// A shown "Closest to a buy price" answer follows the prices: when a setting
+// change starts a rebuild it turns into "Prices are updating" (or the range
+// message), and when the build finishes it answers again from the new prices.
+// Other answers are left alone.
+function refreshXpBuyAnswer() {
+  if (!xpFactsOn() || !xpAnswerBox().querySelector('[data-xp-answer="buy"]')) return;
+  xpBuyAnswer(checkedExportSymbols(), true);
 }
 // The up-in-all-three filter on the table: matches stay, the rest hide, the chip
 // shows, and tickers down in exactly one window are listed under the table.
@@ -7053,7 +7085,9 @@ function wireExportDialog() {
       return;
     }
     var head = e.target.closest && e.target.closest('[data-first]');
-    if (head) openFirstPrice(head.getAttribute('data-first'), false);
+    if (!head) return;
+    if (head.closest('#xpCloseSection')) openCloseSectionPrice(head.getAttribute('data-first'), head);
+    else openFirstPrice(head.getAttribute('data-first'), false);
   });
   document.getElementById('exportPicks').addEventListener('click', function (e) {
     var go = e.target.closest && e.target.closest('[data-go]');

@@ -298,27 +298,47 @@ test("daily cap allows 30 questions per user per New York day and resets at New 
   // 2026-10-23 03:59Z is 23:59 on 2026-10-22 in New York (EDT, UTC-4).
   let now = new Date("2026-10-22T14:00:00Z");
   const counter = createDailyQuestionCounter(30, () => now);
-  for (let i = 0; i < 30; i++) assert.equal(counter.tryConsume("u1"), true, `question ${i + 1}`);
+  for (let i = 0; i < 30; i++) assert.ok(counter.tryConsume("u1"), `question ${i + 1}`);
   assert.equal(counter.tryConsume("u1"), false);
   assert.equal(counter.remaining("u1"), 0);
-  assert.equal(counter.tryConsume("u2"), true, "other users have their own count");
+  assert.ok(counter.tryConsume("u2"), "other users have their own count");
 
   now = new Date("2026-10-23T03:59:00Z");
   assert.equal(counter.tryConsume("u1"), false, "still the same New York day after UTC midnight");
 
   now = new Date("2026-10-23T04:00:00Z");
   assert.equal(counter.remaining("u1"), 30);
-  assert.equal(counter.tryConsume("u1"), true, "new New York day");
+  assert.ok(counter.tryConsume("u1"), "new New York day");
 });
 
 test("daily cap release returns a slot for a question that never reached the model", () => {
   const now = new Date("2026-10-22T14:00:00Z");
   const counter = createDailyQuestionCounter(2, () => now);
-  assert.equal(counter.tryConsume("u1"), true);
-  assert.equal(counter.tryConsume("u1"), true);
+  assert.ok(counter.tryConsume("u1"));
+  const second = counter.tryConsume("u1");
+  assert.ok(second);
   assert.equal(counter.tryConsume("u1"), false);
-  counter.release("u1");
-  assert.equal(counter.tryConsume("u1"), true);
+  counter.release("u1", second);
+  assert.equal(counter.remaining("u1"), 1);
+  counter.release("u1", second);
+  assert.equal(counter.remaining("u1"), 1, "a reservation refunds at most once");
+  assert.ok(counter.tryConsume("u1"));
+  assert.equal(counter.tryConsume("u1"), false);
+});
+
+test("daily cap release refunds the reservation's own New York day, never a later one", () => {
+  // 03:59Z is 23:59 on 2026-10-22 in New York; 04:01Z is 00:01 on 2026-10-23.
+  let now = new Date("2026-10-23T03:59:00Z");
+  const counter = createDailyQuestionCounter(2, () => now);
+  const late = counter.tryConsume("u1");
+  assert.ok(late);
+  now = new Date("2026-10-23T04:01:00Z");
+  assert.ok(counter.tryConsume("u1"));
+  assert.ok(counter.tryConsume("u1"));
+  assert.equal(counter.tryConsume("u1"), false, "the new day's cap is reached");
+  counter.release("u1", late);
+  assert.equal(counter.remaining("u1"), 0, "yesterday's failed question frees nothing today");
+  assert.equal(counter.tryConsume("u1"), false);
 });
 
 test("body validation upper-cases and de-duplicates symbols and trims the question", () => {
