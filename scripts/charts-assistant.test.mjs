@@ -428,25 +428,38 @@ test("the Limit Buy table keeps its column headings visible while it scrolls", (
   assert.match(html, /@media \(max-width:900px\) \{[^}]*\.xp-table thead \{ top:0; \}/);
 });
 
-test("phones: a failed facts load offers Try again on the collapsed summary line", () => {
+test("a failed facts load offers Try again on the collapsed summary line", () => {
   assert.match(html, /<div class="fb-summary">[\s\S]*?<button type="button" class="fb-sumretry" hidden>Try again<\/button>/);
   assert.match(fnBody("setFactMsg"), /\.fb-sumretry'\)\.hidden = !retry;/);
   assert.match(html, /#factBand \.fb-sumretry'\)\.addEventListener\('click', renderFactBand\);/);
   assert.match(html, /#factBand \.fb-sumretry\[hidden\], #factBand\.is-expanded \.fb-sumretry \{ display:none; \}/);
 });
 
-test("phones: the fact band starts collapsed to one line with a toggle", () => {
-  assert.match(html, /<div class="fb-summary">[\s\S]*?<button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">All facts<\/button>/);
+test("the fact band starts collapsed to one clickable line of numbers at every width", () => {
+  // the whole line is the toggle; its numbers sit inside the button
+  assert.match(html, /<div class="fb-summary">\s*<button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">[\s\S]*?data-sum="yield"[\s\S]*?data-sum="d21"[\s\S]*?data-sum="m3"[\s\S]*?data-sum="m6"[\s\S]*?class="fb-sumtrend[\s\S]*?data-sum="high"[\s\S]*?data-sum="buy"[\s\S]*?<span class="fb-more"><span class="fb-morewords">All facts<\/span><\/span>\s*<\/button>/);
   assert.match(html, /#factBand:not\(\.is-expanded\) > \.fb-tile, #factBand:not\(\.is-expanded\) > \.fb-msg \{ display:none; \}/);
-  assert.match(html, /@media \(min-width:601px\) \{ #factBand \.fb-summary \{ display:none; \} \}/);
-  assert.match(html, /#factBand \.fb-toggle \{[^}]*min-height:44px/);
-  assert.match(html, /\[data-action="fact-band-toggle"\]'\)\.addEventListener\('click', function \(\) \{[\s\S]*?band\.classList\.toggle\('is-expanded', open\);\s*this\.setAttribute\('aria-expanded', open \? 'true' : 'false'\);/);
+  assert.doesNotMatch(html, /@media \(min-width:601px\) \{ #factBand \.fb-summary \{ display:none; \} \}/,
+    "the summary line shows on desktop too");
+  assert.match(html, /@media \(max-width:600px\) \{[^}]*#factBand \.fb-toggle \{[^}]*min-height:44px/);
+  assert.match(html, /#factBand\.is-expanded \.fb-toggle > :not\(\.fb-sumsym\):not\(\.fb-more\) \{ display:none; \}/);
+  const open = fnBody("setFactBandOpen");
+  assert.match(open, /band\.classList\.toggle\('is-expanded', open\);\s*btn\.setAttribute\('aria-expanded', open \? 'true' : 'false'\);/);
+  assert.match(open, /btn\.querySelector\('\.fb-morewords'\)\.textContent = open \? 'Fewer facts' : 'All facts';/,
+    "the label changes without wiping the numbers in the button");
+  assert.match(open, /if \(!open && _trendHl\) clearTrendHighlight\(\);/, "closing drops a shaded window whose Clear button is hidden");
+  assert.match(open, /localStorage\.setItem\(FACT_BAND_OPEN_KEY, open \? '1' : '0'\)/);
+  assert.match(html, /var FACT_BAND_OPEN_KEY = 'kf-fact-band-open-v1';/);
+  assert.match(html, /if \(saved === '1'\) setFactBandOpen\(true, false\);/);
   assert.match(fnBody("initAskDock"), /if \(mode === 'open' && window\.matchMedia && window\.matchMedia\('\(max-width:700px\)'\)\.matches\) mode = 'rail';/,
     "a saved open dock does not open as a full-screen sheet over the band on phones");
   const fill = fnBody("fillFactBand");
   assert.match(fill, /\.fb-sumsym'\)\.textContent = sym;/);
   assert.match(fill, /st\.textContent = overall \|\| '—';/);
-  assert.match(fill, /'% yield' : 'no yield'/);
+  assert.match(fill, /setFactSum\('yield', !f \? '—' : fbNum\(f\.yield\) \? f\.yield\.toFixed\(2\) \+ '%' : 'none'/);
+  assert.match(fill, /setFactSum\(w, win \? fbSigned\(win\.change\) : '—'/);
+  assert.match(fnBody("setNearestBuyTile"), /setFactSum\('buy', lim \? px2\(lim\.row\.limit\) : '—'/,
+    "a Limit Buy change updates the line's buy price too");
 });
 
 // Runs page functions out of charts.html in a bare scope, with the helpers they need.

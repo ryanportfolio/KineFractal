@@ -836,21 +836,42 @@
     #factBand .fb-retry { min-height:44px; }
     #factBand button.fb-cell, #factBand .fb-hlclear { min-height:44px; }
     #trendHighlight { font-size:13px; }
-    /* collapsed (the default on phones): one line with the ticker, overall trend and
-       yield, so the chart keeps the height; the toggle opens all five tiles */
-    #factBand .fb-summary { display:flex; flex:1 1 100%; align-items:center; gap:10px; min-width:0;
-                            padding-left:10px; }
-    #factBand.is-expanded .fb-summary { border-bottom:1px solid var(--grid); }
-    #factBand:not(.is-expanded) > .fb-tile, #factBand:not(.is-expanded) > .fb-msg { display:none; }
   }
-  @media (min-width:601px) { #factBand .fb-summary { display:none; } }
-  #factBand .fb-sumsym { font:bold 14px Verdana,Geneva,sans-serif; }
-  #factBand .fb-sumtrend { font-weight:bold; font-size:16px; letter-spacing:.04em; }
-  #factBand .fb-sumyield { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--fg); }
-  #factBand .fb-toggle { flex:0 0 auto; min-height:44px; padding:0 12px; border:0; border-left:1px solid var(--grid);
-                         border-radius:0; background:transparent; font:inherit; color:var(--sup); cursor:pointer; }
+  /* collapsed (the default): one clickable line with the numbers only, so the chart
+     keeps its height; clicking it opens all five tiles. This browser remembers the choice. */
+  #factBand .fb-summary { display:flex; flex:1 1 100%; align-items:stretch; min-width:0; }
+  #factBand.is-expanded .fb-summary { border-bottom:1px solid var(--grid); }
+  #factBand:not(.is-expanded) > .fb-tile, #factBand:not(.is-expanded) > .fb-msg { display:none; }
+  #factBand .fb-toggle { flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 20px;
+                         min-height:32px; padding:3px 14px; border:0; border-radius:0; background:transparent;
+                         font:inherit; color:var(--fg); text-align:left; cursor:pointer; }
   #factBand .fb-toggle:hover { background:rgba(38,198,218,.08); }
   #factBand .fb-toggle:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand .fb-sumsym { font:bold 14px Verdana,Geneva,sans-serif; }
+  #factBand .fb-sumnote { color:var(--mut); }
+  #factBand .fb-sumnote:empty { display:none; }
+  #factBand .fb-c { white-space:nowrap; }
+  #factBand .fb-c[hidden] { display:none; }
+  #factBand .fb-cl { color:var(--mut); font-size:11px; letter-spacing:.08em; }
+  #factBand .fb-c b { font-size:15px; }
+  #factBand .fb-c b + .fb-cl { margin-left:6px; }
+  #factBand .fb-sumtrend { font-size:15px; letter-spacing:.04em; }
+  #factBand .fb-more { margin-left:auto; color:var(--sup); white-space:nowrap; }
+  #factBand .fb-more::after { content:" \25BE"; }
+  #factBand.is-expanded .fb-more::after { content:" \25B4"; }
+  #factBand.is-expanded .fb-toggle > :not(.fb-sumsym):not(.fb-more) { display:none; }
+  #factBand[data-state="loading"] .fb-c b { opacity:.45; }
+  @media (max-width:600px) {
+    /* phones keep yield and trend on the line; cadence, 6M high and buy wait in the tiles */
+    #factBand .fb-toggle { min-height:44px; padding:4px 10px; gap:2px 10px; }
+    #factBand .fb-c b, #factBand .fb-sumtrend { font-size:14px; }
+    #factBand .fb-cl { letter-spacing:0; }
+    /* only the arrow shows; the words stay in the button's accessible name */
+    #factBand:not(.is-expanded) .fb-morewords { position:absolute; width:1px; height:1px; overflow:hidden;
+                                                clip:rect(0 0 0 0); white-space:nowrap; }
+    #factBand .fb-more::after { font-size:16px; }
+    #factBand .fb-ccad, #factBand .fb-chigh, #factBand .fb-cbuy { display:none; }
+  }
   /* a failed load puts Try again on the collapsed summary line too, so the band
      need not open to retry; expanded, the message row below has its own */
   #factBand .fb-sumretry { flex:0 0 auto; min-height:44px; padding:0 12px; border:0; border-left:1px solid var(--grid);
@@ -1055,11 +1076,18 @@
 </div>
 <section id="factBand" aria-label="Ticker facts" data-state="loading" hidden>
   <div class="fb-summary">
-    <span class="fb-sumsym"></span>
-    <span class="fb-sumtrend is-none">—</span>
-    <span class="fb-sumyield">loading…</span>
+    <button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">
+      <span class="fb-sumsym"></span>
+      <span class="fb-sumnote">loading…</span>
+      <span class="fb-c"><span class="fb-cl">YIELD</span> <b class="is-none" data-sum="yield">—</b></span>
+      <span class="fb-c fb-ccad"><b class="is-none" data-sum="cad">—</b></span>
+      <span class="fb-c"><span class="fb-cl">21D</span> <b class="is-none" data-sum="d21">—</b> <span class="fb-cl">3M</span> <b class="is-none" data-sum="m3">—</b> <span class="fb-cl">6M</span> <b class="is-none" data-sum="m6">—</b></span>
+      <b class="fb-sumtrend is-none">—</b>
+      <span class="fb-c fb-chigh"><span class="fb-cl">VS 6M HIGH</span> <b class="is-none" data-sum="high">—</b></span>
+      <span class="fb-c fb-cbuy"><span class="fb-cl">BUY</span> <b class="is-none" data-sum="buy">—</b></span>
+      <span class="fb-more"><span class="fb-morewords">All facts</span></span>
+    </button>
     <button type="button" class="fb-sumretry" hidden>Try again</button>
-    <button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">All facts</button>
   </div>
   <div class="fb-tile" data-fact="yield">
     <span class="fb-label">YIELD</span>
@@ -2901,17 +2929,35 @@ function fillFactBand(sym, state, facts, buy) {
   } else {
     setFactTile('vs6mHigh', '—', 'is-none', '', why);
   }
-  // the one-line summary phones show while the band is collapsed
+  // the collapsed band's one line: the same numbers without the notes
   var sum = document.querySelector('#factBand .fb-summary');
   sum.querySelector('.fb-sumsym').textContent = sym;
+  sum.querySelector('.fb-sumnote').textContent = f ? '' : why;
   var st = sum.querySelector('.fb-sumtrend');
   st.textContent = overall || '—';
   st.className = 'fb-sumtrend ' + (overall === 'UP' ? 'is-up' : overall === 'DOWN' ? 'is-down' : overall === 'MIXED' ? 'is-mixed' : 'is-none');
-  sum.querySelector('.fb-sumyield').textContent = !f ? why : fbNum(f.yield) ? f.yield.toFixed(2) + '% yield' : 'no yield';
+  setFactSum('yield', !f ? '—' : fbNum(f.yield) ? f.yield.toFixed(2) + '%' : 'none', f && fbNum(f.yield) ? 'is-up' : 'is-none');
+  var cadence = f && f.cadence && f.cadence !== 'none' ? f.cadence : '';
+  setFactSum('cad', cadence, 'is-up');
+  sum.querySelector('.fb-ccad').hidden = !cadence;
+  ['d21', 'm3', 'm6'].forEach(function (w) {
+    var win = wins[w];
+    setFactSum(w, win ? fbSigned(win.change) : '—',
+      !win ? 'is-none' : win.verdict === 'BULLISH' ? 'is-up' : win.verdict === 'BEARISH' ? 'is-down' : 'is-flat');
+  });
+  setFactSum('high', f && fbNum(f.vs6mHigh) ? fbSigned(f.vs6mHigh) : '—',
+    !(f && fbNum(f.vs6mHigh)) ? 'is-none' : f.vs6mHigh < 0 ? 'is-down' : 'is-flat');
   setNearestBuyTile(buy);
+}
+function setFactSum(name, text, cls) {
+  var el = document.querySelector('#factBand .fb-summary [data-sum="' + name + '"]');
+  el.textContent = text;
+  el.className = cls;
 }
 // NEAREST BUY: the Limit Buy dialog's lead price (exportLeadPrice); null while it loads
 function setNearestBuyTile(buy) {
+  var lim = buy && buy.lim, tier = lim ? limitStrength(lim) : '';
+  setFactSum('buy', lim ? px2(lim.row.limit) : '—', tier === 'strong' ? 'is-up' : tier && tier !== 'light' ? 'is-flat' : 'is-none');
   if (!buy) {
     setFactTile('nearestBuy', '—', 'is-none', '', 'loading…');
   } else if (buy.lim) {
@@ -3021,14 +3067,27 @@ function refreshStaleFactBand() {
   if (_factReady === r && factBandStale()) renderFactBand();
 }
 document.addEventListener('visibilitychange', armFactBandExpiry);
-// Phones show the band collapsed to its summary line; this opens and closes the tiles.
-// Wider screens never show the summary, so the class has no effect there.
-document.querySelector('#factBand [data-action="fact-band-toggle"]').addEventListener('click', function () {
-  var band = document.getElementById('factBand'), open = !band.classList.contains('is-expanded');
+// The band starts collapsed to its one line of numbers; clicking the line opens and
+// closes the tiles, and this browser keeps the choice. Closing clears a shaded trend
+// window, whose Clear button lives in the tiles.
+var FACT_BAND_OPEN_KEY = 'kf-fact-band-open-v1';
+function setFactBandOpen(open, save) {
+  var band = document.getElementById('factBand');
+  var btn = band.querySelector('[data-action="fact-band-toggle"]');
   band.classList.toggle('is-expanded', open);
-  this.setAttribute('aria-expanded', open ? 'true' : 'false');
-  this.textContent = open ? 'Fewer facts' : 'All facts';
+  btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  btn.querySelector('.fb-morewords').textContent = open ? 'Fewer facts' : 'All facts';
+  if (!open && _trendHl) clearTrendHighlight();
+  if (save) { try { localStorage.setItem(FACT_BAND_OPEN_KEY, open ? '1' : '0'); } catch (e) {} }
+}
+document.querySelector('#factBand [data-action="fact-band-toggle"]').addEventListener('click', function () {
+  setFactBandOpen(!document.getElementById('factBand').classList.contains('is-expanded'), true);
 });
+(function () {
+  var saved = null;
+  try { saved = localStorage.getItem(FACT_BAND_OPEN_KEY); } catch (e) {}
+  if (saved === '1') setFactBandOpen(true, false);
+})();
 // Recomputes only NEAREST BUY, after a Limit Buy setting changed (the dialog closed, or
 // the account's gap placement arrived). The facts and an active trend highlight stay.
 // A band still loading is rendered again instead: its lead price may predate the change.
