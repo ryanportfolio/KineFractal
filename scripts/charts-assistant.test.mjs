@@ -13,14 +13,14 @@ function fnBody(name) {
 
 test("fact band sits between the toolbar and the chart, hidden until signed in", () => {
   assert.match(html, /<\/div>\s*<section id="factBand"[^>]*data-state="loading"[^>]*hidden>/);
-  assert.match(html, /<\/section>\s*<div id="chart">/);
+  assert.match(html, /<\/section>\s*<div id="factTip" role="tooltip" hidden><\/div>\s*<div id="chart">/);
   assert.match(html, /#factBand\[hidden\] \{ display:none; \}/);
   assert.match(html, /#factBand \{[^}]*flex:0 0 auto;[^}]*flex-wrap:wrap/s);
 });
 
 test("fact band exposes the stable hooks the checks read", () => {
   for (const fact of ["yield", "cadence", "trend", "vs6mHigh", "nearestBuy"]) {
-    const tile = html.match(new RegExp(`data-fact="${fact}">([\\s\\S]*?)\\n  </div>`));
+    const tile = html.match(new RegExp(`<div class="fb-tile[^"]*" data-fact="${fact}"[^>]*>([\\s\\S]*?)\\n  </div>`));
     assert.ok(tile, `tile ${fact}`);
     assert.match(tile[1], /class="fact-value"/, `${fact} has a .fact-value`);
     assert.match(tile[1], /class="fact-source">[^<]+</, `${fact} has a non-empty .fact-source`);
@@ -70,7 +70,8 @@ test("nearest buy reuses the Limit Buy dialog's lead-price code", () => {
   const lead = fnBody("exportLeadPrice");
   assert.match(lead, /exportSectionFor\(item, range, strength\)/);
   assert.match(lead, /markExportClusters\(sec\.rows\)/);
-  assert.match(lead, /limits\[nearestStrongIndex\(limits\)\]/);
+  assert.match(lead, /idx = limits\.length \? nearestStrongIndex\(limits\) : 0;/);
+  assert.match(lead, /lim: limits\.length \? limits\[idx\] : null, skipped: idx/);
   assert.match(fnBody("buildExportTable"), /exportSectionFor\(item, range, _exportStrength\)/);
   assert.match(fnBody("exportCardsHtml"), /var lead = nearestStrongIndex\(limits\);/);
   assert.match(fnBody("renderFactBand"), /exportLeadPrice\(sym, resolve\)/);
@@ -176,8 +177,7 @@ test("ASK AI: chips answer from facts with a source line, never a model call or 
   assert.match(fnBody("initAskDock"), /addEventListener\('submit', function \(e\) \{\s*e\.preventDefault\(\);/);
   assert.match(html, /<div id="askAnswer" aria-live="polite"><\/div>/);
   assert.match(html, /<input id="askInput"[^>]*aria-label="[^"]+"/);
-  assert.doesNotMatch(html.slice(html.indexOf('<aside id="askDock"'), html.indexOf('</aside>', html.indexOf('<aside id="askDock"'))), /class="ask-note"/,
-    "the dock has no note line above the chips");
+  assert.doesNotMatch(html, /class="ask-note"|\.ask-note/, "neither the dock nor the Limit Buy column has a note paragraph");
 });
 
 test("ASK AI: a chip answer shown before the facts arrive is answered again when they do", () => {
@@ -1181,4 +1181,46 @@ test("typed answers render as a bold lead, bullet lists and web section headings
   askRenderAnswer(box, "Short answer.");
   assert.equal(box.childNodes.length, 1);
   assert.equal(flat(box.childNodes[0]), "Short answer.");
+});
+
+test("the dock opens with an empty answer area once a ticker is on screen", () => {
+  const hint = fnBody("askHint");
+  assert.match(hint, /if \(_askSym\) box\.replaceChildren\(\);/);
+  assert.doesNotMatch(html, /Pick a quick question about/);
+  assert.doesNotMatch(html, /Quick checks use the facts and buy prices shown here/);
+});
+
+test("NEAREST BUY explains its price on hover and keyboard focus", () => {
+  assert.match(html, /<div class="fb-tile" data-fact="nearestBuy" aria-describedby="factBuyWhy">/);
+  assert.match(html, /<span id="factBuyWhy" hidden><\/span>\s*<\/section>/);
+  const set = fnBody("setNearestBuyTile");
+  assert.match(set, /var tip = nearestBuyTip\(buy\);/);
+  assert.match(set, /\[tile, lineBuy\]\.forEach/, "the tile and the collapsed line's BUY both carry it");
+  assert.match(set, /if \(tip\) tile\.setAttribute\('tabindex', '0'\); else tile\.removeAttribute\('tabindex'\);/);
+  assert.match(fnBody("showExportTip"), /document\.getElementById\(tipId \|\| 'exportTip'\)/);
+  const { nearestBuyTip } = pageFns(["nearestBuyTip"], `
+    var NEAREST_BUY_KIND = { gap: 'Unfilled price gap', ob: 'Buyer zone', pd: 'Bottom of the recent range' };
+    var GAP_PLACEMENT_HINTS = { top: 'Top of the gap: the first price a drop reaches' }, _gapPlacement = 'top';
+    var STRENGTH_WORD = { strong: 'Strong', mid: 'Medium', light: 'Weaker' };
+    function px2(v) { return Number(v).toFixed(2); }
+    function fmtPct(v) { return String(v); }
+    function reasonText(r) { return r.type === 'gap' ? 'A price gap from earlier has not been filled yet' : 'Held as a floor ' + r.touches + ' times'; }
+    function limitStrength(l) { return l.members.length ? 'strong' : 'mid'; }
+    function strengthReason(l) { return l.members.length ? (l.members.length + 1) + ' signals sit within 2% of each other' : 'zones like this are often revisited, but not always'; }
+    function pctBelowText(r) { return ((r.close - r.limit) / r.close * 100).toFixed(1) + '% below'; }
+    function closeLabel() { return 'Oct 22 close'; }`);
+  assert.equal(nearestBuyTip(null), "");
+  assert.equal(nearestBuyTip({ sec: {}, range: { min: 2, depth: 25 }, lim: null }), "");
+  const gap = { type: "gap", limit: 74, zone: "73.33-74", close: 75.66, touches: 0 };
+  assert.equal(nearestBuyTip({ sec: {}, range: { min: 2, depth: 25 }, skipped: 0, lim: { row: gap, members: [{ type: "level", limit: 72.1, touches: 10 }] } }), [
+    "Unfilled price gap · 73.33–74.00",
+    "A price gap from earlier has not been filled yet",
+    "Top of the gap: the first price a drop reaches",
+    "Combined with 72.10: Held as a floor 10 times",
+    "Strong: 2 signals sit within 2% of each other",
+    "2.2% below the Oct 22 close",
+    "Range 2–25% below, set in Limit Buy Levels",
+  ].join("\n"));
+  assert.match(nearestBuyTip({ sec: {}, range: { min: 2, depth: 25 }, skipped: 2, lim: { row: gap, members: [] } }),
+    /Nearest Strong price; 2 closer prices are weaker/);
 });

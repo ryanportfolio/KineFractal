@@ -700,11 +700,15 @@
   #exportDialog #exportGroupSave { padding:18px 44px; font-size:28px; }
   #exportEditor .xp-actions .spacer { flex:1 1 auto; }
   /* instant tooltip: one fixed element, so list scrolling never clips it */
-  #exportTip { position:fixed; z-index:80; max-width:340px; padding:6px 9px; border:1px solid var(--sup);
+  #exportTip, #factTip { position:fixed; z-index:80; max-width:340px; padding:6px 9px; border:1px solid var(--sup);
                background:var(--bg); color:var(--fg); font:14px monospace; line-height:1.45; pointer-events:none; }
-  #exportTip[hidden] { display:none; }
-  #exportTip b { font-family:Verdana,Geneva,sans-serif; }
-  #exportTip .ln { display:block; white-space:nowrap; }
+  #exportTip[hidden], #factTip[hidden] { display:none; }
+  #exportTip b, #factTip b { font-family:Verdana,Geneva,sans-serif; }
+  #exportTip .ln, #factTip .ln { display:block; white-space:nowrap; }
+  #factTip { max-width:380px; }
+  #factTip .ln { white-space:normal; }
+  #factBand [data-fact="nearestBuy"][data-tip] { cursor:help; }
+  #factBand [data-fact="nearestBuy"]:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
   #exportDialog button:focus-visible, #exportDialog .xp-pick:focus-within, #exportDialog input:focus-visible {
     outline:2px solid var(--sup); outline-offset:-2px; }
   #exportDialog #exportPicks .xp-go:focus-visible, #exportDialog #exportPicks input:focus-visible { outline:none; }   /* the row's outline shows */
@@ -991,7 +995,6 @@
               font:13px "JetBrains Mono","IBM Plex Mono",monospace; color:var(--fg); }
   #exportDialog #xpAssist h3 { color:var(--sup); font-size:19px; font-weight:bold; letter-spacing:.08em; }
   #xpAssistCount { margin:-6px 0 0; color:var(--fg); font-size:14px; }
-  #xpAssist .ask-note { margin:0; color:var(--mut); font-size:12px; line-height:1.45; }
   #exportDialog #xpAssist h4 { margin:4px 0 0; font-size:15px; letter-spacing:.03em; }
   #xpAssist .xp-checks { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
   #exportDialog #xpAssist .xp-check { min-height:44px; padding:8px 10px; text-align:left; border-color:var(--grid); background:var(--bg);
@@ -1133,14 +1136,16 @@
     <span class="fact-note"></span>
     <span class="fact-source">loading…</span>
   </div>
-  <div class="fb-tile" data-fact="nearestBuy">
+  <div class="fb-tile" data-fact="nearestBuy" aria-describedby="factBuyWhy">
     <span class="fb-label">NEAREST BUY</span>
     <span class="fact-value">—</span>
     <span class="fact-note"></span>
     <span class="fact-source">loading…</span>
   </div>
   <p class="fb-msg" role="status" aria-live="polite"><span class="fb-msgtext"></span><button type="button" class="fb-retry" hidden>Try again</button></p>
+  <span id="factBuyWhy" hidden></span>
 </section>
+<div id="factTip" role="tooltip" hidden></div>
 <div id="chart"><div id="handles"></div><div id="measureBox"></div><div id="tipBox"></div><div id="cmpLegend"></div></div>
 <aside id="askDock" aria-label="Ask about this ticker" data-mode="rail" hidden>
   <div class="ask-rail">
@@ -1327,7 +1332,6 @@
       <aside id="xpAssist" aria-labelledby="xpAssistTitle" hidden>
         <h3 id="xpAssistTitle">ASK ABOUT YOUR SELECTION</h3>
         <p id="xpAssistCount"></p>
-        <p class="ask-note">Quick checks use the facts and buy prices shown here, with no AI. A typed question goes to an AI model with the facts for every selected ticker. Not investment advice, and the site never places orders.</p>
         <h4 id="xpChecksTitle">Quick checks</h4>
         <div class="xp-checks" role="group" aria-labelledby="xpChecksTitle">
           <button type="button" class="xp-check" data-xp-check="monthly">Which pay monthly?</button>
@@ -2977,6 +2981,38 @@ function setNearestBuyTile(buy) {
     setFactTile('nearestBuy', '—', 'is-none', '',
       buy.reason === 'range' ? 'Limit Buy range is not valid' : buy.reason === 'failed' ? 'chart data did not load' : 'no Limit Buy levels for this chart');
   }
+  // why this price: the tile and the line's BUY show it on hover (the tile on keyboard
+  // focus too); screen readers get the same text as the tile's description
+  var tip = nearestBuyTip(buy);
+  var tile = document.querySelector('#factBand [data-fact="nearestBuy"]');
+  var lineBuy = document.querySelector('#factBand .fb-cbuy');
+  document.getElementById('factBuyWhy').textContent = tip.replace(/\n/g, '. ').replace(/ · /g, ', ');
+  [tile, lineBuy].forEach(function (el) {
+    if (tip) el.setAttribute('data-tip', tip); else el.removeAttribute('data-tip');
+  });
+  if (tip) tile.setAttribute('tabindex', '0'); else tile.removeAttribute('tabindex');
+}
+// The hover text for NEAREST BUY: what the level is, where in a gap the price sits,
+// any nearby prices it combines, why it earns its strength, how far below the close,
+// and when closer prices were passed over for being weaker. '' while loading or
+// when no price qualifies (the tile says why).
+var NEAREST_BUY_KIND = { gap: 'Unfilled price gap', ob: 'Buyer zone', pd: 'Bottom of the recent range' };
+function nearestBuyTip(buy) {
+  var lim = buy && buy.lim;
+  if (!lim) return '';
+  var r = lim.row;
+  var kind = NEAREST_BUY_KIND[r.type] || (r.type === 'confl' ? r.n + ' trendlines meet' : 'Support, held ' + r.touches + ' times');
+  var lines = [kind + (r.zone ? ' · ' + r.zone.split('-').map(px2).join('–') : '')];
+  if (r.type === 'gap' || r.type === 'ob') lines.push(reasonText(r));
+  if (r.type === 'gap' && GAP_PLACEMENT_HINTS[_gapPlacement]) lines.push(GAP_PLACEMENT_HINTS[_gapPlacement]);
+  lim.members.forEach(function (m) { lines.push('Combined with ' + px2(m.limit) + ': ' + reasonText(m)); });
+  lines.push(STRENGTH_WORD[limitStrength(lim)] + ': ' + strengthReason(lim));
+  lines.push(pctBelowText(r) + ' the ' + closeLabel(buy.sec).replace(/^Latest close$/, 'latest close'));
+  if (buy.skipped) {
+    lines.push('Nearest Strong price; ' + buy.skipped + ' closer price' + (buy.skipped === 1 ? ' is' : 's are') + ' weaker');
+  }
+  lines.push('Range ' + fmtPct(buy.range.min) + '–' + fmtPct(buy.range.depth) + '% below, set in Limit Buy Levels');
+  return lines.join('\n');
 }
 // Shows the band for the ticker on screen, or hides it when the visitor is not
 // known to be signed in (signed out or account probe pending: no band, no request).
@@ -3017,6 +3053,23 @@ function renderFactBand() {
   });
 }
 document.querySelector('#factBand .fb-retry').addEventListener('click', renderFactBand);
+// NEAREST BUY's why: shown at once on hover, or on keyboard focus of the tile
+(function () {
+  var band = document.getElementById('factBand');
+  var hide = function () { document.getElementById('factTip').hidden = true; };
+  band.addEventListener('mouseover', function (e) {
+    var el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && band.contains(el)) showExportTip(el, 'factTip'); else hide();
+  });
+  band.addEventListener('mouseleave', hide);
+  band.addEventListener('focusin', function (e) {
+    var el = e.target.closest && e.target.closest('[data-tip]');
+    if (el && e.target === el && e.target.matches(':focus-visible')) showExportTip(el, 'factTip'); else hide();
+  });
+  band.addEventListener('focusout', hide);
+  band.addEventListener('scroll', hide, true);
+  window.addEventListener('scroll', hide, true);
+})();
 document.querySelector('#factBand .fb-sumretry').addEventListener('click', renderFactBand);
 // A tab left open past 18:30 New York holds facts the server has since replaced.
 // Coming back to it drops the expired entries and fetches again what is on screen:
@@ -3250,11 +3303,10 @@ function askNode(tag, cls, text) {
   return el;
 }
 function askHint() {
+  // with a ticker on screen the chips and the question box speak for themselves
   var box = document.getElementById('askAnswer');
-  box.replaceChildren(askNode('p', 'ask-hint', _askSym
-    ? 'Pick a quick question about ' + _askSym + ': those answers come straight from the facts above, with no AI. '
-      + 'Or type your own question below: an AI model answers it from the same facts.'
-    : 'Pick a ticker to ask about it.'));
+  if (_askSym) box.replaceChildren();
+  else box.replaceChildren(askNode('p', 'ask-hint', 'Pick a ticker to ask about it.'));
   setAskPressed(null);
 }
 function setAskPressed(chip) {
@@ -5344,10 +5396,10 @@ function tickerTip(sym) {
 // One fixed-position element shared by every [data-tip] in the dialog, shown at
 // once on hover or keyboard focus (native titles wait ~1s and scroll lists
 // would clip a CSS ::after).
-function showExportTip(el) {
-  var tip = document.getElementById('exportTip');
+function showExportTip(el, tipId) {
+  var tip = document.getElementById(tipId || 'exportTip');
   var text = el.getAttribute('data-tip');
-  if (!text) return hideExportTip();
+  if (!text) { tip.hidden = true; return; }
   var lines = text.split('\n');
   var parts = lines[0].split(' · ');
   tip.innerHTML = '<b>' + escHtml(parts[0]) + '</b>' + (parts.length > 1 ? ' ' + escHtml(parts.slice(1).join(' · ')) : '')
@@ -5789,7 +5841,8 @@ function exportSectionFor(item, range, strength) {
 // the settings the dialog opens with: range inputs, saved strength, saved
 // combine setting and saved gap placement. The /charts fact band shows it as
 // NEAREST BUY, so the band and the dialog give the same price.
-// done({ lim, sec, range }) with lim null when no price qualifies, or
+// done({ lim, sec, range, skipped }) with lim null when no price qualifies (skipped:
+// how many closer prices it passed over for a Strong one), or
 // done({ reason: 'none' | 'range' | 'failed' }).
 function exportLeadPrice(sym, done) {
   if (!superMap[sym]) return done({ reason: 'none' });
@@ -5810,8 +5863,8 @@ function exportLeadPrice(sym, done) {
     if (!item || item.failed) return done({ reason: 'failed' });
     var sec = exportSectionFor(item, range, strength);
     markExportClusters(sec.rows);
-    var limits = exportLimits(sec.rows);
-    done({ sec: sec, range: range, lim: limits.length ? limits[nearestStrongIndex(limits)] : null });
+    var limits = exportLimits(sec.rows), idx = limits.length ? nearestStrongIndex(limits) : 0;
+    done({ sec: sec, range: range, lim: limits.length ? limits[idx] : null, skipped: idx });
   });
 }
 var _exportBeam = null;
