@@ -162,6 +162,8 @@ export function tickerSourceLine(facts: TickerFacts[]): string {
 
 // --- Answer -------------------------------------------------------------------
 
+const TICKER_ASSISTANT_EMPTY_ANSWER = "empty model answer";
+
 export class TickerAssistantNoFactsError extends Error {
   constructor(readonly symbols: string[]) {
     super("no ticker facts for any requested symbol");
@@ -222,7 +224,26 @@ export async function* answerTickerQuestion(
   });
   const adapter = deps.adapter ?? createTickerAssistantAdapter();
   const stream = signal ? adapter.stream(prompt, { signal }) : adapter.stream(prompt);
-  for await (const chunk of stripEmDashes(stream)) yield chunk;
+  // Whitespace before the first real text is held back, so an answer with no
+  // text throws before anything is sent: the route then reports the error and
+  // refunds the question instead of showing a bare source line.
+  let lead = "";
+  let hasText = false;
+  for await (const chunk of stripEmDashes(stream)) {
+    if (hasText) {
+      yield chunk;
+    } else if (chunk.trim()) {
+      hasText = true;
+      yield lead + chunk;
+    } else {
+      lead += chunk;
+    }
+  }
+  if (!hasText) {
+    // A request cancelled after the browser left ends quietly, as before.
+    if (signal?.aborted) return;
+    throw new Error(TICKER_ASSISTANT_EMPTY_ANSWER);
+  }
   yield `\n\n${tickerSourceLine(facts)}`;
 }
 
@@ -232,6 +253,7 @@ export function tickerAssistantErrorDetail(error: unknown): string {
   const message = error instanceof Error ? error.message : "";
   // Provider error text could echo the prompt; log only its kind.
   if (message.startsWith("OpenRouter SSE error:")) return "OpenRouter SSE error";
+  if (message === TICKER_ASSISTANT_EMPTY_ANSWER) return message;
   if (/^(OpenRouter request failed|empty OpenRouter response body|malformed OpenRouter SSE|OpenRouter SSE stream failed)/.test(message)) {
     return message;
   }

@@ -48,7 +48,8 @@ test("facts load one symbol at a time through a cached, de-duplicated tickerFact
   const body = fnBody("tickerFacts");
   assert.match(body, /if \(sym in _tickerFactsCache\) return Promise\.resolve\(_tickerFactsCache\[sym\]\);/);
   assert.match(body, /if \(_tickerFactsPending\[sym\]\) return _tickerFactsPending\[sym\];/);
-  assert.match(body, /fetch\('\/api\/ticker-facts\?symbols=' \+ encodeURIComponent\(sym\)/);
+  assert.match(body, /return fetchTickerFacts\(\[sym\]\)\[0\];/, "the band and the dock ask for one symbol");
+  assert.match(fnBody("fetchTickerFacts"), /fetch\('\/api\/ticker-facts\?symbols=' \+ syms\.map\(encodeURIComponent\)\.join\(','\)/);
   assert.match(html, /factBandShow\(c\.sym\);/);
   assert.match(fnBody("factBandShow"), /if \(sym === _factSym\) return;/);
 });
@@ -57,7 +58,7 @@ test("signed out: no band and no facts request", () => {
   const facts = fnBody("tickerFacts");
   const guard = facts.indexOf("if (!SITE || siteUser !== true) return Promise.resolve(null);");
   assert.ok(guard >= 0, "tickerFacts refuses unless signed in");
-  assert.ok(guard < facts.indexOf("fetch("), "the guard runs before the request");
+  assert.ok(guard < facts.indexOf("fetchTickerFacts("), "the guard runs before the request");
   const render = fnBody("renderFactBand");
   const hide = render.indexOf("if (!SITE || siteUser !== true || !_factSym) { band.hidden = true; return; }");
   assert.ok(hide >= 0, "renderFactBand hides the band unless signed in");
@@ -273,9 +274,9 @@ test("Limit Buy table: fact cells format change, yield and cadence, and show a d
 
 test("Limit Buy table: facts load lazily, through tickerFacts, at most 3 at once", () => {
   assert.match(html, /var XP_FACT_MAX = 3;/);
-  const pump = fnBody("pumpXpFacts");
+  const pump = fnBody("pumpXpFactsNow");
   assert.match(pump, /while \(_xpFactRunning < XP_FACT_MAX && _xpFactQueue\.length\)/);
-  assert.match(pump, /tickerFacts\(sym\)/);
+  assert.match(pump, /fetchTickerFacts\(batch\)/);
   assert.match(pump, /_xpFactRunning--;/);
   const want = fnBody("xpFactWant");
   assert.match(want, /if \(!xpFactsOn\(\) \|\| _exportView !== 'table'\) return;/);
@@ -350,7 +351,7 @@ test("Limit Buy assistant column: whole-selection checks load through the shared
   assert.match(run, /if \(st === 'loading' \|\| st === 'queued'\) return;/, "never a second request");
   assert.match(run, /_xpFactQueue\.push\(sym\);/);
   assert.match(run, /pumpXpFacts\(\);\s*xpRunTick\(\);/);
-  assert.match(fnBody("pumpXpFacts"), /xpRunTick\(\);/);
+  assert.match(fnBody("pumpXpFactsNow"), /xpRunTick\(\);/);
   const tick = fnBody("xpRunTick");
   assert.match(tick, /'Checking ' \+ done \+ ' of ' \+ run\.syms\.length \+ ' tickers…'/);
   assert.match(tick, /setXpBusy\(true\);/);
@@ -496,7 +497,7 @@ test("browser facts expire at the first 18:30 New York after they were fetched",
   const facts = fnBody("tickerFacts");
   assert.match(facts, /if \(sym in _tickerFactsCache && factsExpired\(sym\)\) \{ delete _tickerFactsCache\[sym\]; delete _tickerFactsExpires\[sym\]; \}/);
   assert.ok(facts.indexOf("factsExpired(sym)") < facts.indexOf("if (sym in _tickerFactsCache) return"), "expired entries are dropped before the cache answers");
-  assert.match(facts, /_tickerFactsExpires\[sym\] = nextNewYorkRefresh\(asked\);/);
+  assert.match(fnBody("fetchTickerFacts"), /_tickerFactsExpires\[sym\] = nextNewYorkRefresh\(asked\);/);
   assert.match(fnBody("factsExpired"), /return !\(Date\.now\(\) < _tickerFactsExpires\[sym\]\);/);
 });
 
@@ -593,4 +594,118 @@ test("weekly payers: next ex-date a week after the last one, and never listed as
   assert.equal(askNextExDate({ cadence: "irregular", lastExDate: "2026-10-02", asOf: "2026-10-22" }), null);
   assert.match(html, /var ASK_STEP_WORDS = \{ weekly: 'about a week',/);
   assert.match(fnBody("xpCheckAnswer"), /x\.f\.cadence === 'monthly'/, "weekly payers are not monthly");
+});
+
+test("loadOnce injects a data file once; callers during the load share its result or its miss", () => {
+  const prelude = `var DATA = 'dashboard/'; var injected = [];
+    function inject(src, ok, err) { injected.push({ src: src, ok: ok, err: err }); }`;
+  const src = fnBody("loadOnce");
+  const page = new Function(`${prelude}\nvar _loadWaiters = Object.create(null);\n${src}\nreturn { loadOnce, injected };`)();
+  const reg = {}, got = [];
+  page.loadOnce(reg, "data-", "SPY_D", (p) => got.push(["a", p]), () => got.push(["a", "miss"]));
+  page.loadOnce(reg, "data-", "SPY_D", (p) => got.push(["b", p]), () => got.push(["b", "miss"]));
+  page.loadOnce(reg, "overlays-", "SPY_D", () => got.push(["ov"]), () => got.push(["ov", "miss"]));
+  assert.deepEqual(page.injected.map((x) => x.src), ["dashboard/data-SPY_D.js", "dashboard/overlays-SPY_D.js"], "one injection per file");
+  reg.SPY_D = { candles: [1] };
+  page.injected[0].ok();
+  assert.deepEqual(got, [["a", reg.SPY_D], ["b", reg.SPY_D]], "both callers get the first load's result");
+  page.loadOnce(reg, "data-", "SPY_D", (p) => got.push(["c", p]), () => got.push(["c", "miss"]));
+  assert.equal(page.injected.length, 2, "a loaded file answers from the registry");
+  assert.deepEqual(got[2], ["c", reg.SPY_D]);
+  const reg2 = {}, miss = [];
+  page.loadOnce(reg2, "data-", "ZZZ", () => miss.push("x"), () => miss.push("a"));
+  page.loadOnce(reg2, "data-", "ZZZ", () => miss.push("x"), () => miss.push("b"));
+  page.injected[2].err();
+  assert.deepEqual(miss, ["a", "b"], "a failed load is a miss for every waiting caller");
+  page.loadOnce(reg2, "data-", "ZZZ", () => {}, () => {});
+  assert.equal(page.injected.length, 4, "after a miss the next caller tries again");
+});
+
+test("Limit Buy facts: queued tickers go out up to 40 per request, at most 3 requests at once, never twice", async () => {
+  const prelude = `var SITE = true, siteUser = true, XP_FACT_MAX = 3, TICKER_FACTS_BATCH = 40;
+    var TICKER_FACTS_RE = /^[A-Z0-9](?:[A-Z0-9.-]{0,10}[A-Z0-9])?$/;
+    var _tickerFactsCache = Object.create(null), _tickerFactsPending = Object.create(null), _tickerFactsExpires = Object.create(null);
+    var _xpFactQueue = [], _xpFactRunning = 0, _xpFactState = Object.create(null), _xpFactPumpSoon = false;
+    var calls = [], ticks = 0, filled = [];
+    function nextNewYorkRefresh(ms) { return ms + 3600e3; }
+    function fillXpFactCells(s) { filled.push(s); } function xpRunTick() { ticks++; }
+    function fetch(url) {
+      var syms = decodeURIComponent(url.split('symbols=')[1]).split(',');
+      var call = { syms: syms };
+      call.promise = new Promise(function (ok) { call.settle = ok; });
+      calls.push(call);
+      return call.promise;
+    }`;
+  const names = ["factsExpired", "factsCachedFresh", "tickerFacts", "tickerFactsNeedsRequest", "fetchTickerFacts", "pumpXpFacts", "pumpXpFactsNow", "xpFactTrack"];
+  const page = new Function(`${prelude}\n${names.map((n) => fnBody(n)).join("\n")}\nreturn {
+    queue(syms) { syms.forEach(function (s) { _xpFactState[s] = 'queued'; _xpFactQueue.push(s); }); pumpXpFacts(); },
+    calls, tickerFacts, state: function () { return Object.assign({}, _xpFactState); },
+    cache: function () { return _tickerFactsCache; }, running: function () { return _xpFactRunning; } };`)();
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+  const ok = (body) => ({ ok: true, json: () => Promise.resolve(body) });
+
+  const band = page.tickerFacts("SPY");   // the fact band's own one-symbol request
+  assert.deepEqual(page.calls[0].syms, ["SPY"]);
+  const syms = Array.from({ length: 130 }, (_, i) => "T" + i).concat(["SPY"]);
+  page.queue(syms);
+  page.queue(["T1", "T2"]);   // a second want for queued tickers adds nothing new to the request
+  assert.equal(page.calls.length, 1, "the pump waits for the current task, so the rows queued together share a request");
+  await flush();
+  const batches = page.calls.slice(1);
+  assert.deepEqual(batches.map((c) => c.syms.length), [40, 40, 40], "three requests of 40, the rest wait for a slot");
+  assert.equal(page.running(), 3);
+  const shared = page.tickerFacts("T5");
+  assert.equal(page.calls.length, 4, "a tickerFacts call for a batched ticker shares that request");
+
+  const facts = {}; for (const s of batches[0].syms) if (s !== "T7") facts[s] = { symbol: s };
+  batches[0].settle(ok({ facts, missing: ["T7"] }));
+  await flush(); await flush();
+  assert.deepEqual(await shared, { symbol: "T5" });
+  assert.equal(page.cache().T7, null, "a ticker missing from the answer is cached as no facts");
+  assert.equal(page.state().T5, undefined);
+  assert.deepEqual(page.calls.slice(4).map((c) => c.syms.length), [10], "the freed slot takes the rest; SPY rides on the band's request");
+  assert.equal(page.calls[4].syms.includes("SPY"), false);
+
+  batches[1].settle(Promise.reject(new Error("HTTP 502")));
+  await flush(); await flush();
+  for (const s of batches[1].syms) assert.equal(page.state()[s], "error", s + " marked failed");
+  assert.equal(batches[1].syms.some((s) => s in page.cache()), false, "a failed request caches nothing");
+
+  page.calls[0].settle(ok({ facts: { SPY: { symbol: "SPY" } } }));
+  await band;
+  await flush(); await flush();
+  assert.equal(page.state().SPY, undefined, "SPY settles with the band's answer");
+  const all = page.calls.flatMap((c) => c.syms);
+  assert.equal(new Set(all).size, all.length, "no ticker is requested twice");
+  assert.ok(page.calls.every((c) => c.syms.length <= 40));
+});
+
+test("Download CSV follows the up-in-all-three filter and turns off when no ticker is shown", () => {
+  const prelude = `var _exportRows = null, _xpFilter = null, _exportView = 'table', _exportCsvReady = true;
+    var btn = { disabled: false };
+    var document = { getElementById: function () { return btn; } };`;
+  const page = new Function(`${prelude}\n${["exportCsvRows", "syncExportCsvButton"].map((n) => fnBody(n)).join("\n")}\nreturn {
+    set(o) { if ('rows' in o) _exportRows = o.rows; if ('filter' in o) _xpFilter = o.filter; if ('view' in o) _exportView = o.view; if ('ready' in o) _exportCsvReady = o.ready; },
+    exportCsvRows, syncExportCsvButton, btn };`)();
+  const rows = ["SPY", "SPY", "QQQ", "IWM", "TSLA"].map((sym, i) => ({ sym, limit: i }));
+  page.set({ rows });
+  assert.equal(page.exportCsvRows().length, 5, "no filter: every row");
+  page.set({ filter: { up: ["SPY"], close: ["IWM"] } });
+  assert.deepEqual(page.exportCsvRows().map((r) => r.sym), ["SPY", "SPY", "IWM"], "the matches and the Close tickers, in table order");
+  page.syncExportCsvButton();
+  assert.equal(page.btn.disabled, false);
+  page.set({ filter: { up: [], close: [] } });
+  page.syncExportCsvButton();
+  assert.equal(page.btn.disabled, true, "no ticker shown: nothing to download");
+  page.set({ filter: null });
+  page.syncExportCsvButton();
+  assert.equal(page.btn.disabled, false, "clearing the filter brings the full export back");
+  page.set({ ready: false });
+  page.syncExportCsvButton();
+  assert.equal(page.btn.disabled, true, "a stale table never downloads");
+  const dl = fnBody("downloadExportCsv");
+  assert.match(dl, /var rows = exportCsvRows\(\);/);
+  assert.match(dl, /rows\.forEach\(function \(row\) \{/);
+  assert.match(fnBody("applyXpFilter"), /syncExportCsvButton\(\);/);
+  assert.match(fnBody("updateExportFooter"), /syncExportCsvButton\(\);/);
 });

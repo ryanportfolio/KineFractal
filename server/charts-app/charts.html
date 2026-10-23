@@ -1495,11 +1495,23 @@ function fitAll() {                 // 'fit' button: clear the saved view and sh
   if (chart) chart.timeScale().fitContent();
 }
 
+// A data file is injected once: callers that ask while it is still loading wait
+// for that load and get its result (or its miss), since inject's cache-busting
+// query would make a second injection a second download.
+var _loadWaiters = Object.create(null);   // prefix + key -> [[cb, onmiss], ...] while that file loads
 function loadOnce(registry, prefix, key, cb, onmiss) {
   if (registry[key]) return cb(registry[key]);
-  inject(DATA + prefix + key + '.js', function () {
-    registry[key] ? cb(registry[key]) : onmiss();
-  }, onmiss);
+  var id = prefix + key;
+  if (_loadWaiters[id]) { _loadWaiters[id].push([cb, onmiss]); return; }
+  var waiting = _loadWaiters[id] = [[cb, onmiss]];
+  function settle() {
+    delete _loadWaiters[id];
+    waiting.forEach(function (w) {
+      try { registry[key] ? w[0](registry[key]) : w[1](); }
+      catch (e) { setTimeout(function () { throw e; }); }   // one caller's error never starves the others
+    });
+  }
+  inject(DATA + prefix + key + '.js', settle, settle);
 }
 
 // ===========================================================================
@@ -2691,12 +2703,14 @@ function initSiteAccount() {
 
 // --- ticker facts + fact band (signed in only) ---------------------------------
 // Facts come from GET /api/ticker-facts (server/ticker-facts.ts), computed from
-// Tiingo daily closes and distributions; the page only formats them. One symbol
-// per request, only for the ticker on screen; a page-level cache means a ticker
-// seen before costs no new request.
+// Tiingo daily closes and distributions; the page only formats them. The fact
+// band and ASK AI ask for one symbol per request, only for the ticker on screen;
+// the Limit Buy table batches its rows (pumpXpFacts). A page-level cache means a
+// ticker seen before costs no new request.
 var _tickerFactsCache = Object.create(null);    // SYM -> TickerFacts, or null when the server has none
 var _tickerFactsPending = Object.create(null);  // SYM -> Promise while its request runs
 var _tickerFactsExpires = Object.create(null);  // SYM -> epoch ms when its cache entry goes stale
+var TICKER_FACTS_RE = /^[A-Z0-9](?:[A-Z0-9.-]{0,10}[A-Z0-9])?$/;
 // The server refreshes its facts at the first 18:30 New York time after it fetched
 // them (nextNewYorkRefresh in server/ticker-facts.ts); a page entry expires at the
 // same moment, counted from when the page asked for it.
@@ -2748,22 +2762,38 @@ function dropExpiredFacts() {
 function tickerFacts(sym) {
   sym = String(sym || '').toUpperCase();
   if (!SITE || siteUser !== true) return Promise.resolve(null);
-  if (!/^[A-Z0-9](?:[A-Z0-9.-]{0,10}[A-Z0-9])?$/.test(sym)) return Promise.resolve(null);
+  if (!TICKER_FACTS_RE.test(sym)) return Promise.resolve(null);
   if (sym in _tickerFactsCache && factsExpired(sym)) { delete _tickerFactsCache[sym]; delete _tickerFactsExpires[sym]; }
   if (sym in _tickerFactsCache) return Promise.resolve(_tickerFactsCache[sym]);
   if (_tickerFactsPending[sym]) return _tickerFactsPending[sym];
+  return fetchTickerFacts([sym])[0];
+}
+// True when tickerFacts(sym) would make a request: signed in, a valid ticker,
+// not cached (an expired entry is dropped here) and not already on its way.
+function tickerFactsNeedsRequest(sym) {
+  return !!(SITE && siteUser === true) && TICKER_FACTS_RE.test(sym) && !factsCachedFresh(sym) && !_tickerFactsPending[sym];
+}
+// One GET /api/ticker-facts for syms (1 to TICKER_FACTS_BATCH, none cached or
+// pending); returns one promise per symbol, in order. Each symbol's promise is
+// its pending entry, so a tickerFacts call for it meanwhile shares this request.
+// A symbol missing from a successful answer is cached as null; a failed request
+// rejects every symbol's promise and caches nothing.
+var TICKER_FACTS_BATCH = 40;   // the route takes 1 to 40 symbols
+function fetchTickerFacts(syms) {
   var asked = Date.now();
-  var p = fetch('/api/ticker-facts?symbols=' + encodeURIComponent(sym), { credentials: 'same-origin', cache: 'no-store' })
-    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
-    .then(function (j) {
+  var all = fetch('/api/ticker-facts?symbols=' + syms.map(encodeURIComponent).join(','), { credentials: 'same-origin', cache: 'no-store' })
+    .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); });
+  return syms.map(function (sym) {
+    var p = all.then(function (j) {
       var f = (j && j.facts && j.facts[sym]) || null;
       _tickerFactsCache[sym] = f;
       _tickerFactsExpires[sym] = nextNewYorkRefresh(asked);
       return f;
     });
-  _tickerFactsPending[sym] = p;
-  p.then(function () { delete _tickerFactsPending[sym]; }, function () { delete _tickerFactsPending[sym]; });
-  return p;
+    _tickerFactsPending[sym] = p;
+    p.then(function () { delete _tickerFactsPending[sym]; }, function () { delete _tickerFactsPending[sym]; });
+    return p;
+  });
 }
 var FB_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function fbDay(iso) {   // "2026-10-22" -> "Oct 22", read as a calendar date (no time zone shift)
@@ -5027,10 +5057,25 @@ function markExportClusters(rows) {
   }
   return rows;
 }
+// The rows Download CSV exports: every row, or while the up-in-all-three filter
+// is on, only the rows of the tickers the table shows (the matches, plus the
+// tickers listed under "Close: down in one period").
+function exportCsvRows() {
+  if (!_exportRows) return [];
+  if (!(_xpFilter && _exportView === 'table')) return _exportRows;
+  var shown = _xpFilter.up.concat(_xpFilter.close);
+  return _exportRows.filter(function (row) { return shown.indexOf(row.sym) >= 0; });
+}
+// The button is off while the table is out of date or shows no ticker.
+function syncExportCsvButton() {
+  document.getElementById('exportCsv').disabled = !(_exportCsvReady && exportCsvRows().length);
+}
 function downloadExportCsv() {
   if (!_exportCsvReady || !_exportRows || !_exportRows.length) return;
+  var rows = exportCsvRows();
+  if (!rows.length) return;
   var lines = ['Ticker,Limit price,Signal,Times tested,Timeframe relevance,Gap zone,Below close %,Last close'];
-  _exportRows.forEach(function (row) {
+  rows.forEach(function (row) {
     var dist = (((row.close - row.limit) / row.close) * 100).toFixed(1);
     lines.push([
       row.sym, row.limit,
@@ -5714,9 +5759,9 @@ function nearestStrongIndex(limits) {
 // YIELD, CADENCE, 21D, 3M, 6M sit on each ticker's heading row. Facts load
 // lazily: opening the dialog fetches nothing; a ticker's facts load when its
 // rows come near the visible part of the scroller (IntersectionObserver) or
-// when the visitor selects it. Requests go through tickerFacts (page cache
-// shared with the fact band), at most XP_FACT_MAX at once, never twice for one
-// ticker. A ticker that leaves the area before its turn comes is taken off the
+// when the visitor selects it. Queued tickers go out together, up to
+// TICKER_FACTS_BATCH per request, into the page cache shared with the fact band;
+// at most XP_FACT_MAX requests at once, never twice for one ticker. A ticker that leaves the area before its turn comes is taken off the
 // queue, so scrolling past a row costs nothing.
 var XP_FACT_KEYS = ['yield', 'cadence', 'd21', 'm3', 'm6'];
 var XP_FACT_HEADS = {
@@ -5801,25 +5846,46 @@ function xpFactDrop(sym) {
   _xpFactQueue.splice(_xpFactQueue.indexOf(sym), 1);
   delete _xpFactState[sym];
 }
-// Start queued requests while fewer than XP_FACT_MAX run. Each slot is held
-// until its request settles, so at most XP_FACT_MAX are ever in flight from here.
+// Start queued requests while fewer than XP_FACT_MAX run. Each request carries
+// up to TICKER_FACTS_BATCH tickers from the front of the queue and holds one
+// slot until it settles, so at most XP_FACT_MAX are ever in flight from here.
+// A ticker already cached or on its way (the fact band asked for it) shares
+// that answer and takes no slot. The pump runs after the current task, so the
+// rows that come into view together go out in one request.
+var _xpFactPumpSoon = false;
 function pumpXpFacts() {
+  if (_xpFactPumpSoon) return;
+  _xpFactPumpSoon = true;
+  Promise.resolve().then(function () { _xpFactPumpSoon = false; pumpXpFactsNow(); });
+}
+function pumpXpFactsNow() {
   while (_xpFactRunning < XP_FACT_MAX && _xpFactQueue.length) {
-    (function (sym) {
+    var batch = [];
+    while (batch.length < TICKER_FACTS_BATCH && _xpFactQueue.length) {
+      var sym = _xpFactQueue.shift();
       _xpFactState[sym] = 'loading';
-      _xpFactRunning++;
-      tickerFacts(sym).then(function () {
-        delete _xpFactState[sym];
-      }, function () {
-        _xpFactState[sym] = 'error';
-      }).then(function () {
-        _xpFactRunning--;
-        fillXpFactCells(sym);
-        pumpXpFacts();
-        xpRunTick();
-      });
-    })(_xpFactQueue.shift());
+      if (tickerFactsNeedsRequest(sym)) batch.push(sym);
+      else xpFactTrack(sym, tickerFacts(sym)).then(xpRunTick);
+    }
+    if (!batch.length) continue;
+    _xpFactRunning++;
+    var asks = fetchTickerFacts(batch);
+    Promise.all(batch.map(function (s, i) { return xpFactTrack(s, asks[i]); })).then(function () {
+      _xpFactRunning--;
+      pumpXpFacts();
+      xpRunTick();
+    });
   }
+}
+// One ticker's request settled: its state, then its cells.
+function xpFactTrack(sym, ask) {
+  return ask.then(function () {
+    delete _xpFactState[sym];
+  }, function () {
+    _xpFactState[sym] = 'error';
+  }).then(function () {
+    fillXpFactCells(sym);
+  });
 }
 // Stop watching rows and forget queued tickers (cards view, dialog closed,
 // table rebuilt). Requests already in flight finish and fill the page cache.
@@ -5854,7 +5920,7 @@ function observeXpFactRows() {
 // #xpAssist sits right of the results. Its quick checks answer from ticker facts
 // and the dialog's own lead prices, never from the model. A check that needs the
 // whole selection loads the facts it still lacks only when tapped, through the
-// same queue as the table cells (XP_FACT_MAX at once, one request per ticker),
+// same queue as the table cells (up to TICKER_FACTS_BATCH tickers per request),
 // with a progress line. The question box sends every selected ticker to
 // POST /api/ticker-assistant (at most XP_ASK_MAX) and streams the answer as text.
 var XP_ASK_MAX = 40;          // the assistant route takes 1 to 40 symbols
@@ -6121,6 +6187,7 @@ function applyXpFilter() {
   Array.prototype.forEach.call(res.querySelectorAll('tbody[data-sec]'), function (tb) {
     tb.hidden = on && _xpFilter.up.indexOf(tb.getAttribute('data-sec')) < 0;
   });
+  syncExportCsvButton();   // the CSV follows the filter
   if (!on) return;
   var after = wrap;
   if (!_xpFilter.up.length) {
@@ -6557,7 +6624,7 @@ function renderCombineExample(sections) {
 }
 function updateExportFooter(rows, tickerCount) {
   _exportCsvReady = !!rows.length;
-  document.getElementById('exportCsv').disabled = !rows.length;
+  syncExportCsvButton();
 }
 var STRENGTH_HINTS = {
   any: 'Every support level, weak ones included.',

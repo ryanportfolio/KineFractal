@@ -243,6 +243,39 @@ test("answer passes its abort signal to the model request", async () => {
   assert.deepEqual(signals, [controller.signal]);
 });
 
+test("answer with no text throws before yielding anything, so no bare source line is sent", async () => {
+  for (const chunks of [[], ["  ", "\n\n", " "]]) {
+    const { adapter } = stubAdapter(chunks);
+    const out: string[] = [];
+    await assert.rejects(
+      (async () => {
+        for await (const c of answerTickerQuestion({ symbols: ["CLOZ"], question: "?" }, { adapter, fetchFacts: async () => CLOZ })) out.push(c);
+      })(),
+      /empty model answer/,
+    );
+    assert.deepEqual(out, [], JSON.stringify(chunks));
+  }
+  assert.equal(tickerAssistantErrorDetail(new Error("empty model answer")), "empty model answer");
+});
+
+test("answer keeps leading whitespace and sends it with the first text", async () => {
+  const { adapter } = stubAdapter(["\n", "  ", "CLOZ is up."]);
+  const out = await collect(answerTickerQuestion({ symbols: ["CLOZ"], question: "?" }, { adapter, fetchFacts: async () => CLOZ }));
+  assert.equal(out.join(""), `\n  CLOZ is up.\n\n${tickerSourceLine([CLOZ])}`);
+});
+
+test("answer with no text after the browser left ends quietly", async () => {
+  const controller = new AbortController();
+  const adapter: TickerAssistantAdapter = {
+    async *stream() { controller.abort(); yield " "; },
+  };
+  const out = await collect(answerTickerQuestion(
+    { symbols: ["CLOZ"], question: "?" },
+    { adapter, fetchFacts: async () => CLOZ, signal: controller.signal },
+  ));
+  assert.deepEqual(out, []);
+});
+
 test("adapter sends the pinned model, 400 tokens, no reasoning, no data collection, streaming", async () => {
   let body: Record<string, unknown> | undefined;
   const adapter = createTickerAssistantAdapter({
