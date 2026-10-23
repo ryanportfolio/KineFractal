@@ -302,3 +302,36 @@ test("cancels the OpenRouter response body when the consumer stops early", async
 
   assert.equal(cancelCalls, 1);
 });
+
+test("passes a caller's abort signal to fetch and leaves it out when none is given", async () => {
+  const inits: (RequestInit | undefined)[] = [];
+  const adapter = createOpenRouterRatioAdapter({
+    env: { OPENROUTER_API: "test-openrouter-key" },
+    fetch: async (_url: RequestInfo | URL, init?: RequestInit) => {
+      inits.push(init);
+      return sseResponse([doneSse()]);
+    },
+  });
+  const controller = new AbortController();
+
+  await collect(adapter.stream(input, { signal: controller.signal }));
+  await collect(adapter.stream(input));
+
+  assert.equal(inits[0]?.signal, controller.signal);
+  assert.equal(inits[1] && "signal" in inits[1], false);
+});
+
+test("an aborted signal cancels the OpenRouter request", async () => {
+  const controller = new AbortController();
+  const adapter = createOpenRouterRatioAdapter({
+    env: { OPENROUTER_API: "test-openrouter-key" },
+    // Like fetch: rejects once the signal aborts.
+    fetch: (_url: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+    }),
+  });
+  const pending = collect(adapter.stream(input, { signal: controller.signal }));
+  controller.abort();
+
+  await assert.rejects(pending, { message: "OpenRouter request failed" });
+});

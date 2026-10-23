@@ -87,7 +87,8 @@ test("no payouts: yield null, cadence none, no last ex-date", () => {
   assert.equal(f.special, false);
 });
 
-test("6 to 10 payouts in a year read as irregular", () => {
+test("payouts with no regular spacing read as irregular", () => {
+  // Gaps 35, 40, 50, 60, 70, 70 days: median 55, between monthly and quarterly.
   const list = pay(rows(400), [[5, 0.1], [40, 0.1], [90, 0.1], [130, 0.1], [200, 0.1], [260, 0.1], [330, 0.1]]);
   assert.equal(computeTickerFacts("X", list).cadence, "irregular");
 });
@@ -95,6 +96,65 @@ test("6 to 10 payouts in a year read as irregular", () => {
 test("semiannual and annual cadences", () => {
   assert.equal(computeTickerFacts("X", pay(rows(400), [[20, 1], [200, 1]])).cadence, "semiannual");
   assert.equal(computeTickerFacts("X", pay(rows(400), [[20, 1]])).cadence, "annual");
+  assert.equal(computeTickerFacts("X", pay(rows(400), [[10, 1], [375, 1]])).cadence, "annual");
+});
+
+test("cadence comes from payout spacing, not the count", () => {
+  const cadence = (days: number[]) =>
+    computeTickerFacts("X", pay(rows(400), days.map((d) => [d, 0.1] as [number, number]))).cadence;
+  // 52 weekly payouts: a count rule would call this monthly.
+  assert.equal(cadence(Array.from({ length: 52 }, (_, w) => 2 + w * 7)), "weekly");
+  // Started paying monthly 3 months ago: a count rule would call this quarterly.
+  assert.equal(cadence([3, 33, 63]), "monthly");
+  assert.equal(cadence([10, 100, 190, 280]), "quarterly");
+  // Boundaries: median gap 10 is weekly, 11 to 19 irregular, 20 and 40 monthly.
+  assert.equal(cadence([1, 11, 21]), "weekly");
+  assert.equal(cadence([1, 16, 31]), "irregular");
+  assert.equal(cadence([1, 21, 41]), "monthly");
+  assert.equal(cadence([1, 41, 81]), "monthly");
+  assert.equal(cadence([1, 76, 151]), "quarterly");
+  assert.equal(cadence([1, 106, 211]), "quarterly");
+  assert.equal(cadence([1, 107, 213]), "irregular");
+});
+
+test("cadence uses older payouts but is none when nothing paid in the trailing year", () => {
+  // Monthly until 13 months ago, then stopped.
+  assert.equal(computeTickerFacts("X", pay(rows(400), [[395, 0.1], [380, 0.1], [370, 0.1]])).cadence, "none");
+  // One trailing payout plus older ones a month apart: monthly, though only one counts for yield.
+  const f = computeTickerFacts("X", pay(rows(400), [[396, 0.1], [366, 0.1], [336, 0.1]]));
+  assert.equal(f.cadence, "monthly");
+  assert.equal(f.payouts.length, 1);
+});
+
+test("a 2-for-1 split with an unchanged position shows no loss and adjusts payouts", () => {
+  // 200 before the split 10 bars ago, 100 after: the same position in today's shares.
+  const list = rows(300, (i) => (i < 290 ? 200 : 100));
+  list[290].splitFactor = 2;
+  pay(list, [[200, 1], [100, 1], [5, 0.5]]);         // 1.00 on old shares = 0.50 today
+  const f = computeTickerFacts("SPLT", list);
+  for (const w of [f.windows.d21, f.windows.m3, f.windows.m6]) {
+    assert.equal(w?.change, 0);
+    assert.equal(w?.verdict, "FLAT");
+    assert.equal(w?.startClose, 100);
+  }
+  assert.equal(f.high6m, 100);
+  assert.equal(f.vs6mHigh, 0);
+  assert.equal(f.close, 100);
+  assert.deepEqual(f.payouts.map((p) => p.amount), [0.5, 0.5, 0.5]);
+  assert.equal(f.yield, 1.5);
+  assert.equal(f.special, false);
+});
+
+test("split factors compound and a missing or 0 factor counts as 1", () => {
+  // 3-for-1 then 2-for-1: the oldest close is divided by 6.
+  const list = rows(30, (i) => (i < 10 ? 600 : i < 20 ? 200 : 100));
+  list[10].splitFactor = 3;
+  list[20].splitFactor = 2;
+  list[25].splitFactor = 0;
+  const f = computeTickerFacts("X", list);
+  assert.equal(f.windows.d21?.startClose, 100);
+  assert.equal(f.windows.d21?.change, 0);
+  assert.equal(f.high6m, 100);
 });
 
 test("special payout: one amount above twice the median", () => {
@@ -140,7 +200,6 @@ test("365-day cutoff: a payout exactly 365 days back is outside the trailing yea
   const list = pay(rows(400), [[365, 1], [364, 0.5]]);
   const f = computeTickerFacts("X", list);
   assert.deepEqual(f.payouts, [{ exDate: daysBefore(364), amount: 0.5 }]);
-  assert.equal(f.cadence, "annual");
   assert.equal(f.yield, 0.5);
 
   // Only an old payout: not trailing, but still the last ex-date on record.
@@ -217,13 +276,29 @@ test("fetch sends the key in the Authorization header, never the URL", async (t)
   assert.equal(calls.length, 1);
   const { url, init } = calls[0];
   assert.equal(url,
-    "https://api.tiingo.com/tiingo/daily/CLOZ/prices?startDate=2025-09-18&columns=date,close,divCash");
+    "https://api.tiingo.com/tiingo/daily/CLOZ/prices?startDate=2025-09-18&columns=date,close,divCash,splitFactor");
   assert.ok(!url.includes(KEY));
   assert.equal((init?.headers as Record<string, string>).Authorization, `Token ${KEY}`);
   assert.equal(f?.symbol, "CLOZ");
   assert.equal(f?.asOf, AS_OF);
   assert.equal(f?.close, 299);
   assert.equal(f?.payouts.length, 1);
+});
+
+test("fetch applies Tiingo's splitFactor; a missing one counts as 1", async (t) => {
+  withKey(t);
+  const body = JSON.stringify(rows(200).map((r, i) => ({
+    date: `${r.date}T00:00:00.000Z`,
+    close: i < 190 ? 80 : 20,                       // 4-for-1 split 10 bars ago
+    divCash: i === 100 ? 0.4 : 0.0,
+    ...(i === 190 ? { splitFactor: 4 } : i % 2 ? { splitFactor: 1 } : {}),
+  })));
+  const { fn } = stubFetch(() => new Response(body, { status: 200 }));
+  const f = await fetchTickerFacts("SPLT", { fetch: fn, now: () => NOW });
+  assert.equal(f?.windows.m6?.change, 0);
+  assert.equal(f?.windows.m6?.startClose, 20);
+  assert.equal(f?.vs6mHigh, 0);
+  assert.deepEqual(f?.payouts.map((p) => p.amount), [0.1]);
 });
 
 test("the legacy VITE_T key is used when TIINGO_API_KEY is unset", async (t) => {

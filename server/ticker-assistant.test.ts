@@ -148,6 +148,14 @@ test("answer streams the model chunks, then the source line last", async () => {
   assert.match(calls[0].systemPrompt, /\{"CLOZ":26\}/);
 });
 
+test("prompt field guide names every payout cadence, including weekly, and the split adjustment", () => {
+  const { systemPrompt } = buildTickerAssistantPrompt([CLOZ], "?");
+  for (const cadence of ["weekly", "monthly", "quarterly", "semiannual", "annual", "irregular", "none"]) {
+    assert.ok(systemPrompt.includes(cadence), cadence);
+  }
+  assert.match(systemPrompt, /adjusted for stock splits/);
+});
+
 test("prompt tells the model not to use em dashes", () => {
   const { systemPrompt } = buildTickerAssistantPrompt([CLOZ], "Why?");
   assert.match(systemPrompt, /Do not use em dashes/);
@@ -194,6 +202,45 @@ test("answer throws a typed error and makes no model call when no symbol has fac
     },
   );
   assert.equal(calls.length, 0);
+});
+
+test("answer aborted while facts load ends with no output and no model call", async () => {
+  const { adapter, calls } = stubAdapter(["never"]);
+  const controller = new AbortController();
+  let release!: () => void;
+  const gate = new Promise<void>((r) => { release = r; });
+  const fetched: string[] = [];
+  const pending = collect(answerTickerQuestion(
+    { symbols: ["CLOZ", "SPY", "TSLA", "QQQ", "IWM", "DIA"], question: "Why?" },
+    {
+      adapter,
+      signal: controller.signal,
+      fetchFacts: async (s) => { fetched.push(s); await gate; return CLOZ; },
+    },
+  ));
+  controller.abort();
+  release();
+  assert.deepEqual(await pending, []);
+  assert.equal(calls.length, 0);
+  // The four symbols already in flight finish; no new one starts after the abort.
+  assert.deepEqual(fetched, ["CLOZ", "SPY", "TSLA", "QQQ"]);
+});
+
+test("answer passes its abort signal to the model request", async () => {
+  const signals: (AbortSignal | undefined)[] = [];
+  const adapter: TickerAssistantAdapter = {
+    async *stream(_input, opts) {
+      signals.push(opts?.signal);
+      yield "ok";
+    },
+  };
+  const controller = new AbortController();
+  const out = await collect(answerTickerQuestion(
+    { symbols: ["CLOZ"], question: "?" },
+    { adapter, fetchFacts: async () => CLOZ, signal: controller.signal },
+  ));
+  assert.equal(out[0], "ok");
+  assert.deepEqual(signals, [controller.signal]);
 });
 
 test("adapter sends the pinned model, 400 tokens, no reasoning, no data collection, streaming", async () => {

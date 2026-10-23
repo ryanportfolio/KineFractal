@@ -5,9 +5,13 @@
 // Trend is plain price change (close vs close), not total return: payouts are
 // reported separately as yield, never folded into the change.
 //
+// Closes and payouts are first restated on today's share basis using Tiingo's
+// splitFactor, so a 2-for-1 split is not a 50% drop and pre-split payouts do
+// not inflate the yield.
+//
 // Separate from tiingo-cache.ts on purpose: that cache holds adjusted OHLCV
-// bars under the DailyBar contract, while facts need raw closes plus divCash
-// over a short window. One request per symbol per market day, cached in memory.
+// bars under the DailyBar contract, while facts need raw closes, divCash and
+// splitFactor over a short window. One request per symbol per market day, cached in memory.
 
 export type Verdict = "BULLISH" | "BEARISH" | "FLAT";
 export interface TrendWindow { change: number; verdict: Verdict; startDate: string; startClose: number }
@@ -21,14 +25,16 @@ export interface TickerFacts {
   high6m: number;            // highest close among the last 126 bars (latest included)
   vs6mHigh: number;          // (close / high6m - 1) * 100, 1 decimal
   yield: number | null;      // trailing 12-month payouts / close * 100, 2 decimals; null if no payouts
-  cadence: "monthly" | "irregular" | "quarterly" | "semiannual" | "annual" | "none";
+  // Median spacing of all fetched payouts; "none" when nothing paid in the trailing 365 days.
+  cadence: "weekly" | "monthly" | "quarterly" | "semiannual" | "annual" | "irregular" | "none";
   payouts: { exDate: string; amount: number }[]; // payouts in the trailing 365 days, oldest first
   lastExDate: string | null; // most recent payout in the fetched history
   special: boolean;          // >= 3 payouts and one is > 2x their median
   source: string;
 }
 
-export interface TickerFactsRow { date: string; close: number; divCash: number }
+// splitFactor: Tiingo's split ratio on that date (2 for a 2-for-1); missing or 0 means none.
+export interface TickerFactsRow { date: string; close: number; divCash: number; splitFactor?: number }
 
 // Same shape the chart add route accepts (fearlab-charts.ts TICKER_RE), upper
 // case, as in symbol-search.ts.
@@ -57,18 +63,48 @@ function median(values: number[]): number {
   return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
 }
 
-function cadenceFor(count: number): TickerFacts["cadence"] {
-  if (count >= 11) return "monthly";
-  if (count >= 6) return "irregular";
-  if (count >= 3) return "quarterly";
-  if (count === 2) return "semiannual";
-  if (count === 1) return "annual";
-  return "none";
+/**
+ * Restates each row on today's share basis: close and divCash divided by the
+ * product of the split factors of all later rows. A split on a row's own date
+ * is already in that row's close.
+ */
+function splitAdjusted(rows: TickerFactsRow[]): TickerFactsRow[] {
+  const out = new Array<TickerFactsRow>(rows.length);
+  let factor = 1;
+  for (let i = rows.length - 1; i >= 0; i--) {
+    const r = rows[i];
+    out[i] = { date: r.date, close: r.close / factor, divCash: r.divCash / factor };
+    const s = r.splitFactor;
+    if (typeof s === "number" && Number.isFinite(s) && s > 0) factor *= s;
+  }
+  return out;
 }
 
-/** rows: oldest first, dates YYYY-MM-DD, at least one row. */
-export function computeTickerFacts(symbol: string, rows: TickerFactsRow[]): TickerFacts {
-  if (rows.length === 0) throw new Error("computeTickerFacts needs at least one row");
+/**
+ * How often it pays, from the median gap in days between consecutive payouts
+ * over the whole fetched history. trailingCount is the number of payouts in the
+ * trailing 365 days: none there means "none".
+ */
+function cadenceFor(exDates: string[], trailingCount: number): TickerFacts["cadence"] {
+  if (trailingCount === 0) return "none";
+  if (exDates.length < 2) return "annual";
+  const gaps = exDates.slice(1).map((d, i) => (Date.parse(d) - Date.parse(exDates[i])) / DAY_MS);
+  const gap = median(gaps);
+  if (gap <= 10) return "weekly";
+  if (gap >= 20 && gap <= 40) return "monthly";
+  if (gap >= 75 && gap <= 105) return "quarterly";
+  if (gap >= 160 && gap <= 200) return "semiannual";
+  if (gap >= 330 && gap <= 400) return "annual";
+  return "irregular";
+}
+
+/**
+ * rows: oldest first, dates YYYY-MM-DD, at least one row, raw (unadjusted)
+ * closes and payouts with Tiingo's splitFactor when known.
+ */
+export function computeTickerFacts(symbol: string, rawRows: TickerFactsRow[]): TickerFacts {
+  if (rawRows.length === 0) throw new Error("computeTickerFacts needs at least one row");
+  const rows = splitAdjusted(rawRows);
   const last = rows[rows.length - 1];
   const close = last.close;
   const windows = { d21: trendWindow(rows, 21), m3: trendWindow(rows, 63), m6: trendWindow(rows, 126) };
@@ -100,7 +136,7 @@ export function computeTickerFacts(symbol: string, rows: TickerFactsRow[]): Tick
     high6m,
     vs6mHigh,
     yield: payouts.length ? Number((sum / close * 100).toFixed(2)) : null,
-    cadence: cadenceFor(payouts.length),
+    cadence: cadenceFor(allPayouts.map((r) => r.date), payouts.length),
     payouts,
     lastExDate: allPayouts.length ? allPayouts[allPayouts.length - 1].date : null,
     special: payouts.length >= 3 && amounts.some((a) => a > 2 * med),
@@ -171,7 +207,10 @@ function parseRows(data: unknown): TickerFactsRow[] {
     const close = raw.close;
     if (typeof close !== "number" || !Number.isFinite(close) || close <= 0) continue;
     const div = typeof raw.divCash === "number" && Number.isFinite(raw.divCash) ? raw.divCash : 0;
-    rows.push({ date: raw.date.slice(0, 10), close, divCash: div });
+    const split = typeof raw.splitFactor === "number" && Number.isFinite(raw.splitFactor) && raw.splitFactor > 0
+      ? raw.splitFactor
+      : 1;
+    rows.push({ date: raw.date.slice(0, 10), close, divCash: div, splitFactor: split });
   }
   return rows.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -181,7 +220,7 @@ async function loadTickerFacts(sym: string, fetchImpl: typeof fetch, now: Date):
   if (!key) throw new Error("Tiingo API key not configured");
   const startDate = new Date(now.getTime() - HISTORY_DAYS * DAY_MS).toISOString().slice(0, 10);
   const url = `https://api.tiingo.com/tiingo/daily/${encodeURIComponent(sym)}/prices`
-    + `?startDate=${startDate}&columns=date,close,divCash`;
+    + `?startDate=${startDate}&columns=date,close,divCash,splitFactor`;
   let res: Response;
   try {
     res = await fetchImpl(url, {

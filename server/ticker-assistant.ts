@@ -18,7 +18,7 @@ export const TICKER_ASSISTANT_MAX_QUESTION = 500;
 export const TICKER_ASSISTANT_DAILY_LIMIT = 30;
 
 export interface TickerAssistantAdapter {
-  stream(input: OpenRouterRatioInput): AsyncIterable<string>;
+  stream(input: OpenRouterRatioInput, opts?: { signal?: AbortSignal }): AsyncIterable<string>;
 }
 
 export function createTickerAssistantAdapter(
@@ -44,8 +44,10 @@ const FIELD_GUIDE = [
   "\"periods up\" is how many of those three periods are up; \"overall trend\" is UP, DOWN or MIXED (null when a period lacks history).",
   "\"6-month high close\" is the highest close in the last 126 trading days; \"distance from 6-month high\" is the latest close's percent distance from it (0 means at the high).",
   "\"trailing 12-month yield\" is trailing 12-month payouts divided by the latest close, in percent (null when nothing was paid);",
-  "\"payout cadence\" describes how often it paid in the trailing 365 days; \"payouts\" lists those ex-dates and cash amounts;",
+  "\"payout cadence\" is how often it pays, from the usual spacing between payouts: weekly, monthly, quarterly, semiannual, annual, irregular, or none when nothing was paid in the trailing 365 days;",
+  "\"payouts\" lists the trailing 365 days' ex-dates and cash amounts;",
   "\"last ex-date\" is the most recent payout ex-date; \"special payout\" is true when one payout was more than twice the median.",
+  "Prices and payouts are adjusted for stock splits to today's share basis.",
 ].join(" ");
 
 const RULES = [
@@ -176,12 +178,14 @@ export interface TickerAssistantInput {
 async function factsFor(
   symbols: string[],
   fetchFacts: (symbol: string) => Promise<TickerFacts | null>,
+  signal?: AbortSignal,
 ): Promise<(TickerFacts | null)[]> {
-  // A few Tiingo requests at a time; cache hits return immediately.
+  // A few Tiingo requests at a time; cache hits return immediately. No new
+  // symbol starts once the caller has gone away.
   const results: (TickerFacts | null)[] = new Array(symbols.length).fill(null);
   let next = 0;
   const worker = async () => {
-    while (next < symbols.length) {
+    while (next < symbols.length && !signal?.aborted) {
       const i = next++;
       results[i] = await fetchFacts(symbols[i]);
     }
@@ -193,16 +197,21 @@ async function factsFor(
 /**
  * Streams the model's answer, then a final "\n\n" + source line chunk. Throws
  * TickerAssistantNoFactsError, without calling the model, when no symbol has
- * facts; TickerFactsUnavailableError when Tiingo fails.
+ * facts; TickerFactsUnavailableError when Tiingo fails. When deps.signal is
+ * aborted before the model call, it ends without yielding anything and makes
+ * no model request; the signal is also passed to the model request.
  */
 export async function* answerTickerQuestion(
   input: TickerAssistantInput,
   deps: {
     adapter?: TickerAssistantAdapter;
     fetchFacts?: (symbol: string) => Promise<TickerFacts | null>;
+    signal?: AbortSignal;
   } = {},
 ): AsyncGenerator<string> {
-  const results = await factsFor(input.symbols, deps.fetchFacts ?? ((s) => fetchTickerFacts(s)));
+  const { signal } = deps;
+  const results = await factsFor(input.symbols, deps.fetchFacts ?? ((s) => fetchTickerFacts(s)), signal);
+  if (signal?.aborted) return;
   const facts = results.filter((f): f is TickerFacts => f !== null);
   const missing = input.symbols.filter((_, i) => results[i] === null);
   if (facts.length === 0) throw new TickerAssistantNoFactsError(missing);
@@ -212,7 +221,8 @@ export async function* answerTickerQuestion(
     nearestBuy: input.nearestBuy,
   });
   const adapter = deps.adapter ?? createTickerAssistantAdapter();
-  for await (const chunk of stripEmDashes(adapter.stream(prompt))) yield chunk;
+  const stream = signal ? adapter.stream(prompt, { signal }) : adapter.stream(prompt);
+  for await (const chunk of stripEmDashes(stream)) yield chunk;
   yield `\n\n${tickerSourceLine(facts)}`;
 }
 

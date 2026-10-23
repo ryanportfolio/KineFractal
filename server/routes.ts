@@ -416,16 +416,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     }
 
-    const answer = answerTickerQuestion(parsed.value);
-    // Stop the model stream (and its token spend) if the browser goes away.
+    // If the browser goes away before the answer is finished, skip the model
+    // call when facts are still loading, or cancel the model request (and its
+    // token spend) when it is already running.
+    const abort = new AbortController();
     let closed = false;
     res.on("close", () => {
       closed = true;
+      if (!res.writableFinished) abort.abort();
     });
+    const answer = answerTickerQuestion(parsed.value, { signal: abort.signal });
 
     let step: IteratorResult<string>;
     try {
       step = await answer.next();
+      if (step.done) {
+        // Aborted before the model call (a finished answer always ends with the
+        // source line): nothing reached the model, so the question does not count.
+        tickerAssistantQuota.release(user.id);
+        return;
+      }
     } catch (error) {
       // Nothing reached the model's output: the question does not count.
       tickerAssistantQuota.release(user.id);
@@ -448,8 +458,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         step = await answer.next();
       }
     } catch (error) {
-      console.error("[ticker-assistant] stream interrupted:", tickerAssistantErrorDetail(error));
-      if (!closed) res.write("\n\n[Answer interrupted. Please try again.]\n");
+      // A cancelled model request after the browser left is expected, not a failure.
+      if (!closed) {
+        console.error("[ticker-assistant] stream interrupted:", tickerAssistantErrorDetail(error));
+        res.write("\n\n[Answer interrupted. Please try again.]\n");
+      }
     }
     res.end();
   });

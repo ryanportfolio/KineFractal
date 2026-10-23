@@ -90,7 +90,12 @@ export function createOpenRouterRatioAdapter({
   provider,
 }: OpenRouterRatioAdapterOptions = {}) {
   return {
-    async *stream({ systemPrompt, userPrompt }: OpenRouterRatioInput): AsyncGenerator<string> {
+    // signal, when given, is passed to fetch so the caller can cancel the
+    // upstream request (and its token spend).
+    async *stream(
+      { systemPrompt, userPrompt }: OpenRouterRatioInput,
+      { signal }: { signal?: AbortSignal } = {},
+    ): AsyncGenerator<string> {
       const apiKey = env.OPENROUTER_API?.trim();
       if (!apiKey) throw new Error("OPENROUTER_API is required for Ratio Relevance analysis");
 
@@ -113,6 +118,7 @@ export function createOpenRouterRatioAdapter({
               { role: "user", content: userPrompt },
             ],
           }),
+          ...(signal ? { signal } : {}),
         });
       } catch {
         throw new Error("OpenRouter request failed");

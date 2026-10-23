@@ -2696,21 +2696,69 @@ function initSiteAccount() {
 // seen before costs no new request.
 var _tickerFactsCache = Object.create(null);    // SYM -> TickerFacts, or null when the server has none
 var _tickerFactsPending = Object.create(null);  // SYM -> Promise while its request runs
+var _tickerFactsExpires = Object.create(null);  // SYM -> epoch ms when its cache entry goes stale
+// The server refreshes its facts at the first 18:30 New York time after it fetched
+// them (nextNewYorkRefresh in server/ticker-facts.ts); a page entry expires at the
+// same moment, counted from when the page asked for it.
+var _nyPartsFmt = null;
+function nyWallAsUtc(ms) {   // New York wall-clock time of ms, read back as if it were UTC
+  if (!_nyPartsFmt) {
+    _nyPartsFmt = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' });
+  }
+  var p = {};
+  _nyPartsFmt.formatToParts(new Date(ms)).forEach(function (x) { p[x.type] = x.value; });
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour, +p.minute, +p.second);
+}
+function nextNewYorkRefresh(ms) {   // the first 18:30 America/New_York strictly after ms
+  try {
+    var wall = new Date(nyWallAsUtc(ms));
+    var atOrPast = wall.getUTCHours() * 60 + wall.getUTCMinutes() >= 18 * 60 + 30;
+    var target = Date.UTC(wall.getUTCFullYear(), wall.getUTCMonth(), wall.getUTCDate() + (atOrPast ? 1 : 0), 18, 30);
+    var guess = target - (nyWallAsUtc(target) - target);
+    return target - (nyWallAsUtc(guess) - guess);
+  } catch (e) {
+    return ms + 6 * 3600e3;   // no time zone support: refetch after six hours
+  }
+}
+function factsExpired(sym) { return !(Date.now() < _tickerFactsExpires[sym]); }
+// True when sym's facts are cached and not yet expired. An expired entry is
+// dropped first, so whoever asks draws nothing old and the next tickerFacts call
+// goes to the server.
+function factsCachedFresh(sym) {
+  if (sym in _tickerFactsCache && factsExpired(sym)) { delete _tickerFactsCache[sym]; delete _tickerFactsExpires[sym]; }
+  return sym in _tickerFactsCache;
+}
+// Drops every expired entry; returns the symbols dropped.
+function dropExpiredFacts() {
+  var gone = [];
+  Object.keys(_tickerFactsCache).forEach(function (sym) {
+    if (!factsExpired(sym)) return;
+    delete _tickerFactsCache[sym];
+    delete _tickerFactsExpires[sym];
+    gone.push(sym);
+  });
+  return gone;
+}
 // tickerFacts(sym) -> Promise<TickerFacts | null>. Resolves null when signed
 // out (no request is made) or when the server has no facts for the ticker;
 // rejects when the request fails, and a failed request is not cached, so a
 // later call tries again. Concurrent calls for one symbol share one request.
+// An entry past its 18:30 New York expiry is fetched again.
 function tickerFacts(sym) {
   sym = String(sym || '').toUpperCase();
   if (!SITE || siteUser !== true) return Promise.resolve(null);
   if (!/^[A-Z0-9](?:[A-Z0-9.-]{0,10}[A-Z0-9])?$/.test(sym)) return Promise.resolve(null);
+  if (sym in _tickerFactsCache && factsExpired(sym)) { delete _tickerFactsCache[sym]; delete _tickerFactsExpires[sym]; }
   if (sym in _tickerFactsCache) return Promise.resolve(_tickerFactsCache[sym]);
   if (_tickerFactsPending[sym]) return _tickerFactsPending[sym];
+  var asked = Date.now();
   var p = fetch('/api/ticker-facts?symbols=' + encodeURIComponent(sym), { credentials: 'same-origin', cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
     .then(function (j) {
       var f = (j && j.facts && j.facts[sym]) || null;
       _tickerFactsCache[sym] = f;
+      _tickerFactsExpires[sym] = nextNewYorkRefresh(asked);
       return f;
     });
   _tickerFactsPending[sym] = p;
@@ -2869,6 +2917,24 @@ function renderFactBand() {
 }
 document.querySelector('#factBand .fb-retry').addEventListener('click', renderFactBand);
 document.querySelector('#factBand .fb-sumretry').addEventListener('click', renderFactBand);
+// A tab left open past 18:30 New York holds facts the server has since replaced.
+// Coming back to it drops the expired entries and fetches again what is on screen:
+// the band (which answers an open chip again once it settles), the Limit Buy
+// table's fact cells near view, and an open quick-check answer there.
+function refreshExpiredFacts() {
+  var gone = dropExpiredFacts();
+  if (!gone.length) return;
+  if (_factSym && gone.indexOf(_factSym) >= 0) renderFactBand();
+  if (!document.getElementById('exportDialog').classList.contains('open')) return;
+  gone.forEach(fillXpFactCells);
+  if (_exportView === 'table') observeXpFactRows();
+  var active = document.querySelector('#xpAssist .xp-check.is-active');
+  var kind = active && active.getAttribute('data-xp-check');
+  if (kind && kind !== 'buy' && xpAnswerBox().childNodes.length) runXpCheck(kind);
+}
+document.addEventListener('visibilitychange', function () {
+  if (document.visibilityState === 'visible') refreshExpiredFacts();
+});
 // Phones show the band collapsed to its summary line; this opens and closes the tiles.
 // Wider screens never show the summary, so the class has no effect there.
 document.querySelector('#factBand [data-action="fact-band-toggle"]').addEventListener('click', function () {
@@ -2920,7 +2986,10 @@ function loadAccountGapPlacement() {
 // (sendAskQuestion, below) and streams its answer.
 var ASK_MODE_KEY = 'kf-ask-dock-v1';
 var _factReady = null;   // { sym, ok, facts, buy } once the band has settled for sym
-var _askGen = 0;         // bumps on ticker change; a late QQQ answer for an old ticker is dropped
+// Every answer the dock starts (a chip, a typed question) takes a new token, and a
+// ticker change takes one too; a late answer whose token is no longer current (a slow
+// QQQ compare, a stream) neither writes nor overwrites the newer one.
+var _askToken = 0;
 var _askSym = null;
 var _askChip = null;     // the chip whose answer is on screen, or null (hint or typed answer)
 var _askReq = null;      // { ctl } while a typed question is being answered, else null
@@ -2944,12 +3013,13 @@ function renderAskDock() {
   dock.hidden = !on;
   document.body.classList.toggle('ask-open', on && dock.getAttribute('data-mode') === 'open');
   document.body.classList.toggle('ask-rail', on && dock.getAttribute('data-mode') !== 'open');
+  updateAskSheet();   // phones: the open sheet makes the page behind it inert
   if (!on) { askAbort(); return; }
   var sym = _factSym || '';
   if (sym !== _askSym) {   // new ticker: the old answer described the old one
     askAbort();
     _askSym = sym;
-    _askGen++;
+    _askToken++;
     askHint();
   }
   dock.setAttribute('data-symbol', sym);
@@ -2985,6 +3055,37 @@ function setAskMode(mode, focusTarget) {
 function collapseAskDock() {
   setAskMode('rail');
   document.getElementById('askAiBtn').focus();
+}
+// Phones (max-width 700px): the open dock is a full-screen sheet, so it holds the
+// keyboard like a dialog. Tab and Shift+Tab wrap inside it and the page behind it is
+// inert; both end when it collapses, hides or the screen grows past 700px.
+var ASK_SHEET_MQ = window.matchMedia ? window.matchMedia('(max-width:700px)') : null;
+var ASK_BEHIND = ['#bar', '#factBand', '#chart', '#cmpMenu', '#msg'];
+function askSheetOpen() {
+  var dock = document.getElementById('askDock');
+  return !!(ASK_SHEET_MQ && ASK_SHEET_MQ.matches && dock && !dock.hidden && dock.getAttribute('data-mode') === 'open');
+}
+function updateAskSheet() {
+  var on = askSheetOpen();
+  ASK_BEHIND.forEach(function (sel) {
+    var el = document.querySelector(sel);
+    if (el && el.inert !== on) el.inert = on;
+  });
+}
+function trapAskFocus(event) {
+  if (!askSheetOpen()) return;
+  var dock = document.getElementById('askDock');
+  var focusable = Array.prototype.slice.call(dock.querySelectorAll('button:not(:disabled), input:not(:disabled), a[href], [tabindex="0"]'))
+    .filter(function (el) { return el.getClientRects().length > 0; });   // skip the hidden rail and chips
+  if (!focusable.length) return;
+  var first = focusable[0], last = focusable[focusable.length - 1];
+  if (!dock.contains(document.activeElement)) { event.preventDefault(); (event.shiftKey ? last : first).focus(); return; }
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+}
+if (ASK_SHEET_MQ) {
+  if (ASK_SHEET_MQ.addEventListener) ASK_SHEET_MQ.addEventListener('change', updateAskSheet);
+  else if (ASK_SHEET_MQ.addListener) ASK_SHEET_MQ.addListener(updateAskSheet);
 }
 // --- answer building: DOM nodes with textContent only ---
 function askNode(tag, cls, text) {
@@ -3022,12 +3123,20 @@ function askCloseSource(f, withPayouts) {
 }
 // "expected around" date for the next payout: the last ex-date plus one cadence
 // step, stepped past the as-of date. An estimate, never an announced date.
+// Weekly payers step 7 days at a time; the rest step whole months.
 var ASK_CADENCE_MONTHS = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12 };
 function askNextExDate(f) {
   var months = ASK_CADENCE_MONTHS[f.cadence];
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f.lastExDate || '');
-  if (!months || !m) return null;
+  if (!m || (!months && f.cadence !== 'weekly')) return null;
   var y = +m[1], mo = +m[2] - 1, d = +m[3], iso = '';
+  if (f.cadence === 'weekly') {
+    for (var w = 1; w <= 60; w++) {
+      iso = new Date(Date.UTC(y, mo, d + 7 * w)).toISOString().slice(0, 10);
+      if (iso > f.asOf) return iso;
+    }
+    return null;
+  }
   for (var i = 1; i <= 24; i++) {
     var t = new Date(Date.UTC(y, mo + months * i, 1));
     var last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
@@ -3036,11 +3145,12 @@ function askNextExDate(f) {
   }
   return null;
 }
-var ASK_STEP_WORDS = { monthly: 'about a month', quarterly: 'about three months', semiannual: 'about six months', annual: 'about a year' };
+var ASK_STEP_WORDS = { weekly: 'about a week', monthly: 'about a month', quarterly: 'about three months', semiannual: 'about six months', annual: 'about a year' };
 // Answers one chip into #askAnswer. Everything but "compare" is synchronous.
 function runAskChip(chip) {
   var sym = _askSym, r = askFacts();
   askAbort();   // a chip is a new question: stop a typed answer still streaming
+  var tok = ++_askToken;   // and drop any slower answer still on its way
   setAskPressed(chip);
   if (chip === 'buy') return askBuyAnswer(sym, r);
   if (!r) return askAnswer(sym || 'Facts', ['Facts for ' + sym + ' are still loading. Try again in a moment.'], 'Tiingo daily closes');
@@ -3091,13 +3201,12 @@ function runAskChip(chip) {
         + ', so the next ex-date usually falls ' + ASK_STEP_WORDS[f.cadence] + ' later. Our data has no announced future payouts.'],
       askCloseSource(f, true));
   }
-  if (chip === 'compare') return askCompareAnswer(sym, f);
+  if (chip === 'compare') return askCompareAnswer(sym, f, tok);
 }
-function askCompareAnswer(sym, f) {
-  var gen = _askGen;
+function askCompareAnswer(sym, f, tok) {
   askAnswer(sym + ' vs QQQ', ['Loading QQQ facts…'], askCloseSource(f, false));
   tickerFacts('QQQ').then(function (q) { return q; }, function () { return undefined; }).then(function (q) {
-    if (gen !== _askGen) return;   // the ticker changed meanwhile
+    if (tok !== _askToken) return;   // a newer chip, question or ticker took over meanwhile
     if (!q) {
       return askAnswer(sym + ' vs QQQ', [q === undefined ? 'QQQ facts did not load. Try again in a minute.' : 'No facts for QQQ right now.'],
         askCloseSource(f, false));
@@ -3233,10 +3342,13 @@ function sendAskQuestion(question) {
   askAbort();
   setAskPressed(null);
   _askLast = { sym: sym, question: question };
-  var req = { ctl: window.AbortController ? new AbortController() : null };
+  var req = { ctl: window.AbortController ? new AbortController() : null, tok: ++_askToken };
   _askReq = req;
   setAskBusy(true);
   var card = askTypedCard(question);
+  // current only while it is the running question, holds the newest token and its
+  // card is still on the page: otherwise nothing more is written
+  var live = function () { return _askReq === req && req.tok === _askToken && card.isConnected; };
   var wait = askNode('p', 'ask-hint', 'Writing an answer…');
   var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
   answer.appendChild(text);
@@ -3245,9 +3357,11 @@ function sendAskQuestion(question) {
   var payload = { symbols: [sym], question: question };
   var buyPx = askNearestBuy(sym);
   if (buyPx) { payload.nearestBuy = {}; payload.nearestBuy[sym] = buyPx; }
-  var fail = function (msg, retry) { askTypedError(req, question, msg, retry); };
+  // a superseded question that is somehow still marked running just stops
+  var drop = function () { if (_askReq === req) askAbort(); };
+  var fail = function (msg, retry) { if (!live()) return drop(); askTypedError(req, question, msg, retry); };
   postAskQuestion(JSON.stringify(payload), false, req.ctl && req.ctl.signal).then(function (r) {
-    if (_askReq !== req) return;
+    if (!live()) return drop();
     if (r.status === 401) {
       fail('Your session has ended. Sign in again to ask questions.', false);
       return showSignupCta('Sign in to ask questions', 'Typed questions use your account. Sign in again to keep asking about ' + sym + '.');
@@ -3262,12 +3376,12 @@ function sendAskQuestion(question) {
     if (r.status === 400) return fail('This question could not be sent. Try a shorter question.', false);
     if (!r.ok) return fail(ASK_FAIL_MSG, true);
     var add = function (chunk) {
-      if (_askReq !== req || !chunk) return;
+      if (!live() || !chunk) return;
       if (wait.parentNode) wait.remove();
       text.data += chunk;
     };
     var finish = function () {
-      if (_askReq !== req) return;
+      if (!live()) return drop();
       var all = text.data;
       var lines = all.replace(/\s+$/, '').split(/\r?\n/);
       var last = lines.pop() || '';
@@ -3277,7 +3391,7 @@ function sendAskQuestion(question) {
       text.data = lines.join('\n').trim();
       card.appendChild(askNode('p', 'ask-src', last));
     };
-    return readAskStream(r, function () { return _askReq === req; }, add).then(function (complete) { if (complete) finish(); });
+    return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
   }).catch(function (e) {
     if (e && e.name === 'AbortError') return;   // askAbort already moved on
     fail(ASK_FAIL_MSG, true);
@@ -3323,6 +3437,7 @@ function initAskDock() {
   dock.addEventListener('keydown', function (e) {
     e.stopPropagation();
     if (e.key === 'Escape') { e.preventDefault(); collapseAskDock(); }
+    else if (e.key === 'Tab') trapAskFocus(e);
   });
   // the dock starts under the toolbar, which wraps to more rows on narrow screens
   var bar = document.getElementById('bar');
@@ -5314,11 +5429,13 @@ function updateExportPickCount() {
 // --- live build -----------------------------------------------------------------
 var _exportTimer = null;
 var _exportCsvReady = false;   // true only while the shown table matches the current inputs
+var _exportBuilt = false;      // true once a build finished for the current inputs (even with no rows)
 function scheduleExportBuild(delay) {
   clearTimeout(_exportTimer);
   _exportGen++;   // a build still loading belongs to the old inputs: drop its result
   // the table on screen is about to go stale: never let Download hand out the old rows
   _exportCsvReady = false;
+  _exportBuilt = false;
   document.getElementById('exportCsv').disabled = true;
   _exportTimer = setTimeout(buildExportTable, delay == null ? 250 : delay);
 }
@@ -5334,6 +5451,7 @@ function readExportRange() {
 }
 function buildExportTable() {
   var gen = ++_exportGen;
+  _exportBuilt = false;
   var syms = checkedExportSymbols();
   var msg = document.getElementById('exportMsg');
   var main = document.getElementById('exportMain');
@@ -5388,6 +5506,7 @@ function buildExportTable() {
     msg.classList.toggle('error', !!failed.length);
     renderExportTable(sections);
     updateExportFooter(rows, sections.length);
+    _exportBuilt = true;
   }, function (i, n) {
     if (gen === _exportGen) updateExportLoading(syms[i], i + 1, n);
   }, function () { return gen !== _exportGen; });
@@ -5616,7 +5735,7 @@ function xpFactsOn() { return SITE && siteUser === true; }
 // One fact cell's look: { state, text, cls, tip }.
 function xpFactView(sym, key) {
   var st = _xpFactState[sym];
-  if (!(sym in _tickerFactsCache)) {
+  if (!factsCachedFresh(sym)) {   // past 18:30 New York counts as not loaded
     if (st === 'error') return { state: 'error', text: '—', cls: 'is-none', tip: 'Could not load ' + sym + ' facts · click the ticker to try again' };
     return { state: 'pending', text: '', cls: 'is-pending', tip: '' };
   }
@@ -5658,10 +5777,12 @@ function fillXpFactCells(sym) {
 }
 // Ask for a ticker's facts. urgent (the visitor selected it) jumps the queue
 // and retries a failed request; otherwise a failed ticker stays "—" until the
-// dialog is opened again.
+// dialog is opened again. Facts past their 18:30 New York expiry are fetched
+// again, and their cells go back to the placeholder until the new ones arrive.
 function xpFactWant(sym, urgent) {
   if (!xpFactsOn() || _exportView !== 'table') return;
-  if (sym in _tickerFactsCache) { fillXpFactCells(sym); return; }
+  var expired = sym in _tickerFactsCache;
+  if (factsCachedFresh(sym)) { fillXpFactCells(sym); return; }
   var st = _xpFactState[sym];
   if (st === 'loading' || (st === 'error' && !urgent)) return;
   if (st === 'queued') {
@@ -5670,7 +5791,7 @@ function xpFactWant(sym, urgent) {
   }
   _xpFactState[sym] = 'queued';
   if (urgent) _xpFactQueue.unshift(sym); else _xpFactQueue.push(sym);
-  if (st === 'error') fillXpFactCells(sym);   // back to the dim placeholder
+  if (st === 'error' || expired) fillXpFactCells(sym);   // back to the dim placeholder
   pumpXpFacts();
 }
 // A row left the area before its request started: take it off the queue.
@@ -5743,6 +5864,9 @@ var _xpFilter = null;         // { up, close } while the table shows only ticker
 var _xpSelKey = null;         // the selection the column last showed
 var _xpAskReq = null;         // { ctl } while a typed question is answered
 var _xpAskLast = null;        // the last typed question, for Retry
+// Every quick check and typed question takes a new token, and so does a selection
+// change or a reset; an older one still waiting neither writes nor overwrites.
+var _xpToken = 0;
 function xpRunNeeds(sym) { return !!(_xpRun && _xpRun.need[sym]); }
 function xpAnswerBox() { return document.getElementById('xpAssistAnswer'); }
 function xpList(syms) {   // "A", "A and B", "A, B and C"
@@ -5777,6 +5901,7 @@ function renderXpAssist() {
   document.getElementById('xpAssistCount').textContent = '(' + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + ' selected)';
   if (key === _xpSelKey) return;
   _xpSelKey = key;
+  _xpToken++;
   xpCheckAbort();
   xpAskAbort();
   clearXpFilter();
@@ -5785,6 +5910,7 @@ function renderXpAssist() {
 }
 // dialog opened or closed: nothing carries over
 function resetXpAssist() {
+  _xpToken++;
   xpCheckAbort();
   xpAskAbort();
   clearXpFilter();
@@ -5805,20 +5931,22 @@ function runXpCheck(kind) {
   if (!xpFactsOn()) return;
   xpAskAbort();
   xpCheckAbort();
+  var tok = ++_xpToken;
   setXpCheckActive(kind);
   var syms = checkedExportSymbols();
   if (!syms.length) return xpAnswerCard('No tickers selected', ['Tick one or more tickers on the left first.'], null);
   if (kind === 'buy') return xpBuyAnswer(syms);
-  var run = { kind: kind, syms: syms, need: Object.create(null) };
+  var run = { kind: kind, syms: syms, need: Object.create(null), tok: tok };
   _xpRun = run;
   syms.forEach(function (sym) {
-    if (sym in _tickerFactsCache) return;
+    var expired = sym in _tickerFactsCache;
+    if (factsCachedFresh(sym)) return;   // past 18:30 New York it was dropped: fetched again below
     run.need[sym] = true;
     var st = _xpFactState[sym];
     if (st === 'loading' || st === 'queued') return;   // already on its way: never a second request
     _xpFactState[sym] = 'queued';
     _xpFactQueue.push(sym);
-    if (st === 'error') fillXpFactCells(sym);   // back to the dim placeholder
+    if (st === 'error' || expired) fillXpFactCells(sym);   // back to the dim placeholder
   });
   pumpXpFacts();
   xpRunTick();
@@ -5828,7 +5956,7 @@ function runXpCheck(kind) {
 // its request ended without facts to cache.
 function xpRunTick() {
   var run = _xpRun;
-  if (!run) return;
+  if (!run || run.tok !== _xpToken) return;
   var done = run.syms.filter(function (s) {
     return (s in _tickerFactsCache) || !_xpFactState[s] || _xpFactState[s] === 'error';
   }).length;
@@ -5842,17 +5970,28 @@ function xpRunTick() {
   document.getElementById('xpAssistProgress').textContent = '';
   xpCheckAnswer(run.kind, run.syms);
 }
-// The selection's facts: { facts: [{ sym, f }], failed, none, asOf }.
+// The selection's facts: { facts: [{ sym, f }], failed, none }.
 function xpFactsOf(syms) {
-  var out = { facts: [], failed: [], none: [], asOf: '' };
+  var out = { facts: [], failed: [], none: [] };
   syms.forEach(function (sym) {
     if (!(sym in _tickerFactsCache)) { out.failed.push(sym); return; }
     var f = _tickerFactsCache[sym];
     if (!f) { out.none.push(sym); return; }
     out.facts.push({ sym: sym, f: f });
-    if (f.asOf && f.asOf > out.asOf) out.asOf = f.asOf;
   });
   return out;
+}
+// The as-of part of a source line, naming every distinct date so no ticker's
+// figures sit under a date that is not theirs: " through Oct 22" when all agree,
+// else " through Oct 22; IWM through Jan 2" (the date most tickers share first,
+// unnamed, then each other date with its tickers, newest first).
+function xpThrough(r) {
+  var by = Object.create(null);
+  r.facts.forEach(function (x) { if (x.f.asOf) (by[x.f.asOf] = by[x.f.asOf] || []).push(x.sym); });
+  var days = Object.keys(by).sort(function (a, b) { return by[b].length - by[a].length || (a < b ? 1 : a > b ? -1 : 0); });
+  if (!days.length) return '';
+  var rest = days.slice(1).sort().reverse();
+  return ' through ' + fbDay(days[0]) + rest.map(function (d) { return '; ' + xpList(by[d]) + ' through ' + fbDay(d); }).join('');
 }
 function xpPartialNote(r) {
   var parts = [];
@@ -5862,7 +6001,7 @@ function xpPartialNote(r) {
 }
 function xpCheckAnswer(kind, syms) {
   var r = xpFactsOf(syms), partial = xpPartialNote(r), n = r.facts.length;
-  var through = r.asOf ? ' through ' + fbDay(r.asOf) : '';
+  var through = xpThrough(r);
   if (kind === 'monthly') {
     var monthly = r.facts.filter(function (x) { return x.f.cadence === 'monthly'; });
     var named = monthly.map(function (x) { return x.sym + (fbNum(x.f.yield) ? ' (' + x.f.yield.toFixed(2) + '% yield)' : ''); });
@@ -5915,10 +6054,20 @@ function xpCheckAnswer(kind, syms) {
     ], 'Tiingo daily closes' + through + '; price change, not total return');
   }
 }
+// Why the dialog's prices can't be used right now, or null when its last build
+// matches the inputs on screen: { range: message } while Min/Max is not valid,
+// { pending: true } while the build for the current inputs has not finished.
+function xpPriceProblem() {
+  var range = readExportRange();
+  if (range.error) return { range: range.error };
+  return _exportBuilt ? null : { pending: true };
+}
 // Each selected ticker's lead price: the one its card leads with (nearest
-// Strong price, else the nearest), from the dialog's current build.
+// Strong price, else the nearest), from the dialog's current build. None while
+// that build is stale (xpPriceProblem), so no old price is shown or sent.
 function xpLeadPrices(syms) {
   var out = [];
+  if (xpPriceProblem()) return out;
   syms.forEach(function (sym) {
     var sec = _exportSecs[sym], limits = sec ? exportLimits(sec.rows) : [];
     if (!limits.length) return;
@@ -5928,6 +6077,15 @@ function xpLeadPrices(syms) {
   return out;
 }
 function xpBuyAnswer(syms) {
+  var problem = xpPriceProblem();
+  if (problem && problem.range) {
+    return xpAnswerCard('Fix the Min/Max range first', ['The Min/Max range above is not valid. ' + problem.range,
+      'Buy prices show here again once the range is fixed.'], 'Limit Buy Levels settings');
+  }
+  if (problem) {
+    return xpAnswerCard('Prices are updating', ['Buy prices for the current settings are still being built. Try again in a moment.'],
+      'Limit Buy Levels settings');
+  }
   var leads = xpLeadPrices(syms).sort(function (a, b) { return a.pct - b.pct; });
   var noPrice = syms.filter(function (s) { return _exportSecs[s] && !exportLimits(_exportSecs[s].rows).length; });
   var notBuilt = syms.filter(function (s) { return !_exportSecs[s]; });
@@ -6050,7 +6208,7 @@ function sendXpQuestion(question) {
     return false;
   }
   _xpAskLast = question;
-  var req = { ctl: window.AbortController ? new AbortController() : null };
+  var req = { ctl: window.AbortController ? new AbortController() : null, tok: ++_xpToken };
   _xpAskReq = req;
   setXpAskBusy(true);
   var card = xpTypedCard(question);
@@ -6065,10 +6223,13 @@ function sendXpQuestion(question) {
     if (isFinite(px) && px > 0) { buy[x.sym] = px; anyBuy = true; }
   });
   if (anyBuy) payload.nearestBuy = buy;
-  var live = function () { return _xpAskReq === req; };
-  var fail = function (msg, retry) { xpTypedError(req, question, msg, retry); };
+  // current only while it is the running question, holds the newest token and its
+  // card is still on the page; a superseded one still marked running just stops
+  var live = function () { return _xpAskReq === req && req.tok === _xpToken && card.isConnected; };
+  var drop = function () { if (_xpAskReq === req) xpAskAbort(); };
+  var fail = function (msg, retry) { if (!live()) return drop(); xpTypedError(req, question, msg, retry); };
   postAskQuestion(JSON.stringify(payload), false, req.ctl && req.ctl.signal).then(function (r) {
-    if (!live()) return;
+    if (!live()) return drop();
     if (r.status === 401) return fail('Your session has ended. Sign in again to ask questions.', false);
     if (r.status === 404) return fail('No facts for these tickers: Tiingo has no daily prices for them, so there is nothing to explain.', false);
     if (r.status === 429) {
@@ -6084,7 +6245,7 @@ function sendXpQuestion(question) {
       text.data += chunk;
     };
     var finish = function () {
-      if (!live()) return;
+      if (!live()) return drop();
       var all = text.data;
       var lines = all.replace(/\s+$/, '').split(/\r?\n/);
       var last = lines.pop() || '';
@@ -6094,7 +6255,7 @@ function sendXpQuestion(question) {
       text.data = lines.join('\n').trim();
       card.appendChild(askNode('p', 'ask-src', last));
     };
-    return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); });
+    return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
   }).catch(function (e) {
     if (e && e.name === 'AbortError') return;
     fail(ASK_FAIL_MSG, true);

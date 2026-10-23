@@ -211,7 +211,7 @@ test("ASK AI: the answer streams in as text under the question, source line last
   assert.match(fnBody("askTypedCard"), /askNode\('p', 'ask-q', question\)/);
   assert.match(fnBody("readAskStream"), /r\.body\.getReader\(\)/);
   assert.match(fnBody("readAskStream"), /if \(!live\(\)\) \{ reader\.cancel\(\)/, "a dropped answer stops reading");
-  assert.match(send, /readAskStream\(r, function \(\) \{ return _askReq === req; \}, add\)\.then\(function \(complete\) \{ if \(complete\) finish\(\); \}\)/);
+  assert.match(send, /readAskStream\(r, live, add\)\.then\(function \(complete\) \{ if \(complete\) finish\(\); else drop\(\); \}\)/);
   assert.match(send, /text\.data \+= chunk;/, "chunks append to a text node");
   assert.match(send, /card\.appendChild\(askNode\('p', 'ask-src', last\)\);/);
   assert.ok(send.includes("if (/\\[Answer interrupted/.test(all) || !/^Source: /.test(last)) return fail(ASK_FAIL_MSG, true);"),
@@ -279,7 +279,7 @@ test("Limit Buy table: facts load lazily, through tickerFacts, at most 3 at once
   assert.match(pump, /_xpFactRunning--;/);
   const want = fnBody("xpFactWant");
   assert.match(want, /if \(!xpFactsOn\(\) \|\| _exportView !== 'table'\) return;/);
-  assert.match(want, /if \(sym in _tickerFactsCache\) \{ fillXpFactCells\(sym\); return; \}/);
+  assert.match(want, /if \(factsCachedFresh\(sym\)\) \{ fillXpFactCells\(sym\); return; \}/);
   assert.match(want, /if \(st === 'loading' \|\| \(st === 'error' && !urgent\)\) return;/);
   assert.match(fnBody("xpFactDrop"), /if \(_xpFactState\[sym\] !== 'queued'\) return;/);
   const obs = fnBody("observeXpFactRows");
@@ -446,4 +446,151 @@ test("phones: the fact band starts collapsed to one line with a toggle", () => {
   assert.match(fill, /\.fb-sumsym'\)\.textContent = sym;/);
   assert.match(fill, /st\.textContent = overall \|\| '—';/);
   assert.match(fill, /'% yield' : 'no yield'/);
+});
+
+// Runs page functions out of charts.html in a bare scope, with the helpers they need.
+function pageFns(names, prelude = "") {
+  const src = names.map((n) => fnBody(n)).join("\n");
+  return new Function(`${prelude}\n${src}\nreturn { ${names.join(", ")} };`)();
+}
+
+test("ASK AI: every chip and typed question takes a new token, so a slow compare never overwrites a newer answer", () => {
+  assert.match(html, /var _askToken = 0;/);
+  assert.doesNotMatch(html, /_askGen/, "the ticker-only counter is gone");
+  assert.match(fnBody("runAskChip"), /askAbort\(\);[^\n]*\n\s*var tok = \+\+_askToken;/);
+  assert.match(fnBody("runAskChip"), /return askCompareAnswer\(sym, f, tok\);/);
+  const compare = fnBody("askCompareAnswer");
+  assert.match(compare, /function askCompareAnswer\(sym, f, tok\)/);
+  assert.match(compare, /if \(tok !== _askToken\) return;/);
+  assert.match(fnBody("renderAskDock"), /if \(sym !== _askSym\) \{[^}]*_askToken\+\+;/, "a ticker change drops pending answers");
+  const send = fnBody("sendAskQuestion");
+  assert.match(send, /tok: \+\+_askToken \};/);
+  assert.match(send, /var live = function \(\) \{ return _askReq === req && req\.tok === _askToken && card\.isConnected; \};/,
+    "a typed answer stops writing once superseded or detached");
+  assert.match(send, /if \(!live\(\) \|\| !chunk\) return;/);
+  assert.match(send, /var fail = function \(msg, retry\) \{ if \(!live\(\)\) return drop\(\);/);
+});
+
+test("Limit Buy assistant column: checks and questions take tokens; an older one neither writes nor overwrites", () => {
+  assert.match(html, /var _xpToken = 0;/);
+  const run = fnBody("runXpCheck");
+  assert.match(run, /var tok = \+\+_xpToken;/);
+  assert.match(run, /need: Object\.create\(null\), tok: tok \}/);
+  assert.match(fnBody("xpRunTick"), /if \(!run \|\| run\.tok !== _xpToken\) return;/);
+  assert.match(fnBody("renderXpAssist"), /_xpSelKey = key;\s*_xpToken\+\+;/);
+  assert.match(fnBody("resetXpAssist"), /_xpToken\+\+;/);
+  const send = fnBody("sendXpQuestion");
+  assert.match(send, /tok: \+\+_xpToken \};/);
+  assert.match(send, /var live = function \(\) \{ return _xpAskReq === req && req\.tok === _xpToken && card\.isConnected; \};/);
+  assert.match(send, /readAskStream\(r, live, add\)\.then\(function \(complete\) \{ if \(complete\) finish\(\); else drop\(\); \}\)/);
+});
+
+test("browser facts expire at the first 18:30 New York after they were fetched", () => {
+  const { nextNewYorkRefresh } = pageFns(["nyWallAsUtc", "nextNewYorkRefresh"], "var _nyPartsFmt = null;");
+  const at = (iso) => new Date(nextNewYorkRefresh(Date.parse(iso))).toISOString();
+  assert.equal(at("2026-10-23T14:00:00Z"), "2026-10-23T22:30:00.000Z", "10:00 EDT -> 18:30 the same day");
+  assert.equal(at("2026-10-23T22:30:00Z"), "2026-10-24T22:30:00.000Z", "at 18:30 -> the next day");
+  assert.equal(at("2026-10-24T03:00:00Z"), "2026-10-24T22:30:00.000Z", "23:00 EDT the day before");
+  assert.equal(at("2026-11-01T12:00:00Z"), "2026-11-01T23:30:00.000Z", "after the fall clock change: 18:30 EST");
+  assert.equal(at("2026-03-08T12:00:00Z"), "2026-03-08T22:30:00.000Z", "after the spring clock change: 18:30 EDT");
+  const facts = fnBody("tickerFacts");
+  assert.match(facts, /if \(sym in _tickerFactsCache && factsExpired\(sym\)\) \{ delete _tickerFactsCache\[sym\]; delete _tickerFactsExpires\[sym\]; \}/);
+  assert.ok(facts.indexOf("factsExpired(sym)") < facts.indexOf("if (sym in _tickerFactsCache) return"), "expired entries are dropped before the cache answers");
+  assert.match(facts, /_tickerFactsExpires\[sym\] = nextNewYorkRefresh\(asked\);/);
+  assert.match(fnBody("factsExpired"), /return !\(Date\.now\(\) < _tickerFactsExpires\[sym\]\);/);
+});
+
+test("coming back to the tab refetches expired facts for the band and an open Limit Buy answer", () => {
+  assert.match(html, /document\.addEventListener\('visibilitychange', function \(\) \{\s*if \(document\.visibilityState === 'visible'\) refreshExpiredFacts\(\);/);
+  const refresh = fnBody("refreshExpiredFacts");
+  assert.match(refresh, /var gone = dropExpiredFacts\(\);/);
+  assert.match(refresh, /if \(_factSym && gone\.indexOf\(_factSym\) >= 0\) renderFactBand\(\);/);
+  assert.match(refresh, /observeXpFactRows\(\);/);
+  assert.match(refresh, /runXpCheck\(kind\);/);
+  assert.match(fnBody("runXpCheck"), /if \(factsCachedFresh\(sym\)\) return;/, "a quick check refetches expired tickers");
+});
+
+test("Limit Buy table: facts past their 18:30 New York expiry are never drawn and are fetched again", () => {
+  const prelude = `var _tickerFactsCache = Object.create(null); var _tickerFactsExpires = Object.create(null);
+    var _xpFactState = Object.create(null); var _xpFactQueue = []; var _exportView = 'table';
+    var filled = [], pumped = 0;
+    function xpFactsOn() { return true; } function fillXpFactCells(s) { filled.push(s); } function pumpXpFacts() { pumped++; }`;
+  const src = ["factsExpired", "factsCachedFresh", "xpFactWant"].map((n) => fnBody(n)).join("\n");
+  const page = new Function(`${prelude}\n${src}\nreturn {
+    set(sym, f, msLeft) { _tickerFactsCache[sym] = f; _tickerFactsExpires[sym] = Date.now() + msLeft; },
+    has(sym) { return sym in _tickerFactsCache; },
+    state: () => ({ queue: _xpFactQueue.slice(), st: Object.assign({}, _xpFactState), filled: filled.slice(), pumped }),
+    factsCachedFresh, xpFactWant };`)();
+  page.set("SPY", { yield: 1.1 }, 60000);
+  page.set("QQQ", { yield: 0.6 }, -1);
+  assert.equal(page.factsCachedFresh("SPY"), true, "an entry before its expiry stays");
+  assert.equal(page.factsCachedFresh("QQQ"), false, "an expired entry counts as not loaded");
+  assert.equal(page.has("QQQ"), false, "and is dropped from the cache");
+  page.xpFactWant("SPY", false);
+  assert.deepEqual(page.state(), { queue: [], st: {}, filled: ["SPY"], pumped: 0 }, "fresh facts redraw without a request");
+  page.set("IWM", { yield: 1.3 }, -1);
+  page.xpFactWant("IWM", false);
+  const s = page.state();
+  assert.deepEqual(s.queue, ["IWM"], "an expired ticker goes back on the queue");
+  assert.equal(s.st.IWM, "queued");
+  assert.deepEqual(s.filled, ["SPY", "IWM"], "its old cells go back to the placeholder");
+  assert.equal(s.pumped, 1);
+  assert.equal(page.has("IWM"), false);
+  page.xpFactWant("IWM", false);
+  assert.deepEqual(page.state().queue, ["IWM"], "never queued twice");
+  assert.match(fnBody("xpFactView"), /if \(!factsCachedFresh\(sym\)\) \{/, "the table never draws expired facts");
+  assert.match(fnBody("runXpCheck"), /if \(st === 'error' \|\| expired\) fillXpFactCells\(sym\);/);
+  assert.doesNotMatch(fnBody("xpFactWant"), /fetch\(|tickerFacts\(/, "requests still go through the queue");
+});
+
+test("Limit Buy answers name each distinct as-of date", () => {
+  const { xpThrough } = pageFns(["xpList", "fbDay", "xpThrough"], "var FB_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];");
+  const r = (pairs) => ({ facts: pairs.map(([sym, asOf]) => ({ sym, f: { asOf } })) });
+  assert.equal(xpThrough(r([["SPY", "2026-10-22"], ["QQQ", "2026-10-22"]])), " through Oct 22");
+  assert.equal(xpThrough(r([["SPY", "2026-10-22"], ["IWM", "2026-01-02"], ["TSLA", "2026-10-22"]])), " through Oct 22; IWM through Jan 2");
+  assert.equal(xpThrough(r([["A", "2026-10-22"], ["B", "2026-01-02"], ["C", "2026-10-21"], ["D", "2026-10-22"]])),
+    " through Oct 22; C through Oct 21; B through Jan 2");
+  assert.equal(xpThrough(r([])), "");
+  assert.match(fnBody("xpCheckAnswer"), /var through = xpThrough\(r\);/);
+  assert.doesNotMatch(fnBody("xpFactsOf"), /asOf/, "no single newest date any more");
+});
+
+test("Limit Buy answers carry no stale buy prices while Min/Max is invalid or the build is pending", () => {
+  const problem = fnBody("xpPriceProblem");
+  assert.match(problem, /if \(range\.error\) return \{ range: range\.error \};/);
+  assert.match(problem, /return _exportBuilt \? null : \{ pending: true \};/);
+  assert.match(fnBody("xpLeadPrices"), /if \(xpPriceProblem\(\)\) return out;/, "so typed questions send no nearestBuy");
+  const buy = fnBody("xpBuyAnswer");
+  assert.ok(buy.indexOf("xpPriceProblem()") < buy.indexOf("xpLeadPrices("), "checked before any price is listed");
+  assert.match(buy, /'The Min\/Max range above is not valid\. ' \+ problem\.range/);
+  assert.match(fnBody("scheduleExportBuild"), /_exportBuilt = false;/);
+  assert.match(fnBody("buildExportTable"), /updateExportFooter\(rows, sections\.length\);\s*_exportBuilt = true;/);
+  assert.match(fnBody("sendXpQuestion"), /xpLeadPrices\(syms\)\.forEach/);
+});
+
+test("phones: the full-screen dock keeps keyboard focus inside it", () => {
+  assert.match(html, /var ASK_SHEET_MQ = window\.matchMedia \? window\.matchMedia\('\(max-width:700px\)'\) : null;/);
+  assert.match(html, /var ASK_BEHIND = \['#bar', '#factBand', '#chart'/);
+  assert.match(fnBody("askSheetOpen"), /dock\.getAttribute\('data-mode'\) === 'open'/);
+  const upd = fnBody("updateAskSheet");
+  assert.match(upd, /ASK_BEHIND\.forEach/);
+  assert.match(upd, /el\.inert = on;/);
+  const trap = fnBody("trapAskFocus");
+  assert.match(trap, /if \(!askSheetOpen\(\)\) return;/);
+  assert.match(trap, /if \(event\.shiftKey && document\.activeElement === first\) \{ event\.preventDefault\(\); last\.focus\(\); \}/);
+  assert.match(trap, /else if \(!event\.shiftKey && document\.activeElement === last\) \{ event\.preventDefault\(\); first\.focus\(\); \}/);
+  assert.match(fnBody("initAskDock"), /else if \(e\.key === 'Tab'\) trapAskFocus\(e\);/);
+  assert.match(fnBody("renderAskDock"), /updateAskSheet\(\);[^\n]*\n\s*if \(!on\) \{ askAbort\(\); return; \}/, "collapse or sign-out lifts the inert page");
+  assert.match(html, /ASK_SHEET_MQ\.addEventListener\('change', updateAskSheet\)/, "growing past 700px lifts it too");
+});
+
+test("weekly payers: next ex-date a week after the last one, and never listed as monthly", () => {
+  const { askNextExDate } = pageFns(["askNextExDate"], "var ASK_CADENCE_MONTHS = { monthly: 1, quarterly: 3, semiannual: 6, annual: 12 };");
+  assert.equal(askNextExDate({ cadence: "weekly", lastExDate: "2026-10-20", asOf: "2026-10-22" }), "2026-10-27");
+  assert.equal(askNextExDate({ cadence: "weekly", lastExDate: "2026-10-13", asOf: "2026-10-22" }), "2026-10-27", "stepped past the as-of date");
+  assert.equal(askNextExDate({ cadence: "weekly", lastExDate: "2026-12-29", asOf: "2026-12-30" }), "2027-01-05", "across the year end");
+  assert.equal(askNextExDate({ cadence: "monthly", lastExDate: "2026-10-02", asOf: "2026-10-22" }), "2026-11-02");
+  assert.equal(askNextExDate({ cadence: "irregular", lastExDate: "2026-10-02", asOf: "2026-10-22" }), null);
+  assert.match(html, /var ASK_STEP_WORDS = \{ weekly: 'about a week',/);
+  assert.match(fnBody("xpCheckAnswer"), /x\.f\.cadence === 'monthly'/, "weekly payers are not monthly");
 });
