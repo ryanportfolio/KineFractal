@@ -17,6 +17,8 @@ test("modal provides reliable non-drag movement and reset controls", () => {
     assert.match(html, new RegExp(`makeTickerMoveButton\\(symbol, '${action}'`));
   }
   assert.match(html, /id="tickerReorderReset"[^>]*>Reset to default order</);
+  assert.match(html, /id="tickerReorderRecent"[^>]*>Newest added first</);
+  assert.match(html, /function recentTickerOrder\(\)/);
   assert.match(html, /function moveTickerInModal\(symbol, destination\)/);
   assert.match(html, /function resetTickerOrder\(\)/);
 });
