@@ -1099,7 +1099,7 @@ test("a visible tab redraws the band and the dock from new facts once they expir
 
 test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends web: true only when ticked", () => {
   for (const id of ["askWeb", "xpAskWeb"]) {
-    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" aria-describedby="${id}Note"> Search the web</label>`));
+    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" autocomplete="off" aria-describedby="${id}Note"> Search the web</label>`));
     assert.match(html, new RegExp(`<p class="ask-webnote" id="${id}Note" hidden>[^<]*web results are not checked by this site\\.</p>`));
     assert.match(html, new RegExp(`wireAskWeb\\('${id}'\\);`));
   }
@@ -1112,6 +1112,10 @@ test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends 
   assert.match(xp, /if \(web\) payload\.web = true;/);
   assert.match(xp, /card\.appendChild\(askSourceNode\(last\)\);/);
   assert.match(fnBody("wireAskWeb"), /note\.hidden = !c\.checked;/);
+  // a box the browser restored on reload or Back starts unticked again
+  const wire = fnBody("wireAskWeb");
+  assert.match(wire, /var reset = function \(\) \{ c\.checked = false; note\.hidden = true; \};\s*reset\(\);/);
+  assert.match(wire, /window\.addEventListener\('pageshow', reset\);/);
 });
 
 test("source line links: only http and https become links, opened safely, as text nodes", () => {

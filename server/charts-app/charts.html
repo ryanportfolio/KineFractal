@@ -1161,7 +1161,7 @@
       <input id="askInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about this ticker" placeholder="Ask about this ticker…">
       <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
     </form>
-    <label class="ask-web"><input type="checkbox" id="askWeb" aria-describedby="askWebNote"> Search the web</label>
+    <label class="ask-web"><input type="checkbox" id="askWeb" autocomplete="off" aria-describedby="askWebNote"> Search the web</label>
     <p class="ask-webnote" id="askWebNote" hidden>Typed questions also search the web for news and context. Your question goes to the search; web results are not checked by this site.</p>
   </div>
 </aside>
@@ -1334,7 +1334,7 @@
           <input id="xpAskInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about the selected tickers" placeholder="Ask about these tickers…">
           <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
         </form>
-        <label class="ask-web"><input type="checkbox" id="xpAskWeb" aria-describedby="xpAskWebNote"> Search the web</label>
+        <label class="ask-web"><input type="checkbox" id="xpAskWeb" autocomplete="off" aria-describedby="xpAskWebNote"> Search the web</label>
         <p class="ask-webnote" id="xpAskWebNote" hidden>Typed questions also search the web for news and context. Your question goes to the search; web results are not checked by this site.</p>
       </aside>
     </div>
@@ -3469,9 +3469,14 @@ function readAskStream(r, live, add) {
 }
 // "Search the web" under a question box (#askWeb, #xpAskWeb): off on every page load
 function askWebOn(id) { var c = document.getElementById(id); return !!(c && c.checked); }
+// Browsers can restore a ticked box on reload (Firefox form restore) or on Back
+// (page cache), so it is cleared at start and on every pageshow.
 function wireAskWeb(id) {
   var c = document.getElementById(id), note = document.getElementById(id + 'Note');
+  var reset = function () { c.checked = false; note.hidden = true; };
+  reset();
   c.addEventListener('change', function () { note.hidden = !c.checked; });
+  window.addEventListener('pageshow', reset);
 }
 // The server's source line, with any web result links it lists made clickable
 // (http and https only, named by their site). Text nodes only, never HTML.
