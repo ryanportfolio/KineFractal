@@ -363,6 +363,7 @@ test("web prompt keeps the facts as the only source of the ticker's numbers and 
   assert.match(systemPrompt, /1\. For the ticker's prices, closes, price changes, volume, yield, cadence, payouts and their dates, use only the facts/);
   assert.match(systemPrompt, /If a web result disagrees with the facts, use the facts/);
   assert.match(systemPrompt, /a line that reads exactly "From the facts:"[\s\S]*a line that reads exactly "From the web:"/);
+  assert.match(systemPrompt, /The only other lines allowed are any section lines rule 6 asks for, written exactly as rule 6 gives them, never as bullets/, "rule 11 leaves the section lines bare");
   assert.match(systemPrompt, /No other markdown: no bold, no # headings, no links or URLs/);
   assert.match(systemPrompt, /even when a web result shows its own figure/);
   assert.match(systemPrompt, /names its site in plain words at the start of the line/);
