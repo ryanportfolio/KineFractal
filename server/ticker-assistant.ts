@@ -54,9 +54,10 @@ export function createTickerAssistantAdapter(
     ...opts,
     model: TICKER_ASSISTANT_MODEL,
     // High reasoning effort, kept out of the stream (only the answer is sent). The
-    // reasoning counts toward max_tokens, so the cap leaves room for it: a measured
-    // answer used about 140 reasoning and 150 answer tokens and took about 0.5 s longer.
-    maxTokens: 2000,
+    // reasoning counts toward max_tokens, so the cap (owner's choice) leaves it ample
+    // room: a measured answer used about 140 reasoning and 150 answer tokens. The prompt,
+    // not the cap, keeps answers short; the cap bounds a runaway answer at about $0.024.
+    maxTokens: 20000,
     reasoning: { effort: "high", exclude: true },
     // Ask OpenRouter to route only to providers that do not keep prompts.
     provider: { data_collection: "deny" },
@@ -91,6 +92,7 @@ const RULES = [
   "8. When the answer covers more than one ticker, every number must name its ticker on the same line. Never give one ticker's figure for another.",
   "9. Use the plain period names (21-day, 3-month, 6-month) and the plain labels from the facts. Never write code-style field names or JSON.",
   "10. Write percentages with the % sign and their sign as given, for example -1.5% or 7.14%. Do not put \"down\" or \"up\" in front of a signed percentage.",
+  "11. Make it easy to scan: never write a paragraph. After the first line every line is a bullet that starts with a short label, a colon, then the value, for example \"- 21-day change: -1.5%\" or \"- reuters.com: fund inflows rose\". One fact per bullet, the number near the start. Do not restate the question, add filler, or repeat the ticker on every line of a one-ticker answer.",
 ].join("\n");
 
 // With web search on, rules 1, 5 and 6 change: the facts stay the only source for

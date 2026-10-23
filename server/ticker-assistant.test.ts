@@ -104,6 +104,7 @@ test("prompt carries the facts as JSON under plain labels and the grounding and 
   assert.match(systemPrompt, /first line, one short sentence that answers the question\. Then 2 to 4 lines that each start with "- "/);
   assert.match(systemPrompt, /At most about 100 words in all/);
   assert.match(systemPrompt, /10\. Write percentages with the % sign/);
+  assert.match(systemPrompt, /11\. Make it easy to scan: never write a paragraph\. After the first line every line is a bullet that starts with a short label, a colon, then the value/);
   assert.match(systemPrompt, /Do not add a source line/);
   assert.match(systemPrompt, /No data for: ZZZZ/);
   assert.match(systemPrompt, /Chart levels \(JSON\).*\{"CLOZ":26\.5\}/s);
@@ -302,7 +303,7 @@ test("answer with no text after the browser left ends quietly", async () => {
   assert.deepEqual(out, []);
 });
 
-test("adapter sends the pinned model, 2000 tokens, high hidden reasoning, no data collection, streaming", async () => {
+test("adapter sends the pinned model, 20000 tokens, high hidden reasoning, no data collection, streaming", async () => {
   let body: Record<string, unknown> | undefined;
   const adapter = createTickerAssistantAdapter({
     env: { OPENROUTER_API: "test-openrouter-key" },
@@ -314,7 +315,7 @@ test("adapter sends the pinned model, 2000 tokens, high hidden reasoning, no dat
   await collect(adapter.stream({ systemPrompt: "s", userPrompt: "u" }));
   assert.equal(body?.model, TICKER_ASSISTANT_MODEL);
   assert.equal(TICKER_ASSISTANT_MODEL, "deepseek/deepseek-v4.1-flash-1017");
-  assert.equal(body?.max_tokens, 2000);
+  assert.equal(body?.max_tokens, 20000);
   assert.deepEqual(body?.reasoning, { effort: "high", exclude: true });
   assert.deepEqual(body?.provider, { data_collection: "deny" });
   assert.equal(body?.stream, true);
