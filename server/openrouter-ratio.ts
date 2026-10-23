@@ -39,7 +39,35 @@ function sanitizedSseErrorMessage(error: unknown): string {
     .replace(/\bsk-[A-Za-z0-9_-]+/g, "[redacted]");
 }
 
-function contentFromSseEvent(event: string): string | undefined {
+/** A web page the answer drew on, from OpenRouter's url_citation annotations. */
+export interface OpenRouterCitation {
+  url: string;
+  title?: string;
+}
+
+export interface OpenRouterStreamOptions {
+  signal?: AbortSignal;
+  // OpenRouter plugins for this request only, e.g. [{ id: "web" }] for web search.
+  plugins?: Record<string, unknown>[];
+  // Called with each url_citation the response carries (web search results).
+  onCitation?: (citation: OpenRouterCitation) => void;
+}
+
+function citationsFrom(annotations: unknown, onCitation: (citation: OpenRouterCitation) => void) {
+  if (!Array.isArray(annotations)) return;
+  for (const a of annotations) {
+    const c = a && typeof a === "object" ? (a as { type?: unknown; url_citation?: unknown }) : null;
+    if (!c || c.type !== "url_citation" || !c.url_citation || typeof c.url_citation !== "object") continue;
+    const { url, title } = c.url_citation as { url?: unknown; title?: unknown };
+    if (typeof url !== "string" || !url) continue;
+    onCitation(typeof title === "string" && title ? { url, title } : { url });
+  }
+}
+
+function contentFromSseEvent(
+  event: string,
+  onCitation?: (citation: OpenRouterCitation) => void,
+): string | undefined {
   const data = event
     .split(/\r?\n/)
     .filter((line) => line.startsWith("data:"))
@@ -64,6 +92,11 @@ function contentFromSseEvent(event: string): string | undefined {
 
   const firstChoice = choices[0];
   if (!firstChoice || typeof firstChoice !== "object") return undefined;
+  if (onCitation) {
+    // streamed citations arrive on the delta; some providers repeat them on a message
+    citationsFrom(((firstChoice as { delta?: { annotations?: unknown } }).delta ?? {}).annotations, onCitation);
+    citationsFrom(((firstChoice as { message?: { annotations?: unknown } }).message ?? {}).annotations, onCitation);
+  }
   const delta = (firstChoice as { delta?: unknown }).delta;
   if (!delta || typeof delta !== "object") return undefined;
   const content = (delta as { content?: unknown }).content;
@@ -94,7 +127,7 @@ export function createOpenRouterRatioAdapter({
     // upstream request (and its token spend).
     async *stream(
       { systemPrompt, userPrompt }: OpenRouterRatioInput,
-      { signal }: { signal?: AbortSignal } = {},
+      { signal, plugins, onCitation }: OpenRouterStreamOptions = {},
     ): AsyncGenerator<string> {
       const apiKey = env.OPENROUTER_API?.trim();
       if (!apiKey) throw new Error("OPENROUTER_API is required for Ratio Relevance analysis");
@@ -113,6 +146,7 @@ export function createOpenRouterRatioAdapter({
             max_tokens: maxTokens,
             reasoning,
             ...(provider ? { provider } : {}),
+            ...(plugins && plugins.length ? { plugins } : {}),
             messages: [
               { role: "system", content: systemPrompt },
               { role: "user", content: userPrompt },
@@ -147,7 +181,7 @@ export function createOpenRouterRatioAdapter({
           let event = consumeSseEvent(buffer);
           while (event) {
             buffer = event.rest;
-            const content = contentFromSseEvent(event.event);
+            const content = contentFromSseEvent(event.event, onCitation);
             if (content) yield content;
             event = consumeSseEvent(buffer);
           }

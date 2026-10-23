@@ -920,7 +920,17 @@
   #askAnswer .ask-card h3, #exportDialog #xpAssistAnswer .ask-card h3 { margin:0 0 6px; font-size:15px; letter-spacing:.03em; color:var(--fg); }
   #askAnswer .ask-card p, #xpAssistAnswer .ask-card p { margin:0 0 8px; }
   #askAnswer .ask-hint, #xpAssistAnswer .ask-hint { margin:0; color:var(--mut); line-height:1.5; }
-  #askAnswer .ask-src, #xpAssistAnswer .ask-src { margin:8px 0 0; color:var(--mut); font-size:12px; }
+  #askAnswer .ask-src, #xpAssistAnswer .ask-src { margin:8px 0 0; color:var(--mut); font-size:12px; overflow-wrap:anywhere; }
+  #askAnswer .ask-src a, #xpAssistAnswer .ask-src a { color:var(--sup); }
+  /* "Search the web" under each question box: off on every page load; the checkbox
+     and its words are one target */
+  #askDock .ask-web, #xpAssist .ask-web { display:flex; align-items:center; gap:8px; min-height:32px; margin:6px 0 0;
+                                          color:var(--fg); font-size:13px; cursor:pointer; }
+  #askDock .ask-web input, #xpAssist .ask-web input { width:18px; height:18px; margin:0; accent-color:var(--sup); }
+  #askDock .ask-web input:focus-visible, #xpAssist .ask-web input:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #askDock .ask-webnote, #xpAssist .ask-webnote { margin:2px 0 0; color:var(--mut); font-size:12px; line-height:1.45; }
+  #askDock .ask-webnote[hidden], #xpAssist .ask-webnote[hidden] { display:none; }
+  @media (max-width:600px) { #askDock .ask-web, #xpAssist .ask-web { min-height:44px; } }
   #askAnswer table { border-collapse:collapse; margin:4px 0 10px; }
   #askAnswer th, #askAnswer td { padding:3px 14px 3px 0; text-align:right; font-variant-numeric:tabular-nums; }
   #askAnswer th:first-child, #askAnswer td:first-child { text-align:left; }
@@ -1123,6 +1133,8 @@
       <input id="askInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about this ticker" placeholder="Ask about this ticker…">
       <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
     </form>
+    <label class="ask-web"><input type="checkbox" id="askWeb" aria-describedby="askWebNote"> Search the web</label>
+    <p class="ask-webnote" id="askWebNote" hidden>Typed questions also search the web for news and context. Your question goes to the search; web results are not checked by this site.</p>
   </div>
 </aside>
 <div id="cmpMenu" role="dialog" aria-label="Compare a ticker" hidden>
@@ -1294,6 +1306,8 @@
           <input id="xpAskInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about the selected tickers" placeholder="Ask about these tickers…">
           <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
         </form>
+        <label class="ask-web"><input type="checkbox" id="xpAskWeb" aria-describedby="xpAskWebNote"> Search the web</label>
+        <p class="ask-webnote" id="xpAskWebNote" hidden>Typed questions also search the web for news and context. Your question goes to the search; web results are not checked by this site.</p>
       </aside>
     </div>
     <div id="exportEditor" role="region" aria-labelledby="exportEditorTitle" hidden>
@@ -3394,6 +3408,34 @@ function readAskStream(r, live, add) {
   };
   return pump();
 }
+// "Search the web" under a question box (#askWeb, #xpAskWeb): off on every page load
+function askWebOn(id) { var c = document.getElementById(id); return !!(c && c.checked); }
+function wireAskWeb(id) {
+  var c = document.getElementById(id), note = document.getElementById(id + 'Note');
+  c.addEventListener('change', function () { note.hidden = !c.checked; });
+}
+// The server's source line, with any web result links it lists made clickable
+// (http and https only, named by their site). Text nodes only, never HTML.
+function askSourceNode(line) {
+  var p = askNode('p', 'ask-src'), parts = String(line).split(/(https?:\/\/\S+)/);
+  parts.forEach(function (part, i) {
+    var url = null;
+    if (i % 2) { try { url = new URL(part); } catch (e) {} }
+    if (!url || (url.protocol !== 'https:' && url.protocol !== 'http:')) {
+      // the space between two links reads as a list
+      if (/^\s+$/.test(part) && i < parts.length - 1 && p.lastChild && p.lastChild.nodeName === 'A') part = ', ';
+      if (part) p.appendChild(document.createTextNode(part));
+      return;
+    }
+    var a = askNode('a', '', url.hostname.replace(/^www\./, ''));
+    a.href = url.href;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    a.title = url.href;
+    p.appendChild(a);
+  });
+  return p;
+}
 // the card for a typed question: the question on top, then the answer
 function askTypedCard(question) {
   var card = askNode('div', 'ask-card ask-typed');
@@ -3434,7 +3476,8 @@ function sendAskQuestion(question) {
   // current only while it is the running question, holds the newest token and its
   // card is still on the page: otherwise nothing more is written
   var live = function () { return _askReq === req && req.tok === _askToken && card.isConnected; };
-  var wait = askNode('p', 'ask-hint', 'Writing an answer…');
+  var web = askWebOn('askWeb');
+  var wait = askNode('p', 'ask-hint', web ? 'Searching the web and writing an answer…' : 'Writing an answer…');
   var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
   answer.appendChild(text);
   card.appendChild(wait);
@@ -3442,6 +3485,7 @@ function sendAskQuestion(question) {
   var payload = { symbols: [sym], question: question };
   var buyPx = askNearestBuy(sym);
   if (buyPx) { payload.nearestBuy = {}; payload.nearestBuy[sym] = buyPx; }
+  if (web) payload.web = true;
   // a superseded question that is somehow still marked running just stops
   var drop = function () { if (_askReq === req) askAbort(); };
   var fail = function (msg, retry) { if (!live()) return drop(); askTypedError(req, question, msg, retry); };
@@ -3474,7 +3518,7 @@ function sendAskQuestion(question) {
       _askReq = null;
       setAskBusy(false);
       text.data = lines.join('\n').trim();
-      card.appendChild(askNode('p', 'ask-src', last));
+      card.appendChild(askSourceNode(last));
     };
     return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
   }).catch(function (e) {
@@ -3509,6 +3553,7 @@ function initAskDock() {
     });
   });
   // Enter or the send button: one question at a time (sending is off while one streams)
+  wireAskWeb('askWeb');
   document.getElementById('askForm').addEventListener('submit', function (e) {
     e.preventDefault();
     if (_askReq) return;
@@ -6456,7 +6501,8 @@ function sendXpQuestion(question) {
   _xpAskReq = req;
   setXpAskBusy(true);
   var card = xpTypedCard(question);
-  var wait = askNode('p', 'ask-hint', 'Writing an answer about ' + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + '…');
+  var web = askWebOn('xpAskWeb');
+  var wait = askNode('p', 'ask-hint', (web ? 'Searching the web and writing' : 'Writing') + ' an answer about ' + syms.length + ' ticker' + (syms.length === 1 ? '' : 's') + '…');
   var answer = askNode('p', 'ask-stream'), text = document.createTextNode('');
   answer.appendChild(text);
   card.appendChild(wait);
@@ -6467,6 +6513,7 @@ function sendXpQuestion(question) {
     if (isFinite(px) && px > 0) { buy[x.sym] = px; anyBuy = true; }
   });
   if (anyBuy) payload.nearestBuy = buy;
+  if (web) payload.web = true;
   // current only while it is the running question, holds the newest token and its
   // card is still on the page; a superseded one still marked running just stops
   var live = function () { return _xpAskReq === req && req.tok === _xpToken && card.isConnected; };
@@ -6497,7 +6544,7 @@ function sendXpQuestion(question) {
       _xpAskReq = null;
       setXpAskBusy(false);
       text.data = lines.join('\n').trim();
-      card.appendChild(askNode('p', 'ask-src', last));
+      card.appendChild(askSourceNode(last));
     };
     return readAskStream(r, live, add).then(function (complete) { if (complete) finish(); else drop(); });
   }).catch(function (e) {
@@ -6516,6 +6563,7 @@ function wireXpAssist() {
     document.querySelector('#xpAssist [data-xp-check="up3"]').focus();   // the chip and its button just went away
   });
   // Enter or the send button; one question at a time. Over the limit the text stays to edit.
+  wireAskWeb('xpAskWeb');
   document.getElementById('xpAskForm').addEventListener('submit', function (e) {
     e.preventDefault();
     if (_xpAskReq) return;
