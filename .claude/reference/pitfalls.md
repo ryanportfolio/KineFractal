@@ -94,3 +94,7 @@ Two things cost reruns while recovering the worker after Railway's October 2026 
 - A manual worker run (`deploymentInstanceExecutionCreate` with the worker's service instance id) during US market hours halts in `emit_signals.py` with `HALT (P3): decision bar is still FORMING`. It cannot backfill a missed session then; run it after the close, or let the `0 11 * * 2-6` cron run.
 
 Read logs with the GraphQL query `deploymentLogs(deploymentId, limit)`: `railway logs --deployment <id>` printed nothing for two of the crashed cron runs.
+
+### 2026-10-23: Local ticker checks share production's Tiingo key and can get it throttled
+
+Local checks of the ticker assistant run the dev server under the production `web` Railway variables, so `/api/ticker-facts` calls Tiingo with production's key (`VITE_T`). The facts cache lives in memory (`server/ticker-facts.ts`), so every server restart empties it and the next check fetches every symbol again. Back-to-back check runs got `Tiingo answered 429`, and that limit is on the shared key: it can throttle the live site's Tiingo features too. In UI checks, serve `/api/ticker-facts` from a recorded fixture with Playwright `page.route`, and keep live Tiingo runs to one per change.

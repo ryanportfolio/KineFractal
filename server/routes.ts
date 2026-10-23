@@ -21,8 +21,22 @@ import {
 import { streamAnalyzeRatioRelevance, type RatioRelevanceData } from "./gemini-analyzer";
 import { getRunArtifact, getDatedRunArtifact, getLatestPointer, isConfigured as fearlabLiveConfigured, ageHours, STALE_AFTER_HOURS, type FetchResult as LiveFetchResult } from "./fearlab-live";
 import { registerFearlabChartsRoutes } from "./fearlab-charts";
-import { registerAccountRoutes, requireUser } from "./account-routes";
+import { registerAccountRoutes, requireUser, type SessionUser } from "./account-routes";
 import { registerAlertsRoutes } from "./alerts-routes";
+import {
+  answerTickerQuestion,
+  parseTickerAssistantBody,
+  tickerAssistantErrorDetail,
+  tickerAssistantQuota,
+  TickerAssistantNoFactsError,
+  TICKER_ASSISTANT_DAILY_LIMIT,
+} from "./ticker-assistant";
+import {
+  fetchTickerFacts,
+  TickerFactsUnavailableError,
+  TICKER_RE,
+  type TickerFacts,
+} from "./ticker-facts";
 import type { BoardV1, ComboV1, SignalsV1, ChartV1 } from "@shared/fearlab-contracts";
 // Static board snapshot fallback: the same board.json the client falls back
 // to, bundled into the server build. `npm run sync:snapshot` rewrites it, so a
@@ -30,6 +44,7 @@ import type { BoardV1, ComboV1, SignalsV1, ChartV1 } from "@shared/fearlab-contr
 import fearlabBoardSnapshot from "../client/public/fearlab/board.json";
 
 const TIINGO_DAILY_COLUMNS = "date,open,high,low,close,volume,adjClose";
+const TICKER_FACTS_MAX_SYMBOLS = 40;
 
 function tiingoApiKey(): string | undefined {
   return process.env.TIINGO_API_KEY?.trim() || process.env.VITE_T?.trim();
@@ -335,6 +350,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerFearlabChartsRoutes(app);
   registerAccountRoutes(app);
   registerAlertsRoutes(app);
+
+  // /charts ticker facts: trend, 6-month high, yield and payout cadence, all
+  // computed from Tiingo rows in server/ticker-facts.ts. Signed-in only (keeps
+  // anonymous traffic off the Tiingo quota); tickerFactsLimiter in security.ts.
+  // ?symbols=CLOZ,SPY -> { facts: { SYM: TickerFacts }, missing: [SYM] },
+  // where missing lists symbols Tiingo does not know (404).
+  app.get("/api/ticker-facts", requireUser, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const symbols = Array.from(new Set(
+      String(req.query.symbols ?? "")
+        .split(",")
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean),
+    ));
+    if (symbols.length < 1 || symbols.length > TICKER_FACTS_MAX_SYMBOLS) {
+      return res.status(400).json({ error: `send 1 to ${TICKER_FACTS_MAX_SYMBOLS} symbols` });
+    }
+    if (symbols.some((s) => !TICKER_RE.test(s))) {
+      return res.status(400).json({ error: "invalid ticker" });
+    }
+    if (!tiingoApiKey()) {
+      return res.status(503).json({ error: "ticker facts unavailable" });
+    }
+    try {
+      const facts: Record<string, TickerFacts> = {};
+      const missing: string[] = [];
+      // A few Tiingo requests at a time; cache hits return immediately.
+      let next = 0;
+      const worker = async () => {
+        while (next < symbols.length) {
+          const sym = symbols[next++];
+          const result = await fetchTickerFacts(sym);
+          if (result) facts[sym] = result;
+          else missing.push(sym);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(4, symbols.length) }, worker));
+      missing.sort((a, b) => symbols.indexOf(a) - symbols.indexOf(b));
+      res.json({ facts, missing });
+    } catch (error) {
+      // TickerFactsUnavailableError messages carry only the upstream status.
+      const detail = error instanceof TickerFactsUnavailableError ? error.message : "unexpected error";
+      console.error("[ticker-facts] failed:", detail);
+      res.status(502).json({ error: "ticker facts unavailable" });
+    }
+  });
+
+  // /charts ticker assistant: the model explains the same facts in plain text
+  // (server/ticker-assistant.ts). Signed-in only, 30 questions per user per New
+  // York day; tickerAssistantLimiter + CSRF in security.ts.
+  // { symbols, question, nearestBuy? } -> text/plain stream whose last line is
+  // the server's source line.
+  app.post("/api/ticker-assistant", requireUser, async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const parsed = parseTickerAssistantBody(req.body);
+    if (!parsed.ok) return res.status(400).json({ error: parsed.error });
+    if (!process.env.OPENROUTER_API?.trim() || !tiingoApiKey()) {
+      return res.status(503).json({ error: "ticker assistant unavailable" });
+    }
+    const user = (req as any).kfUser as SessionUser;
+    if (!tickerAssistantQuota.tryConsume(user.id)) {
+      return res.status(429).json({
+        error: `Daily limit of ${TICKER_ASSISTANT_DAILY_LIMIT} questions reached. Try again tomorrow.`,
+      });
+    }
+
+    const answer = answerTickerQuestion(parsed.value);
+    // Stop the model stream (and its token spend) if the browser goes away.
+    let closed = false;
+    res.on("close", () => {
+      closed = true;
+    });
+
+    let step: IteratorResult<string>;
+    try {
+      step = await answer.next();
+    } catch (error) {
+      // Nothing reached the model's output: the question does not count.
+      tickerAssistantQuota.release(user.id);
+      if (error instanceof TickerAssistantNoFactsError) {
+        return res.status(404).json({ error: "no data for these tickers" });
+      }
+      console.error("[ticker-assistant] failed:", tickerAssistantErrorDetail(error));
+      return res.status(502).json({ error: "ticker assistant unavailable" });
+    }
+
+    res.status(200);
+    res.set("Content-Type", "text/plain; charset=utf-8");
+    try {
+      while (!step.done) {
+        if (closed) {
+          await answer.return(undefined);
+          return;
+        }
+        res.write(step.value);
+        step = await answer.next();
+      }
+    } catch (error) {
+      console.error("[ticker-assistant] stream interrupted:", tickerAssistantErrorDetail(error));
+      if (!closed) res.write("\n\n[Answer interrupted. Please try again.]\n");
+    }
+    res.end();
+  });
 
   // Tiingo API Proxy Route with Daily Caching
   // Server-side cache is shared across ALL users globally

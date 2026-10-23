@@ -92,6 +92,60 @@ test("sends the pinned Gemini Flash Lite request with medium hidden reasoning", 
   });
 });
 
+test("sends caller model, token cap, reasoning and provider overrides", async () => {
+  let request: CapturedRequest | undefined;
+  const adapter = createOpenRouterRatioAdapter({
+    env: { OPENROUTER_API: "test-openrouter-key" },
+    fetch: async (url: RequestInfo | URL, init?: RequestInit) => {
+      request = { url: String(url), init };
+      return sseResponse([doneSse()]);
+    },
+    model: "example/other-model",
+    maxTokens: 400,
+    reasoning: { enabled: false },
+    provider: { data_collection: "deny" },
+  });
+
+  await collect(adapter.stream(input));
+
+  assert.deepEqual(JSON.parse(String(request?.init?.body)), {
+    model: "example/other-model",
+    stream: true,
+    max_tokens: 400,
+    reasoning: { enabled: false },
+    provider: { data_collection: "deny" },
+    messages: [
+      { role: "system", content: input.systemPrompt },
+      { role: "user", content: input.userPrompt },
+    ],
+  });
+});
+
+test("keeps the default request fields that a caller does not override", async () => {
+  let body: unknown;
+  const adapter = createOpenRouterRatioAdapter({
+    env: { OPENROUTER_API: "test-openrouter-key" },
+    fetch: async (_url: RequestInfo | URL, init?: RequestInit) => {
+      body = JSON.parse(String(init?.body));
+      return sseResponse([doneSse()]);
+    },
+    maxTokens: 512,
+  });
+
+  await collect(adapter.stream(input));
+
+  assert.deepEqual(body, {
+    model: MODEL,
+    stream: true,
+    max_tokens: 512,
+    reasoning: { effort: "medium", exclude: true },
+    messages: [
+      { role: "system", content: input.systemPrompt },
+      { role: "user", content: input.userPrompt },
+    ],
+  });
+});
+
 test("requires a non-blank OPENROUTER_API without substitute-key fallbacks", async () => {
   for (const env of [
     { OPENROUTER_API_KEY: "must-not-be-used" },
