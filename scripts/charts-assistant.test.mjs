@@ -23,8 +23,14 @@ test("fact band exposes the stable hooks the checks read", () => {
     const tile = html.match(new RegExp(`<div class="fb-tile[^"]*" data-fact="${fact}"[^>]*>([\\s\\S]*?)\\n  </div>`));
     assert.ok(tile, `tile ${fact}`);
     if (fact !== "trend") assert.match(tile[1], /class="fact-value"/, `${fact} has a .fact-value`);
-    assert.match(tile[1], /class="fact-source">[^<]+</, `${fact} has a non-empty .fact-source`);
+    assert.match(tile[1], /<span class="fb-label">[^<]*<button type="button" class="fb-q" data-name="[^"]+" data-srctip="[^"]+" aria-label="[^"]+">\?<\/button>/,
+      `${fact} has a "?" with its source tip`);
   }
+  assert.doesNotMatch(html, /class="fact-source"/, "the source text moved into the tips");
+  assert.match(fnBody("setFactTile"), /setFactSource\(tile, source\);/);
+  assert.match(fnBody("setFactSource"), /q\.setAttribute\('data-srctip', text\);/);
+  assert.match(fnBody("setFactSource"), /q\.setAttribute\('aria-label', q\.getAttribute\('data-name'\) \+ \(text \? ': ' \+ text : ''\)\);/);
+  assert.match(fnBody("showFactSrcTip"), /tip\.replaceChildren\(document\.createTextNode\(text\)\);/, "tip text goes in as a text node");
   assert.doesNotMatch(html, /data-fact="overall"/);
   for (const w of ["d21", "m3", "m6"]) {
     assert.match(html, new RegExp(`data-window="${w}">.*<span class="fact-change">.*<span class="fact-verdict">`));
@@ -35,13 +41,14 @@ test("fact band exposes the stable hooks the checks read", () => {
 });
 
 test("trend says it is price change, and missing data shows a dash", () => {
-  assert.match(html, /TREND <span class="fb-sub">price change, not total return<\/span>/);
+  assert.match(html, /TREND<button[^>]*>\?<\/button> <span class="fb-sub">price change, not total return<\/span>/);
   const fill = fnBody("fillFactBand");
   assert.match(fill, /setFactTile\('yield', 'none'/);
   assert.match(fill, /setFactTile\('cadence', '—'/);
   assert.match(fill, /includes a special payout/);
   assert.match(fnBody("setFactWindow"), /win \? fbSigned\(win\.change\) : '—'/);
-  assert.match(fill, /overall \|\| '—'/);
+  assert.doesNotMatch(fill, /overall/, "no overall verdict in the band, tiles or line");
+  assert.match(fill, /setFactSource\(document\.querySelector\('#factBand \[data-fact="trend"\]'\), f \? 'daily closes through ' \+ day : why\);/);
 });
 
 test("facts load one symbol at a time through a cached, de-duplicated tickerFacts()", () => {
@@ -445,7 +452,7 @@ test("a failed facts load offers Try again on the collapsed summary line", () =>
 
 test("the fact band starts collapsed to one clickable line of numbers at every width", () => {
   // the whole line is the toggle; its numbers sit inside the button
-  assert.match(html, /<div class="fb-summary">\s*<button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">[\s\S]*?data-sum="yield"[\s\S]*?data-sum="d21"[\s\S]*?data-sum="m3"[\s\S]*?data-sum="m6"[\s\S]*?class="fb-sumtrend[\s\S]*?data-sum="high"[\s\S]*?data-sum="buy"[\s\S]*?<span class="fb-more"><span class="fb-morewords">All facts<\/span><\/span>\s*<\/button>/);
+  assert.match(html, /<div class="fb-summary">\s*<button type="button" class="fb-toggle" data-action="fact-band-toggle" aria-expanded="false">[\s\S]*?data-sum="yield"[\s\S]*?data-sum="d21"[\s\S]*?data-sum="m3"[\s\S]*?data-sum="m6"[\s\S]*?data-sum="high"[\s\S]*?data-sum="buy"[\s\S]*?<span class="fb-more"><span class="fb-morewords">All facts<\/span><\/span>\s*<\/button>/);
   assert.match(html, /#factBand:not\(\.is-expanded\) > \.fb-tile, #factBand:not\(\.is-expanded\) > \.fb-msg \{ display:none; \}/);
   assert.doesNotMatch(html, /@media \(min-width:601px\) \{ #factBand \.fb-summary \{ display:none; \} \}/,
     "the summary line shows on desktop too");
@@ -463,7 +470,7 @@ test("the fact band starts collapsed to one clickable line of numbers at every w
     "a saved open dock does not open as a full-screen sheet over the band on phones");
   const fill = fnBody("fillFactBand");
   assert.match(fill, /\.fb-sumsym'\)\.textContent = sym;/);
-  assert.match(fill, /st\.textContent = overall \|\| '—';/);
+  assert.doesNotMatch(html, /fb-sumtrend/, "the line has no MIXED / UP / DOWN verdict");
   assert.match(fill, /setFactSum\('yield', !f \? '—' : fbNum\(f\.yield\) \? f\.yield\.toFixed\(2\) \+ '%' : 'none'/);
   assert.match(fill, /setFactSum\(w, win \? fbSigned\(win\.change\) : '—'/);
   assert.match(fnBody("setNearestBuyTile"), /setFactSum\('buy', lim \? px2\(lim\.row\.limit\) : '—'/,
@@ -567,16 +574,13 @@ test("Limit Buy table: facts past their 18:30 New York expiry are never drawn an
   assert.doesNotMatch(fnBody("xpFactWant"), /fetch\(|tickerFacts\(/, "requests still go through the queue");
 });
 
-test("Limit Buy answers name each distinct as-of date", () => {
-  const { xpThrough } = pageFns(["xpList", "fbDay", "xpThrough"], "var FB_MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];");
-  const r = (pairs) => ({ facts: pairs.map(([sym, asOf]) => ({ sym, f: { asOf } })) });
-  assert.equal(xpThrough(r([["SPY", "2026-10-22"], ["QQQ", "2026-10-22"]])), " through Oct 22");
-  assert.equal(xpThrough(r([["SPY", "2026-10-22"], ["IWM", "2026-01-02"], ["TSLA", "2026-10-22"]])), " through Oct 22; IWM through Jan 2");
-  assert.equal(xpThrough(r([["A", "2026-10-22"], ["B", "2026-01-02"], ["C", "2026-10-21"], ["D", "2026-10-22"]])),
-    " through Oct 22; C through Oct 21; B through Jan 2");
-  assert.equal(xpThrough(r([])), "");
-  assert.match(fnBody("xpCheckAnswer"), /var through = xpThrough\(r\);/);
-  assert.doesNotMatch(fnBody("xpFactsOf"), /asOf/, "no single newest date any more");
+test("no answer or tip names the price data provider", () => {
+  const visible = html.split(/\r?\n/).filter((l) => !/^\s*\/\//.test(l) && !/\/\/ .*Tiingo/.test(l));
+  assert.deepEqual(visible.filter((l) => /Tiingo/.test(l)), [], "Tiingo appears only in code comments");
+  assert.doesNotMatch(fnBody("xpCheckAnswer"), /through|Source/, "quick checks end without a source line");
+  assert.match(fnBody("askAnswer"), /if \(source\) card\.appendChild/);
+  assert.match(fnBody("askView"), /if \(source\) foot\.appendChild/);
+  assert.match(fnBody("askCompareAnswer"), /if \(q\.asOf !== f\.asOf\) how\.push\(/, "a different QQQ end date is still said");
 });
 
 test("Limit Buy answers carry no stale buy prices while Min/Max is invalid or the build is pending", () => {
@@ -1132,7 +1136,7 @@ test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends 
 
 test("source line links: only http and https become links, opened safely, as text nodes", () => {
   const src = fnBody("askLinkLine");
-  assert.match(fnBody("askSourceNode"), /frag\.appendChild\(askLinkLine\(m \? m\[1\] : String\(line\)\)\);/);
+  assert.doesNotMatch(fnBody("askSourceNode"), /m\[1\]/, "the server's price-data part of the line never shows");
   assert.match(fnBody("askSourceNode"), /Web, not checked by this site:/, "the web links sit on their own line, still marked unchecked");
   assert.match(src, /url\.protocol !== 'https:' && url\.protocol !== 'http:'/);
   assert.match(src, /a\.rel = 'noopener noreferrer';/);

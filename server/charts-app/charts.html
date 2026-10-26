@@ -705,6 +705,7 @@
              border:1px solid var(--sup); background:var(--bg); color:var(--fg);
              font:13px "JetBrains Mono","IBM Plex Mono",monospace; line-height:1.4; pointer-events:none; }
   #factTip[hidden] { display:none; }
+  #factTip.is-src { width:auto; max-width:min(360px, calc(100vw - 16px)); }
   #factTip .ft-head { display:flex; align-items:center; justify-content:space-between; gap:10px;
                       color:var(--mut); font-size:11px; font-weight:bold; letter-spacing:.1em; text-transform:uppercase; }
   #factTip .ft-tier { padding:1px 6px; border:1px solid currentColor; letter-spacing:.08em; }
@@ -779,7 +780,12 @@
   #factBand .fact-note { color:var(--fg); font-size:13px; }
   #factBand .fact-flag { color:var(--thr); font-size:12px; }
   #factBand .fact-flag:empty, #factBand .fact-note:empty { display:none; }
-  #factBand .fact-source { margin-top:auto; padding-top:2px; color:var(--mut); font-size:12px; }
+  /* "?" after a tile's name: what the number is based on, shown in #factTip */
+  #factBand .fb-q { width:18px; height:18px; margin-left:6px; padding:0; border:1px solid var(--mut); border-radius:50%;
+                    background:none; color:var(--mut); font:bold 11px/16px Verdana,Geneva,sans-serif; letter-spacing:0;
+                    vertical-align:1px; cursor:help; }
+  #factBand .fb-q:hover { color:var(--sup); border-color:var(--sup); }
+  #factBand .fb-q:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
   #factBand .fb-trendrow { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; }
   #factBand .fb-cells { display:flex; flex:1 1 250px; min-width:0; max-width:360px; border:1px solid var(--grid); }
   #factBand .fb-cell { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center;
@@ -790,7 +796,6 @@
   #factBand .fact-verdict { font-weight:bold; font-size:11px; letter-spacing:.06em; }
   #factBand .is-up { color:var(--cbuy); }
   #factBand .is-down { color:var(--csell); }
-  #factBand .is-mixed { color:var(--thr); }
   #factBand .is-flat { color:var(--fg); }
   #factBand .is-none { color:var(--mut); }
   #factBand .fb-cell.is-none .fact-verdict { font-weight:normal; letter-spacing:normal; }
@@ -866,7 +871,6 @@
   #factBand .fb-cl { color:var(--mut); font-size:11px; letter-spacing:.08em; }
   #factBand .fb-c b { font-size:15px; }
   #factBand .fb-c b + .fb-cl { margin-left:6px; }
-  #factBand .fb-sumtrend { font-size:15px; letter-spacing:.04em; }
   #factBand .fb-more { margin-left:auto; color:var(--sup); white-space:nowrap; }
   #factBand .fb-more::after { content:" \25BE"; }
   #factBand.is-expanded .fb-more::after { content:" \25B4"; }
@@ -875,7 +879,7 @@
   @media (max-width:600px) {
     /* phones keep yield and trend on the line; cadence, 6M high and buy wait in the tiles */
     #factBand .fb-toggle { min-height:44px; padding:4px 10px; gap:2px 10px; }
-    #factBand .fb-c b, #factBand .fb-sumtrend { font-size:14px; }
+    #factBand .fb-c b { font-size:14px; }
     #factBand .fb-cl { letter-spacing:0; }
     /* only the arrow shows; the words stay in the button's accessible name */
     #factBand:not(.is-expanded) .fb-morewords { position:absolute; width:1px; height:1px; overflow:hidden;
@@ -1176,7 +1180,6 @@
       <span class="fb-c"><span class="fb-cl">YIELD</span> <b class="is-none" data-sum="yield">—</b></span>
       <span class="fb-c fb-ccad"><b class="is-none" data-sum="cad">—</b></span>
       <span class="fb-c"><span class="fb-cl">21D</span> <b class="is-none" data-sum="d21">—</b> <span class="fb-cl">3M</span> <b class="is-none" data-sum="m3">—</b> <span class="fb-cl">6M</span> <b class="is-none" data-sum="m6">—</b></span>
-      <b class="fb-sumtrend is-none">—</b>
       <span class="fb-c fb-chigh"><span class="fb-cl">VS 6M HIGH</span> <b class="is-none" data-sum="high">—</b></span>
       <span class="fb-c fb-cbuy"><span class="fb-cl">BUY</span> <b class="is-none" data-sum="buy">—</b></span>
       <span class="fb-more"><span class="fb-morewords">All facts</span></span>
@@ -1184,20 +1187,18 @@
     <button type="button" class="fb-sumretry" hidden>Try again</button>
   </div>
   <div class="fb-tile" data-fact="yield">
-    <span class="fb-label">YIELD</span>
+    <span class="fb-label">YIELD<button type="button" class="fb-q" data-name="YIELD" data-srctip="loading…" aria-label="YIELD: loading…">?</button></span>
     <span class="fact-value">—</span>
     <span class="fact-note"></span>
     <span class="fact-flag"></span>
-    <span class="fact-source">loading…</span>
   </div>
   <div class="fb-tile" data-fact="cadence">
-    <span class="fb-label">CADENCE</span>
+    <span class="fb-label">CADENCE<button type="button" class="fb-q" data-name="CADENCE" data-srctip="loading…" aria-label="CADENCE: loading…">?</button></span>
     <span class="fact-value">—</span>
     <span class="fact-note"></span>
-    <span class="fact-source">loading…</span>
   </div>
   <div class="fb-tile fb-trend" data-fact="trend">
-    <span class="fb-label">TREND <span class="fb-sub">price change, not total return</span></span>
+    <span class="fb-label">TREND<button type="button" class="fb-q" data-name="TREND" data-srctip="loading…" aria-label="TREND: loading…">?</button> <span class="fb-sub">price change, not total return</span></span>
     <div class="fb-trendrow">
       <div class="fb-cells">
         <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="d21"><span class="fb-wlabel">21D</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
@@ -1206,19 +1207,16 @@
       </div>
     </div>
     <p class="fb-hlnote" aria-live="polite"><span class="fb-hltext"></span><button type="button" class="fb-hlclear" data-action="clear-highlight" hidden>Clear</button></p>
-    <span class="fact-source">loading…</span>
   </div>
   <div class="fb-tile" data-fact="vs6mHigh">
-    <span class="fb-label">VS 6M HIGH</span>
+    <span class="fb-label">VS 6M HIGH<button type="button" class="fb-q" data-name="VS 6M HIGH" data-srctip="loading…" aria-label="VS 6M HIGH: loading…">?</button></span>
     <span class="fact-value">—</span>
     <span class="fact-note"></span>
-    <span class="fact-source">loading…</span>
   </div>
   <div class="fb-tile" data-fact="nearestBuy" aria-describedby="factBuyWhy">
-    <span class="fb-label">NEAREST BUY</span>
+    <span class="fb-label">NEAREST BUY<button type="button" class="fb-q" data-name="NEAREST BUY" data-srctip="loading…" aria-label="NEAREST BUY: loading…">?</button></span>
     <span class="fact-value">—</span>
     <span class="fact-note"></span>
-    <span class="fact-source">loading…</span>
   </div>
   <p class="fb-msg" role="status" aria-live="polite"><span class="fb-msgtext"></span><button type="button" class="fb-retry" hidden>Try again</button></p>
   <span id="factBuyWhy" hidden></span>
@@ -2954,8 +2952,17 @@ function setFactTile(name, value, cls, note, source) {
   v.className = 'fact-value' + (cls ? ' ' + cls : '');
   var n = tile.querySelector('.fact-note');
   if (n) n.textContent = note || '';
-  var s = tile.querySelector('.fact-source');
-  if (s) s.textContent = source || '';
+  setFactSource(tile, source);
+}
+// The tile's "?" names what its number is based on: the tip text and the
+// button's accessible name follow source. A tip open on the old text closes.
+function setFactSource(tile, source) {
+  var q = tile.querySelector('.fb-q');
+  if (!q) return;
+  var text = source ? source.charAt(0).toUpperCase() + source.slice(1) : '';
+  if (q.getAttribute('data-srctip') !== text) document.getElementById('factTip').hidden = true;
+  q.setAttribute('data-srctip', text);
+  q.setAttribute('aria-label', q.getAttribute('data-name') + (text ? ': ' + text : ''));
 }
 // hasFacts false (loading, failed, no data): a bare dash; the tile sources and
 // the band's message say why
@@ -3002,12 +3009,10 @@ function fillFactBand(sym, state, facts, buy) {
   }
   document.querySelector('#factBand [data-fact="yield"] .fact-flag').textContent =
     f && f.special && fbNum(f.yield) ? 'includes a special payout' : '';
-  // TREND: three windows + overall
+  // TREND: three windows
   var wins = (f && f.windows) || {};
   ['d21', 'm3', 'm6'].forEach(function (w) { setFactWindow(w, wins[w] || null, !!f); });
-  var overall = f && f.overall;
-  document.querySelector('#factBand [data-fact="trend"] > .fact-source').textContent =
-    f ? 'Tiingo daily closes through ' + day : why;
+  setFactSource(document.querySelector('#factBand [data-fact="trend"]'), f ? 'daily closes through ' + day : why);
   // VS 6M HIGH
   if (f && fbNum(f.vs6mHigh)) {
     setFactTile('vs6mHigh', fbSigned(f.vs6mHigh), f.vs6mHigh < 0 ? 'is-down' : 'is-flat',
@@ -3019,9 +3024,6 @@ function fillFactBand(sym, state, facts, buy) {
   var sum = document.querySelector('#factBand .fb-summary');
   sum.querySelector('.fb-sumsym').textContent = sym;
   sum.querySelector('.fb-sumnote').textContent = f ? '' : why;
-  var st = sum.querySelector('.fb-sumtrend');
-  st.textContent = overall || '—';
-  st.className = 'fb-sumtrend ' + (overall === 'UP' ? 'is-up' : overall === 'DOWN' ? 'is-down' : overall === 'MIXED' ? 'is-mixed' : 'is-none');
   setFactSum('yield', !f ? '—' : fbNum(f.yield) ? f.yield.toFixed(2) + '%' : 'none', f && fbNum(f.yield) ? 'is-up' : 'is-none');
   var cadence = f && f.cadence && f.cadence !== 'none' ? f.cadence : '';
   setFactSum('cad', cadence, 'is-up');
@@ -3113,6 +3115,18 @@ function showFactTip(el) {
   var dl = document.createElement('dl');
   t.rows.forEach(function (x) { dl.appendChild(askNode('dt', '', x[0])); dl.appendChild(askNode('dd', '', x[1])); });
   tip.replaceChildren(head, price, dl);
+  tip.classList.remove('is-src');
+  placeFactTip(tip, el);
+}
+// A tile's "?": its data-srctip text alone, in the same card
+function showFactSrcTip(el) {
+  var tip = document.getElementById('factTip'), text = el.getAttribute('data-srctip');
+  if (!text) { tip.hidden = true; return; }
+  tip.replaceChildren(document.createTextNode(text));
+  tip.classList.add('is-src');
+  placeFactTip(tip, el);
+}
+function placeFactTip(tip, el) {
   tip.hidden = false;
   var r = el.getBoundingClientRect(), w = tip.offsetWidth, h = tip.offsetHeight;
   tip.style.left = Math.min(Math.max(8, r.left), window.innerWidth - w - 8) + 'px';
@@ -3147,7 +3161,7 @@ function renderFactBand() {
     band.removeAttribute('aria-busy');
     fillFactBand(sym, state, r.ok ? r.facts : undefined, res[1]);
     if (!r.ok) setFactMsg('Could not load facts for ' + sym + '. Try again in a minute.', true, true);
-    else if (!r.facts) setFactMsg('No facts for ' + sym + ': Tiingo has no daily prices for it.', false, false);
+    else if (!r.facts) setFactMsg('No facts for ' + sym + ': there are no daily prices for it.', false, false);
     else setFactMsg('');
     // expires: when these facts go stale (the cache entry's 18:30 New York); none after a failure
     _factReady = { sym: sym, ok: r.ok, facts: r.ok ? r.facts : null, buy: res[1], expires: r.ok ? _tickerFactsExpires[sym] : undefined };
@@ -3163,15 +3177,22 @@ document.querySelector('#factBand .fb-retry').addEventListener('click', renderFa
 (function () {
   var band = document.getElementById('factBand');
   var hide = function () { document.getElementById('factTip').hidden = true; };
+  // a tile's "?" wins over the NEAREST BUY tile around it
+  var srcTip = function (e) { var q = e.target.closest && e.target.closest('.fb-q'); return q && band.contains(q) ? q : null; };
   band.addEventListener('mouseover', function (e) {
+    var q = srcTip(e);
+    if (q) return showFactSrcTip(q);
     var el = e.target.closest && e.target.closest('[data-buytip]');
     if (el && band.contains(el)) showFactTip(el); else hide();
   });
   band.addEventListener('mouseleave', hide);
   band.addEventListener('focusin', function (e) {
+    var q = srcTip(e);
+    if (q) return showFactSrcTip(q);   // any focus, so a tap on a phone shows it too
     var el = e.target.closest && e.target.closest('[data-buytip]');
     if (el && e.target === el && e.target.matches(':focus-visible')) showFactTip(el); else hide();
   });
+  band.addEventListener('click', function (e) { var q = srcTip(e); if (q) showFactSrcTip(q); });   // Safari does not focus a tapped button
   band.addEventListener('focusout', hide);
   band.addEventListener('scroll', hide, true);
   window.addEventListener('scroll', hide, true);
@@ -3419,17 +3440,18 @@ function setAskPressed(chip) {
     c.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
 }
-// one answer card: a title (string or h3 node), paragraphs (strings or nodes) and
-// the source line last. Loading, failed and empty states use it.
+// one answer card: a title (string or h3 node), paragraphs (strings or nodes) and,
+// when given, the source line last. Loading, failed and empty states use it.
 function askAnswer(title, parts, source) {
   var card = askNode('div', 'ask-card');
   card.appendChild(typeof title === 'string' ? askNode('h3', null, title) : title);
   parts.forEach(function (p) { card.appendChild(typeof p === 'string' ? askNode('p', null, p) : p); });
-  card.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
+  if (source) card.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
   document.getElementById('askAnswer').replaceChildren(card);
 }
 // One quick answer as a view that fills the panel: its parts (nodes), then the
-// method and caveats behind a closed "How this is worked out", and the source line last.
+// method and caveats behind a closed "How this is worked out", and the source line
+// last when given.
 function askView(parts, how, source) {
   var view = askNode('div', 'ask-view');
   var foot = askNode('div', 'ask-foot');   // pinned to the bottom of the panel
@@ -3441,8 +3463,8 @@ function askView(parts, how, source) {
     d.appendChild(ul);
     foot.appendChild(d);
   }
-  foot.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
-  view.appendChild(foot);
+  if (source) foot.appendChild(askNode('p', 'ask-src', 'Source: ' + source));
+  if (foot.firstChild) view.appendChild(foot);
   document.getElementById('askAnswer').replaceChildren(view);
   return view;
 }
@@ -3524,9 +3546,6 @@ function askLegend() {
 }
 function askVerdictCls(v) { return v === 'UP' || v === 'BULLISH' ? 'is-up' : v === 'DOWN' || v === 'BEARISH' ? 'is-down' : v === 'MIXED' ? 'is-mixed' : ''; }
 function askTrendTag(f) { return f.overall ? f.upCount + ' of 3 periods up' : 'not enough history'; }
-function askCloseSource(f, withPayouts) {
-  return 'Tiingo daily closes' + (withPayouts ? ' and distributions' : '') + ' through ' + askDay(f.asOf);
-}
 // "expected around" date for the next payout: the last ex-date plus one cadence
 // step, stepped past the as-of date. An estimate, never an announced date.
 // Weekly payers step 7 days at a time; the rest step whole months.
@@ -3560,10 +3579,10 @@ function runAskChip(chip) {
   var tok = ++_askToken;   // and drop any slower answer still on its way
   setAskPressed(chip);
   if (chip === 'buy') return askBuyAnswer(sym, r);
-  if (!r) return askAnswer(sym || 'Facts', ['Facts for ' + sym + ' are still loading. Try again in a moment.'], 'Tiingo daily closes');
-  if (!r.ok) return askAnswer(sym, ['Facts for ' + sym + ' did not load. Use Try again in the facts band above.'], 'Tiingo daily closes');
+  if (!r) return askAnswer(sym || 'Facts', ['Facts for ' + sym + ' are still loading. Try again in a moment.']);
+  if (!r.ok) return askAnswer(sym, ['Facts for ' + sym + ' did not load. Use Try again in the facts band above.']);
   var f = r.facts;
-  if (!f) return askAnswer(sym, ['No facts for ' + sym + ': Tiingo has no daily prices for it.'], 'Tiingo daily closes');
+  if (!f) return askAnswer(sym, ['No facts for ' + sym + ': there are no daily prices for it.']);
   if (chip === 'summary') return askSummaryView(sym, f, r.buy, tok);
   if (chip === 'yield') return askYieldView(f);
   if (chip === 'why') return askTrendView(f);
@@ -3574,7 +3593,7 @@ function runAskChip(chip) {
 function askYieldView(f) {
   var payouts = Array.isArray(f.payouts) ? f.payouts : [];
   if (!askPayer(f) || !fbNum(f.yield)) {
-    return askView([askHero('None', '', 'no distributions in the last 12 months')], [], askCloseSource(f, true));
+    return askView([askHero('None', '', 'no distributions in the last 12 months')], []);
   }
   var parts = [
     askHero(f.yield.toFixed(2) + '%', 'is-up', 'trailing 12-month yield', f.special ? 'SPECIAL PAYOUT' : ''),
@@ -3585,7 +3604,7 @@ function askYieldView(f) {
   var how = ['Yield: the payouts with an ex-date in the last 365 days, divided by the ' + askDay(f.asOf) + ' close of ' + px2(f.close) + '.',
     'How often it pays comes from the usual gap between payouts.'];
   if (f.special) how.push('The 12 months include a special payout (more than twice the usual amount), so the yield may overstate a typical year.');
-  return askView(parts, how, askCloseSource(f, true));
+  return askView(parts, how);
 }
 // a column per payout, height by cash amount, oldest left; each amount is in the
 // chart's label for screen readers and on hover
@@ -3622,7 +3641,7 @@ function askTrendView(f) {
     f.overall ? askHero(f.overall, askVerdictCls(f.overall), askTrendTag(f)) : askHero('—', '', 'not enough history for all three periods'),
     askLabel('Price change'), bars, askLegend(),
   ], ['Each bar is the price change from the close on its start date to the ' + askDay(f.asOf) + ' close.',
-    'The verdict counts how many of the three periods are up.', 'Price change only; distributions are not counted.'], askCloseSource(f, false));
+    'The verdict counts how many of the three periods are up.', 'Price change only; distributions are not counted.']);
 }
 // PAYOUT: the estimated next ex-date large, then recent ex-dates on a line ending
 // in the estimate
@@ -3637,7 +3656,7 @@ function askPayoutView(f) {
   return askView(parts, next
     ? ['The last ex-date (' + askDay(f.lastExDate) + ') plus ' + ASK_STEP_WORDS[f.cadence] + ', from how often it pays.',
       'It is not an announced date: our data has no announced future payouts.']
-    : ['Our data has no announced future payouts.'], askCloseSource(f, true));
+    : ['Our data has no announced future payouts.']);
 }
 // past ex-dates as filled dots, oldest left, then the estimate as a hollow dot;
 // month over day so seven fit the narrowest dock
@@ -3675,13 +3694,10 @@ function askSummaryView(sym, f, buy, tok) {
       var c = q ? askCompareWindows(f, q) : null, n = c ? c.ahead.length + c.behind.length + c.same.length : 0;
       cmp.querySelector('.ask-tile-v').textContent = n ? c.ahead.length + ' of ' + n : '—';
       cmp.querySelector('.ask-tile-s').textContent = !q ? 'QQQ facts did not load' : n ? 'periods ahead of QQQ' : 'not enough history';
-      // QQQ's facts can end on another day than the ticker's: name it, as VS QQQ does
-      if (q && q.asOf !== f.asOf) src.textContent = 'Source: ' + askCloseSource(f, payer) + ' (QQQ through ' + askDay(q.asOf) + ')' + buyNote;
     });
   }
   tiles.appendChild(askBuyTile(buy));
-  var buyNote = '; NEAREST BUY from Limit Buy Levels';
-  var src = askView([tiles], [], askCloseSource(f, payer) + buyNote).querySelector('.ask-src');
+  askView([tiles], []);
 }
 function askTile(chip, label, value, cls, sub) {
   var b = askNode('button', 'ask-tile');
@@ -3744,12 +3760,11 @@ function askCompareWindows(f, q) {
 }
 // VS QQQ: a headline, then per period a pair of bars from one zero line
 function askCompareAnswer(sym, f, tok) {
-  askAnswer(sym + ' vs QQQ', ['Loading QQQ facts…'], askCloseSource(f, false));
+  askAnswer(sym + ' vs QQQ', ['Loading QQQ facts…']);
   tickerFacts('QQQ').then(function (q) { return q; }, function () { return undefined; }).then(function (q) {
     if (tok !== _askToken) return;   // a newer chip, question or ticker took over meanwhile
     if (!q) {
-      return askAnswer(sym + ' vs QQQ', [q === undefined ? 'QQQ facts did not load. Try again in a minute.' : 'No facts for QQQ right now.'],
-        askCloseSource(f, false));
+      return askAnswer(sym + ' vs QQQ', [q === undefined ? 'QQQ facts did not load. Try again in a minute.' : 'No facts for QQQ right now.']);
     }
     var c = askCompareWindows(f, q), pairs = askNode('div', 'ask-pairs');
     c.rows.forEach(function (x) {
@@ -3759,9 +3774,9 @@ function askCompareAnswer(sym, f, tok) {
       g.appendChild(askBarRow('QQQ', x.b, c.max, x.better === 'b' ? 'better' : '', 'ask-better'));
       pairs.appendChild(g);
     });
-    var src = askCloseSource(f, false) + (q.asOf !== f.asOf ? ' (QQQ through ' + askDay(q.asOf) + ')' : ', both tickers');
-    askView([askNode('p', 'ask-headline', askCompareHeadline(sym, c.ahead, c.behind, c.same)), pairs],
-      ['Each bar is the price change over its period, up to the latest close.', 'Price change only; distributions are not counted.'], src);
+    var how = ['Each bar is the price change over its period, up to the latest close.', 'Price change only; distributions are not counted.'];
+    if (q.asOf !== f.asOf) how.push(sym + ' closes run through ' + askDay(f.asOf) + ', QQQ closes through ' + askDay(q.asOf) + '.');
+    askView([askNode('p', 'ask-headline', askCompareHeadline(sym, c.ahead, c.behind, c.same)), pairs], how);
   });
 }
 // opens Limit Buy Levels as its toolbar button does; with focusRange, the range's
@@ -3909,12 +3924,11 @@ function wireAskWeb(id) {
   reset();
   window.addEventListener('pageshow', reset);
 }
-// The server's source line: the Tiingo part, then the web results (when the
-// question searched the web) on a line of their own, as links.
+// The server's source line names the price data, then the web results (when the
+// question searched the web). Only the web results show, as links; with none, nothing.
 function askSourceNode(line) {
   var frag = document.createDocumentFragment();
   var m = /^(.*?)\s+(Web results \(not checked by this site\): .*|Web search returned no sources\.)$/.exec(String(line));
-  frag.appendChild(askLinkLine(m ? m[1] : String(line)));
   if (m) frag.appendChild(askLinkLine(m[2].replace(/^Web results \(not checked by this site\):/, 'Web, not checked by this site:')));
   return frag;
 }
@@ -4036,7 +4050,7 @@ function sendAskQuestion(question) {
       fail('Your session has ended. Sign in again to ask questions.', false);
       return showSignupCta('Sign in to ask questions', 'Typed questions use your account. Sign in again to keep asking about ' + sym + '.');
     }
-    if (r.status === 404) return fail('No facts for ' + sym + ': Tiingo has no daily prices for it, so there is nothing to explain.', false);
+    if (r.status === 404) return fail('No facts for ' + sym + ': there are no daily prices for it, so there is nothing to explain.', false);
     if (r.status === 429) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         var m = typeof j.error === 'string' && j.error.length <= 200 ? j.error : 'You have reached the question limit. Try again later.';
@@ -6795,18 +6809,6 @@ function xpFactsOf(syms) {
   });
   return out;
 }
-// The as-of part of a source line, naming every distinct date so no ticker's
-// figures sit under a date that is not theirs: " through Oct 22" when all agree,
-// else " through Oct 22; IWM through Jan 2" (the date most tickers share first,
-// unnamed, then each other date with its tickers, newest first).
-function xpThrough(r) {
-  var by = Object.create(null);
-  r.facts.forEach(function (x) { if (x.f.asOf) (by[x.f.asOf] = by[x.f.asOf] || []).push(x.sym); });
-  var days = Object.keys(by).sort(function (a, b) { return by[b].length - by[a].length || (a < b ? 1 : a > b ? -1 : 0); });
-  if (!days.length) return '';
-  var rest = days.slice(1).sort().reverse();
-  return ' through ' + fbDay(days[0]) + rest.map(function (d) { return '; ' + xpList(by[d]) + ' through ' + fbDay(d); }).join('');
-}
 function xpPartialNote(r) {
   var parts = [];
   if (r.failed.length) parts.push('could not check ' + xpList(r.failed) + ' (facts did not load; tap the check again to retry)');
@@ -6822,7 +6824,6 @@ function xpSkippedNote(skipped) {
 function xpCheckAnswer(kind, syms, skipped) {
   var r = xpFactsOf(syms), partial = xpPartialNote(r), n = r.facts.length;
   var more = xpSkippedNote(skipped);
-  var through = xpThrough(r);
   if (kind === 'monthly') {
     var monthly = r.facts.filter(function (x) { return x.f.cadence === 'monthly'; });
     var named = monthly.map(function (x) { return x.sym + (fbNum(x.f.yield) ? ' (' + x.f.yield.toFixed(2) + '% yield)' : ''); });
@@ -6830,14 +6831,13 @@ function xpCheckAnswer(kind, syms, skipped) {
       partial, more,
       monthly.length ? 'Paid monthly in the last 12 months: ' + named.join(', ') + '.'
         : 'None of the ' + n + ' checked tickers paid monthly in the last 12 months.'
-    ], 'Tiingo distributions, last 12 months' + through);
+    ]);
   }
   if (kind === 'yield') {
     var payers = r.facts.filter(function (x) { return askPayer(x.f) && fbNum(x.f.yield); })
       .sort(function (a, b) { return b.f.yield - a.f.yield; });
     if (!payers.length) {
-      return xpAnswerCard('No payers', [partial, more, 'None of the ' + n + ' checked tickers paid distributions in the last 12 months.'],
-        'Tiingo distributions, last 12 months' + through);
+      return xpAnswerCard('No payers', [partial, more, 'None of the ' + n + ' checked tickers paid distributions in the last 12 months.']);
     }
     var top = payers[0], next = payers.slice(1, 4), non = n - payers.length;
     return xpAnswerCard('Highest yield: ' + top.sym, [
@@ -6845,7 +6845,7 @@ function xpCheckAnswer(kind, syms, skipped) {
       top.sym + ' yields ' + top.f.yield.toFixed(1) + '%, paid ' + top.f.cadence + '.',
       next.length ? 'Next: ' + next.map(function (x) { return x.sym + ' ' + x.f.yield.toFixed(1) + '%'; }).join(', ') + '.' : null,
       non ? non + ' of the checked tickers paid nothing in the last 12 months.' : null
-    ], 'Tiingo distributions in the last 12 months ÷ latest close' + through);
+    ]);
   }
   if (kind === 'up3') {
     // Up means above 0 in all three windows; a missing window never counts as up.
@@ -6872,7 +6872,7 @@ function xpCheckAnswer(kind, syms, skipped) {
       close.length ? 'Close, down in one period: ' + close.map(function (x) { return x.text; }).join(', ') + '.' : null,
       rest ? 'The other ' + rest + ' ' + (rest === 1 ? 'is' : 'are') + ' not up in all three periods.' : null,
       'The table now shows only the matches. Clear the filter above it to see every ticker.'
-    ], 'Tiingo daily closes' + through + '; price change, not total return');
+    ]);
   }
 }
 // Why the dialog's prices can't be used right now, or null when its last build
@@ -7064,7 +7064,7 @@ function sendXpQuestion(question) {
   postAskQuestion(JSON.stringify(payload), false, req.ctl && req.ctl.signal).then(function (r) {
     if (!live()) return drop();
     if (r.status === 401) return fail('Your session has ended. Sign in again to ask questions.', false);
-    if (r.status === 404) return fail('No facts for these tickers: Tiingo has no daily prices for them, so there is nothing to explain.', false);
+    if (r.status === 404) return fail('No facts for these tickers: there are no daily prices for them, so there is nothing to explain.', false);
     if (r.status === 429) {
       return r.json().catch(function () { return {}; }).then(function (j) {
         fail(typeof j.error === 'string' && j.error.length <= 200 ? j.error : 'You have reached the question limit. Try again later.', false);
@@ -7150,7 +7150,7 @@ function exportTableHtml(sections) {
   html += '</table></div>';
   if (facts) {
     html += '<p class="xp-factnote">21D, 3M, 6M: price change (not total return) from daily closes. '
-      + 'Yield: distributions with an ex-date in the last 12 months ÷ latest close. Source: Tiingo.</p>';
+      + 'Yield: distributions with an ex-date in the last 12 months ÷ latest close.</p>';
   }
   return html;
 }
