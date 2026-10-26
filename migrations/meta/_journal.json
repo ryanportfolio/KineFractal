@@ -71,6 +71,13 @@
       "when": 1791504000000,
       "tag": "0009_gap_limit_placement",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792540800000,
+      "tag": "0010_chart_view_prefs",
+      "breakpoints": true
     }
   ]
 }

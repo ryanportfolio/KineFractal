@@ -45,7 +45,7 @@ import express, { type Express, type Request, type Response } from "express";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db";
 import { chartLines, chartPreferences, chartSymbols, symbolRequests } from "@shared/schema";
-import { DEFAULT_GAP_PLACEMENT, isGapPlacement, normalizeGapPlacement } from "@shared/gap-placement";
+import { DEFAULT_GAP_PLACEMENT, isGapPlacement, normalizeGapPlacement, type GapPlacement } from "@shared/gap-placement";
 import { sessionUser } from "./account-routes";
 import { registerSymbolSearchRoute } from "./symbol-search";
 import {
@@ -453,6 +453,22 @@ const MAX_GROUP_NAME = 40;
 const MAX_GROUP_SYMBOLS = 100;
 const GROUP_ID_RE = /^[a-z0-9]{1,24}$/;
 
+
+// The /charts page's display choices, saved per account in
+// chart_preferences.view_prefs: the colour theme and whether line labels at the
+// price axis stay hidden until hovered.
+export type ViewPrefs = { theme: "dark" | "light"; hoverLabels: boolean };
+export function isViewPrefs(value: unknown): value is ViewPrefs {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const v = value as Record<string, unknown>;
+  return (v.theme === "dark" || v.theme === "light") && typeof v.hoverLabels === "boolean";
+}
+/** Only the known fields, with defaults for anything missing or malformed. */
+export function normalizeViewPrefs(value: unknown): ViewPrefs {
+  const v = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  return { theme: v.theme === "light" ? "light" : "dark", hoverLabels: v.hoverLabels === true };
+}
+
 // onlyHere: members added from inside this group, which the dialog keeps off
 // its All tickers tab. Always a subset of symbols; omitted when empty.
 export type TickerGroup = { id: string; name: string; symbols: string[]; onlyHere?: string[] };
@@ -806,50 +822,75 @@ function registerChartSymbolRoutes(app: Express): void {
   });
 
   // GET /api/chart-prefs — this account's gap limit placement, shared by the
-  // Limit Buy dialog, the /alerts page and the weekly email. Same answer shape
-  // as /api/chart-groups: account:false for visitors, stored:false while the
-  // gap_limit_placement column is not there yet.
+  // Limit Buy dialog, the /alerts page and the weekly email, plus the chart
+  // page's display choices (viewPrefs: theme and labels on hover, or null when
+  // none are saved). Same answer shape as /api/chart-groups: account:false for
+  // visitors, stored:false while the gap_limit_placement column is not there yet.
+  // view_prefs is read on its own, so a database without that column still
+  // answers the gap placement.
   app.get("/api/chart-prefs", async (req: Request, res: Response) => {
     res.set("Cache-Control", "no-store");
     try {
       const u = db ? await sessionUser(req) : null;
       if (!db || !u) {
-        return res.json({ gapPlacement: DEFAULT_GAP_PLACEMENT, account: false, stored: false });
+        return res.json({ gapPlacement: DEFAULT_GAP_PLACEMENT, account: false, stored: false, viewPrefs: null });
       }
-      const rows = await db
-        .select({ gapLimitPlacement: chartPreferences.gapLimitPlacement })
-        .from(chartPreferences)
-        .where(eq(chartPreferences.userId, u.id))
-        .limit(1)
-        .catch(() => null);
+      const [rows, viewRows] = await Promise.all([
+        db
+          .select({ gapLimitPlacement: chartPreferences.gapLimitPlacement })
+          .from(chartPreferences)
+          .where(eq(chartPreferences.userId, u.id))
+          .limit(1)
+          .catch(() => null),
+        db
+          .select({ viewPrefs: chartPreferences.viewPrefs })
+          .from(chartPreferences)
+          .where(eq(chartPreferences.userId, u.id))
+          .limit(1)
+          .catch(() => null),
+      ]);
+      const viewPrefs = viewRows?.[0]?.viewPrefs == null ? null : normalizeViewPrefs(viewRows[0].viewPrefs);
       if (rows === null) {
-        return res.json({ gapPlacement: DEFAULT_GAP_PLACEMENT, account: true, stored: false });
+        return res.json({ gapPlacement: DEFAULT_GAP_PLACEMENT, account: true, stored: false, viewPrefs });
       }
-      res.json({ gapPlacement: normalizeGapPlacement(rows[0]?.gapLimitPlacement), account: true, stored: true });
+      res.json({ gapPlacement: normalizeGapPlacement(rows[0]?.gapLimitPlacement), account: true, stored: true, viewPrefs });
     } catch (e: any) {
       console.error("[FearLab charts] chart-prefs get failed:", e?.message ?? e);
       res.status(500).json({ error: "failed to load chart preferences" });
     }
   });
 
-  // PUT /api/chart-prefs — { gapPlacement: 'top' | 'middle' | 'fill' }.
+  // PUT /api/chart-prefs — { gapPlacement?: 'top' | 'middle' | 'fill',
+  // viewPrefs?: { theme: 'dark' | 'light', hoverLabels: boolean } }. Either or
+  // both; a field left out keeps its saved value.
   app.put("/api/chart-prefs", async (req: Request, res: Response) => {
     try {
       if (!db) return res.status(503).json({ ok: false, error: "database unavailable" });
       const u = await sessionUser(req);
       if (!u) return res.status(401).json({ ok: false, error: "sign in required" });
-      const gapPlacement = (req.body as any)?.gapPlacement;
-      if (!isGapPlacement(gapPlacement)) {
+      const body = (req.body as any) ?? {};
+      const hasGap = body.gapPlacement !== undefined;
+      const hasView = body.viewPrefs !== undefined;
+      if (!hasGap && !hasView) {
+        return res.status(400).json({ ok: false, error: "send gapPlacement or viewPrefs" });
+      }
+      if (hasGap && !isGapPlacement(body.gapPlacement)) {
         return res.status(400).json({ ok: false, error: "gapPlacement must be top, middle or fill" });
       }
+      if (hasView && !isViewPrefs(body.viewPrefs)) {
+        return res.status(400).json({ ok: false, error: "viewPrefs must be { theme: 'dark' | 'light', hoverLabels: boolean }" });
+      }
+      const set: { gapLimitPlacement?: GapPlacement; viewPrefs?: ViewPrefs } = {};
+      if (hasGap) set.gapLimitPlacement = body.gapPlacement;
+      if (hasView) set.viewPrefs = normalizeViewPrefs(body.viewPrefs);
       await db
         .insert(chartPreferences)
-        .values({ userId: u.id, gapLimitPlacement: gapPlacement })
+        .values({ userId: u.id, ...set })
         .onConflictDoUpdate({
           target: chartPreferences.userId,
-          set: { gapLimitPlacement: gapPlacement, updatedAt: new Date() },
+          set: { ...set, updatedAt: new Date() },
         });
-      res.json({ ok: true, gapPlacement });
+      res.json({ ok: true, ...(hasGap ? { gapPlacement: set.gapLimitPlacement } : {}), ...(hasView ? { viewPrefs: set.viewPrefs } : {}) });
     } catch (e: any) {
       console.error("[FearLab charts] chart-prefs save failed:", e?.message ?? e);
       res.status(500).json({ ok: false, error: "failed to save chart preferences" });

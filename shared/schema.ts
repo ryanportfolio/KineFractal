@@ -169,6 +169,9 @@ export const chartPreferences = pgTable("chart_preferences", {
   // 'top' (shared/gap-placement.ts). The engine's weekly email reads it with
   // plain SQL, so keep the column name stable.
   gapLimitPlacement: text("gap_limit_placement"),
+  // The /charts page's display choices: { theme: 'dark' | 'light', hoverLabels }.
+  // null until the account first changes one (normalizeViewPrefs in server/fearlab-charts.ts).
+  viewPrefs: jsonb("view_prefs"),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });
 
