@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KineFractalLab — Charts</title>
 <link rel="stylesheet" href="assets/kf-theme.css">
+<script>
+  // the saved theme goes on before the first paint, so a light-theme visitor never sees a dark flash
+  try { if (localStorage.getItem('kf-chart-theme-v1') === 'light') document.documentElement.setAttribute('data-theme', 'light'); } catch (e) {}
+</script>
 <style>
   /* KF terminal chrome tokens (canonical: assets/kf-theme.css). Series/overlay colors
      below the first line are DATA colors — they encode meaning, do not retheme.
@@ -13,14 +17,47 @@
   :root { --bg:#080808; --panel:#0d0d0d; --grid:#262626; --fg:#e6e6e6; --mut:#b8b8b8;
           --sup:#26c6da; --res:#ffa726; --lvl:#ab47bc; --gap:#caa84a; --ss:#ff5ec8; --ssr:#ffffff; --prom:#9aa0a6; --thr:#f5c518; --rr:#4f8cff;
           --cbuy:#21d07a; --csell:#ff5b5b; --pdeq:#9598a1; --mine:#c6ff00; --struct:#9d6bff; --dpool:#5b8def; --gex:#ffd60a;
-          --uoac:#21d07a; --uoap:#ff5b5b; --meas:#3b82f6; }
+          --uoac:#21d07a; --uoap:#ff5b5b; --meas:#3b82f6;
+          /* chrome accents and tints: rgb triplets feed rgba(var(--x-rgb),a) washes; --tag-ink and
+             --halo are read by the overlay canvas (level badges, print labels) */
+          --brand:#00ff88; --brand-rgb:0,255,136; --sup-rgb:38,198,218; --panel-rgb:13,13,13; --grid-rgb:38,38,38;
+          --fg-rgb:230,230,230; --ink-rgb:255,255,255; --ink-hi:#ffffff; --cbuy-rgb:33,208,122; --csell-rgb:255,91,91;
+          --struct-rgb:157,107,255; --mine-rgb:198,255,0; --on-sup:#03181c; --sup-hi:#5fd8e6; --tour-detail:#b6bcc9;
+          --spy:#f5a623; --scroll:#333; --tag-ink:#0b0e15; --halo:rgba(8,11,18,0.88); }
+  /* LIGHT THEME (html[data-theme="light"], the sun button in the top bar; kf-chart-theme-v1).
+     Warm off-white chrome, Verdana for every element, text set larger through
+     font-size-adjust. Data colours keep their hue and only get darker where they would wash
+     out on a light ground. Still HEX ONLY: getCss() hands these to lightweight-charts. */
+  html[data-theme="light"] { color-scheme:light;
+          --bg:#f4f1ea; --panel:#ebe6db; --grid:#d3ccbd; --fg:#26231e; --mut:#5f594f;
+          --sup:#00849a; --res:#c56a00; --lvl:#8e2fa6; --gap:#93731a; --ss:#c42a8f; --ssr:#3a3631; --prom:#6b7178; --thr:#9c7700; --rr:#2a62d4;
+          --cbuy:#0e8a4a; --csell:#cc3030; --pdeq:#6c6f78; --mine:#4f7d00; --struct:#6e3fe0; --dpool:#3563c9; --gex:#9a7d00;
+          --uoac:#0e8a4a; --uoap:#cc3030; --meas:#2f6fe0;
+          --brand:#00874f; --brand-rgb:0,135,79; --sup-rgb:0,132,154; --panel-rgb:235,230,219; --grid-rgb:211,204,189;
+          --fg-rgb:38,35,30; --ink-rgb:38,35,30; --ink-hi:#26231e; --cbuy-rgb:14,138,74; --csell-rgb:204,48,48;
+          --struct-rgb:110,63,224; --mine-rgb:79,125,0; --on-sup:#ffffff; --sup-hi:#006d80; --tour-detail:#5f594f;
+          --spy:#c26a00; --scroll:#bfb6a4; --tag-ink:#ffffff; --halo:rgba(244,241,234,0.92); }
+  /* the font shorthand resets font-size-adjust, so both carry !important to reach every element */
+  html[data-theme="light"] body, html[data-theme="light"] body *,
+  html[data-theme="light"] body *::before, html[data-theme="light"] body *::after {
+    font-family:Verdana,Geneva,sans-serif !important; font-size-adjust:0.6 !important; }
+  html[data-theme="light"] .kf-brand { text-shadow:none; }
+  html[data-theme="light"] #drawCta, html[data-theme="light"] #signInDialog, html[data-theme="light"] #buildOvl,
+  html[data-theme="light"] #removeTickerDialog, html[data-theme="light"] #tickerReorderDialog,
+  html[data-theme="light"] #exportDialog { background:rgba(58,50,38,.36); }
+  html[data-theme="light"] .symbtn::after, html[data-theme="light"] #measureBox, html[data-theme="light"] #tipBox,
+  html[data-theme="light"] #cmpMenu, html[data-theme="light"] .tkfind, html[data-theme="light"] .tour-card,
+  html[data-theme="light"] #siteMenu, html[data-theme="light"] #acctMenu, html[data-theme="light"] .box,
+  html[data-theme="light"] #askDock .ask-railbtn::after { box-shadow:0 8px 24px rgba(58,50,38,.18); }
+  html[data-theme="light"] #legend2 { --lg-txt:var(--fg); --lg-sec:var(--mut); --lg-rule:var(--grid); background:var(--bg); }
+  html[data-theme="light"] .lg2Scr { background:var(--bg); }
   * { box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; }
   body { margin:0; overflow:hidden; display:flex; flex-direction:column;
          background:var(--bg); color:var(--fg); font:14px "Space Grotesk","Segoe UI",Verdana,sans-serif; }
   .kf-brand { font-family:Orbitron,"Space Grotesk",sans-serif; font-weight:700; font-size:13px;
-              letter-spacing:.08em; color:#00ff88; margin-right:4px;
-              text-shadow:0 0 5px rgba(0,255,136,.25),0 0 10px rgba(0,255,136,.15);
+              letter-spacing:.08em; color:var(--brand); margin-right:4px;
+              text-shadow:0 0 5px rgba(var(--brand-rgb),.25),0 0 10px rgba(var(--brand-rgb),.15);
               animation:kf-glow 1s ease-in-out infinite; }
   #bar { flex:0 0 auto; min-height:44px; display:flex; gap:6px 8px; align-items:center;
          flex-wrap:wrap; white-space:nowrap; overflow:visible;
@@ -33,7 +70,7 @@
   select, button { background:var(--bg); color:var(--fg); border:1px solid var(--grid);
            border-radius:0; padding:3px 6px; font:inherit; }
   button { cursor:pointer; }
-  button:hover { border-color:#00ff88; }
+  button:hover { border-color:var(--brand); }
   /* REORDER and Limit Buy Levels live on the TOP row (right of the brand) so the ticker
      strip below gets the full bar width */
   #topActions { margin-left:auto; display:flex; align-items:center; gap:18px; }
@@ -45,15 +82,15 @@
   #superBtns { display:flex; flex:1 1 auto; flex-wrap:wrap; gap:4px; min-width:0; vertical-align:middle; }
   .superbtn { font-weight:bold; letter-spacing:.5px; padding:3px 7px; font-size:15px; }   /* bar is 13px; tickers read 2px bigger */
   .superbtn.active { border-color:var(--sup); color:var(--sup); }
-  #exportBtn { flex:0 0 auto; color:var(--sup); border-color:rgba(38,198,218,.48); }
+  #exportBtn { flex:0 0 auto; color:var(--sup); border-color:rgba(var(--sup-rgb),.48); }
   /* the main action on this row: font, size and caps match REORDER; a solid
      border and a light fill make it read heavier (user, 2026-10-08) */
-  #topActions #exportBtn { font:bold 11px monospace; letter-spacing:1.5px; text-transform:uppercase; border-color:var(--sup); background:rgba(38,198,218,.10); }
-  #topActions #exportBtn:hover, #topActions #exportBtn[aria-expanded="true"] { background:rgba(38,198,218,.22); }
-  #exportBtn:hover, #exportBtn[aria-expanded="true"] { border-color:var(--sup); background:rgba(38,198,218,.08); }
-  #tickerReorderBtn { flex:0 0 auto; color:var(--sup); border-color:rgba(38,198,218,.48);
+  #topActions #exportBtn { font:bold 11px monospace; letter-spacing:1.5px; text-transform:uppercase; border-color:var(--sup); background:rgba(var(--sup-rgb),.10); }
+  #topActions #exportBtn:hover, #topActions #exportBtn[aria-expanded="true"] { background:rgba(var(--sup-rgb),.22); }
+  #exportBtn:hover, #exportBtn[aria-expanded="true"] { border-color:var(--sup); background:rgba(var(--sup-rgb),.08); }
+  #tickerReorderBtn { flex:0 0 auto; color:var(--sup); border-color:rgba(var(--sup-rgb),.48);
                       font:11px monospace; letter-spacing:.12em; padding:4px 8px; }
-  #tickerReorderBtn:hover, #tickerReorderBtn[aria-expanded="true"] { border-color:var(--sup); background:rgba(38,198,218,.08); }
+  #tickerReorderBtn:hover, #tickerReorderBtn[aria-expanded="true"] { border-color:var(--sup); background:rgba(var(--sup-rgb),.08); }
   #tfBtns { display:inline-flex; gap:3px; }
   .tfbtn { font-weight:bold; padding:3px 6px; }
   .tfbtn.active { border-color:var(--sup); color:var(--sup); }
@@ -91,7 +128,7 @@
             background:var(--mine); border:2px solid rgba(0,0,0,.6); box-sizing:border-box;
             pointer-events:auto; cursor:grab; }
   .handle.mid { border-radius:2px; opacity:.85; }       /* square midpoint = move whole line */
-  .handle.sel { box-shadow:0 0 0 2px #fff; }            /* selected line's anchors */
+  .handle.sel { box-shadow:0 0 0 2px var(--ink-hi); }            /* selected line's anchors */
   .handle:hover { transform:scale(1.25); }
   #handles.drawing .handle { pointer-events:none; }    /* while placing, dots don't grab clicks */
   /* measure tool (Shift+drag ruler): blue pill label centered over the measured box */
@@ -103,7 +140,7 @@
   #measureBox .sub { font-weight:400; opacity:.9; font-size:14px; }
   /* hover tips for on-chart marks: what THIS mark says (its own numbers) + its distance from the latest close */
   #tipBox { position:absolute; z-index:6; pointer-events:none; display:none; max-width:320px;
-            background:rgba(13,13,13,.97); border:1px solid var(--grid); border-radius:8px;
+            background:rgba(var(--panel-rgb),.97); border:1px solid var(--grid); border-radius:8px;
             padding:8px 11px; font-size:14px; line-height:1.45; color:var(--fg);
             box-shadow:0 3px 12px rgba(0,0,0,.5); }
   #tipBox b { display:block; margin-bottom:2px; }
@@ -112,7 +149,7 @@
   #cmpLegend { position:absolute; top:6px; left:8px; z-index:5; display:flex; flex-wrap:wrap; gap:4px 8px;
                max-width:calc(100% - 120px); pointer-events:none; font:bold 14px Verdana,Geneva,sans-serif; }
   #cmpLegend:empty { display:none; }
-  #cmpLegend .it { display:inline-flex; align-items:center; gap:6px; padding:2px 6px; background:rgba(13,13,13,.85);
+  #cmpLegend .it { display:inline-flex; align-items:center; gap:6px; padding:2px 6px; background:rgba(var(--panel-rgb),.85);
                    border:1px solid var(--grid); pointer-events:auto; }
   #cmpLegend .pct { color:var(--fg); font-weight:normal; }
   #cmpLegend button { padding:0 3px; border:0; background:none; color:var(--mut); font-size:15px; line-height:1; }
@@ -122,7 +159,7 @@
   #cmpMenu[hidden] { display:none; }
   #cmpList { display:flex; flex-direction:column; overflow:auto; }
   #cmpList button { display:flex; align-items:baseline; gap:8px; padding:5px 8px; border:0; background:none; text-align:left; }
-  #cmpList button:hover, #cmpList button:focus-visible { background:rgba(38,198,218,.12); }
+  #cmpList button:hover, #cmpList button:focus-visible { background:rgba(var(--sup-rgb),.12); }
   #cmpList .sym { font-weight:bold; }
   #cmpList .nm { overflow:hidden; color:var(--mut); font-size:14px; white-space:nowrap; text-overflow:ellipsis; }
   #cmpList .note { margin:4px; color:var(--mut); font-size:14px; }
@@ -132,7 +169,7 @@
   .tkfind[hidden] { display:none; }
   .tkfind .tkopt { display:grid; grid-template-columns:72px minmax(0,1fr) auto; align-items:baseline; gap:8px;
                    padding:6px 10px; color:var(--fg); cursor:pointer; }
-  .tkfind .tkopt:hover, .tkfind .tkopt.active { background:rgba(38,198,218,.14); }
+  .tkfind .tkopt:hover, .tkfind .tkopt.active { background:rgba(var(--sup-rgb),.14); }
   .tkfind .tkopt.active { box-shadow:inset 2px 0 0 var(--sup); }
   .tkfind .sym { font:bold 14px Verdana,Geneva,sans-serif; }
   .tkfind .nm { overflow:hidden; color:var(--mut); white-space:nowrap; text-overflow:ellipsis; }
@@ -141,23 +178,23 @@
   label:has(#tLog:disabled), #drawBtn:disabled { opacity:.4; cursor:not-allowed; }
   /* ---- guided layer tour: a card pinned in the FUTURE_BARS whitespace, explaining one overlay at a time ---- */
   .tour-card { position:absolute; z-index:6; pointer-events:auto; width:calc(460px * var(--ts,1)); max-width:92%;
-               padding:24px 26px; background:rgba(13,13,13,.97); border:1px solid var(--grid);
+               padding:24px 26px; background:rgba(var(--panel-rgb),.97); border:1px solid var(--grid);
                border-left:5px solid var(--grid); border-radius:13px; color:var(--fg);
                font-size:22px; line-height:1.55; opacity:0; transform:translateY(8px);
                transition:opacity .3s ease, transform .3s ease, width .15s ease; box-shadow:0 10px 36px rgba(0,0,0,.62); }
   .tour-card.show { opacity:1; transform:translateY(0); }
   .tour-h { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
-  .tour-sw { width:19px; height:19px; border-radius:5px; flex:0 0 auto; box-shadow:0 0 0 1px rgba(255,255,255,.16); }
+  .tour-sw { width:19px; height:19px; border-radius:5px; flex:0 0 auto; box-shadow:0 0 0 1px rgba(var(--ink-rgb),.16); }
   .tour-name { font-weight:700; font-size:calc(26px * var(--ts,1)); letter-spacing:.2px; }
   .tour-body { margin-bottom:22px; }
   .tour-lead { color:var(--fg); font-size:calc(23px * var(--ts,1)); font-weight:650; line-height:1.28; letter-spacing:.1px; margin:0 0 9px; }
-  .tour-detail { color:#b6bcc9; font-size:calc(18px * var(--ts,1)); font-weight:400; line-height:1.46; margin:0; }
+  .tour-detail { color:var(--tour-detail); font-size:calc(18px * var(--ts,1)); font-weight:400; line-height:1.46; margin:0; }
   .tour-chips { display:flex; flex-wrap:wrap; gap:7px 9px; margin-top:13px; }
   .tour-chip { display:inline-flex; align-items:center; gap:7px; font-size:calc(14px * var(--ts,1)); line-height:1; color:var(--fg);
-               padding:5px 10px 5px 8px; border-radius:999px; background:rgba(255,255,255,.04);
+               padding:5px 10px 5px 8px; border-radius:999px; background:rgba(var(--ink-rgb),.04);
                border:1px solid var(--grid); white-space:nowrap; }
   .tour-chip i { width:10px; height:10px; border-radius:50%; flex:0 0 auto; background:currentColor;
-                 box-shadow:0 0 0 1px rgba(255,255,255,.18); }
+                 box-shadow:0 0 0 1px rgba(var(--ink-rgb),.18); }
   .tour-ctl { display:flex; gap:10px; }
   .tour-b { padding:9px 20px; font-size:21px; line-height:1; border-radius:7px; }
   .tour-b:hover { border-color:var(--fg); }
@@ -165,7 +202,7 @@
   #msg { position:fixed; left:50%; top:55%; transform:translate(-50%,-50%);
          color:var(--mut); pointer-events:none; }
   /* ---- chart legend (#legend / #legend-CODE): layer index + two screens drawn by the chart's own code ---- */
-  #legend2 { --lg-txt:#e6e6e6; --lg-sec:#b8b8b8; --lg-beam:#00ff88; --lg-rule:#1f3a2c;
+  #legend2 { --lg-txt:#e6e6e6; --lg-sec:#b8b8b8; --lg-beam:var(--brand); --lg-rule:#1f3a2c;
              position:fixed; inset:0; z-index:20; display:none; overflow:auto; background:#070908; color:var(--lg-txt); }
   #legend2.open { display:block; }
   #legend2Close { position:fixed; top:14px; right:18px; z-index:21; font-size:22px; padding:5px 13px; }
@@ -181,8 +218,8 @@
   #lg2Index button { display:flex; align-items:center; gap:9px; width:100%; padding:7px 10px 7px 12px; border:0;
                      border-left:3px solid transparent; background:none; color:var(--lg-txt); font:16px "Space Grotesk", sans-serif;
                      text-align:left; cursor:pointer; }
-  #lg2Index button:hover { background:rgba(0,255,136,.06); }
-  #lg2Index button[aria-current="true"] { border-left-color:var(--lg-beam); background:rgba(0,255,136,.1); }
+  #lg2Index button:hover { background:rgba(var(--brand-rgb),.06); }
+  #lg2Index button[aria-current="true"] { border-left-color:var(--lg-beam); background:rgba(var(--brand-rgb),.1); }
   #lg2Index .sw { display:flex; gap:3px; flex:0 0 auto; }
   #lg2Index .sw i { width:12px; height:12px; border-radius:2px; }
   #lg2Index .nm { flex:1 1 auto; }
@@ -206,7 +243,7 @@
   #lg2Step p, #lg2LiveNote p { margin:0; }
   #lg2Step ul { margin:6px 0 0; padding-left:20px; }
   #lg2Step li { margin:2px 0; }
-  #lg2Mark { position:absolute; z-index:5; pointer-events:none; border:2px solid #ffffff; border-radius:50%; background:none; }
+  #lg2Mark { position:absolute; z-index:5; pointer-events:none; border:2px solid var(--ink-hi); border-radius:50%; background:none; }
   #lg2Text { max-width:980px; padding-top:22px; }
   #lg2Text .hd { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
   #lg2Text h2 { margin:0; font:600 28px "JetBrains Mono", monospace; }
@@ -235,7 +272,7 @@
   #siteMenu.open { display:block; }
   #siteMenu a { display:block; padding:7px 12px; color:var(--fg); text-decoration:none;
                 font-size:15px; letter-spacing:.04em; }
-  #siteMenu a:hover { color:#00ff88; background:rgba(0,255,136,.06); }
+  #siteMenu a:hover { color:var(--brand); background:rgba(var(--brand-rgb),.06); }
   /* signed-out draw CTA (site mode only — built by showDrawCta()) */
   #drawCta { display:none; position:fixed; inset:0; z-index:60; background:rgba(0,0,0,.55);
              align-items:center; justify-content:center; }
@@ -247,18 +284,18 @@
   #drawCta .row { display:flex; gap:8px; align-items:center; }
   #drawCta button.go { flex:1; padding:7px 10px; border-color:var(--mine); color:var(--mine);
                        font-size:15px; letter-spacing:.04em; }
-  #drawCta button.go:hover { background:rgba(198,255,0,.08); }
+  #drawCta button.go:hover { background:rgba(var(--mine-rgb),.08); }
   #drawCta a.alt { padding:7px 6px; color:var(--fg); font-size:15px; }
   #drawCta button.later { padding:7px 10px; font-size:15px; }
   /* account control (site mode, right of Limit Buy Levels) + in-page sign-in dialog */
   #acct { position:relative; display:inline-flex; align-items:center; }
   #acct[hidden], #acct [hidden] { display:none !important; }
-  #topActions #signInBtn { color:#00ff88; border-color:rgba(0,255,136,.55); }
-  #topActions #signInBtn:hover { border-color:#00ff88; background:rgba(0,255,136,.08); }
+  #topActions #signInBtn { color:var(--brand); border-color:rgba(var(--brand-rgb),.55); }
+  #topActions #signInBtn:hover { border-color:var(--brand); background:rgba(var(--brand-rgb),.08); }
   #topActions #acctBtn { display:inline-flex; align-items:center; gap:7px; max-width:230px;
                          font-weight:normal; letter-spacing:normal; color:var(--fg); }
-  #acctBtn .dot { flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:#00ff88;
-                  box-shadow:0 0 5px rgba(0,255,136,.6); }
+  #acctBtn .dot { flex:0 0 auto; width:7px; height:7px; border-radius:50%; background:var(--brand);
+                  box-shadow:0 0 5px rgba(var(--brand-rgb),.6); }
   #acctEmail { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #acctMenu { position:absolute; top:calc(100% + 6px); right:0; z-index:30; min-width:210px;
               background:var(--panel); border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5);
@@ -267,35 +304,35 @@
   #acctMenu a, #acctMenu button { display:block; width:100%; padding:8px 12px; text-align:left;
                                   color:var(--fg); text-decoration:none; font-size:15px; border:0;
                                   background:none; letter-spacing:normal; font-weight:normal; }
-  #acctMenu a:hover, #acctMenu button:hover { color:#00ff88; background:rgba(0,255,136,.06); }
+  #acctMenu a:hover, #acctMenu button:hover { color:var(--brand); background:rgba(var(--brand-rgb),.06); }
   #acctMenuErr { margin:0 12px; color:var(--csell); font-size:14px; }
   #acctMenuErr:empty { display:none; }
   #signInDialog { display:none; position:fixed; inset:0; z-index:90; padding:20px;
                   background:rgba(0,0,0,.72); align-items:center; justify-content:center; }
   #signInDialog.open { display:flex; }
-  #signInDialog .box { width:min(380px,100%); background:var(--panel); border:1px solid rgba(0,255,136,.45);
+  #signInDialog .box { width:min(380px,100%); background:var(--panel); border:1px solid rgba(var(--brand-rgb),.45);
                        padding:22px; box-shadow:0 12px 38px rgba(0,0,0,.72); display:flex; flex-direction:column;
                        max-height:calc(100vh - 40px); overflow-y:auto; overscroll-behavior:contain; }
-  #signInDialog .eyebrow { margin-bottom:8px; color:#00ff88; font:13px monospace; letter-spacing:.16em;
+  #signInDialog .eyebrow { margin-bottom:8px; color:var(--brand); font:13px monospace; letter-spacing:.16em;
                            text-transform:uppercase; }
   #signInDialog h3 { margin:0 0 6px; color:var(--fg); font-size:18px; letter-spacing:.03em; }
   #signInDialog .lede { margin:0 0 14px; color:var(--mut); font-size:15px; line-height:1.5; }
   #signInDialog label { margin:8px 0 4px; color:var(--mut); font-size:14px; letter-spacing:.04em; }
   #signInDialog input { background:var(--bg); color:var(--fg); border:1px solid var(--grid); border-radius:0;
                         padding:8px 9px; font:14px "Space Grotesk","Segoe UI",sans-serif; }
-  #signInDialog input:focus { outline:none; border-color:#00ff88; }
+  #signInDialog input:focus { outline:none; border-color:var(--brand); }
   #signInDialog .err { min-height:19px; margin:10px 0 0; color:var(--csell); font-size:15px; }
   #signInDialog .row { display:flex; align-items:center; gap:8px; margin-top:12px; }
   #signInDialog a.alt { margin-right:auto; color:var(--fg); font-size:15px; }
   #signInDialog a.forgot { align-self:flex-end; margin-top:6px; padding:2px 0; color:var(--mut); font-size:14px; }
-  #signInDialog a.forgot:hover { color:#00ff88; }
+  #signInDialog a.forgot:hover { color:var(--brand); }
   #signInDialog button { padding:7px 12px; font-size:15px; }
-  #signInDialog button.go { color:#00ff88; border-color:#00ff88; font-weight:bold; }
-  #signInDialog button.go:hover { background:rgba(0,255,136,.1); }
+  #signInDialog button.go { color:var(--brand); border-color:var(--brand); font-weight:bold; }
+  #signInDialog button.go:hover { background:rgba(var(--brand-rgb),.1); }
   #signInDialog button:disabled { cursor:wait; opacity:.6; }
   #acct button:focus-visible, #acctMenu a:focus-visible, #signInDialog a:focus-visible,
   #signInDialog button:focus-visible, #drawCta a:focus-visible, #drawCta button:focus-visible {
-    outline:2px solid #00ff88; outline-offset:2px; }
+    outline:2px solid var(--brand); outline-offset:2px; }
   @media (max-width:600px) {
     /* the top row wraps on phones so the account control never leaves the screen */
     #topActions { flex-wrap:wrap; justify-content:flex-end; gap:8px; min-width:0; }
@@ -345,7 +382,7 @@
   #removeTickerDialog .err { min-height:19px; margin-top:9px; color:var(--csell); }
   #removeTickerDialog .row { display:flex; justify-content:flex-end; gap:8px; margin-top:15px; }
   #removeTickerDialog .remove { border-color:var(--csell); color:var(--csell); }
-  #removeTickerDialog .remove:hover { background:rgba(255,91,91,.1); }
+  #removeTickerDialog .remove:hover { background:rgba(var(--csell-rgb),.1); }
   #removeTickerDialog button:disabled { cursor:wait; opacity:.55; }
   /* ticker ordering: explicit modal because toolbar dragging competes with chart selection. */
   #tickerReorderDialog { display:none; position:fixed; inset:0; z-index:75; padding:18px;
@@ -375,7 +412,7 @@
   .ticker-reorder-controls button:disabled { cursor:not-allowed; opacity:.35; }
   .ticker-reorder-sep { flex:0 0 1px; width:1px; height:20px; background:var(--grid); margin:0 5px; }
   .ticker-reorder-controls .reorder-delete { border-color:var(--csell); color:var(--csell); }
-  .ticker-reorder-controls .reorder-delete:hover { background:rgba(255,91,91,.1); }
+  .ticker-reorder-controls .reorder-delete:hover { background:rgba(var(--csell-rgb),.1); }
   .ticker-reorder-foot { display:flex; align-items:center; gap:10px; padding:13px 20px 16px; border-top:1px solid var(--grid); }
   #tickerReorderReset, #tickerReorderAlpha, #tickerReorderRecent { color:var(--fg); }
   #tickerReorderAlpha { font-weight:bold; }
@@ -387,8 +424,8 @@
   #tickerReorderRetry { display:none; border-color:var(--csell); color:var(--csell); }
   /* scrollbars: thin, dark track, grey thumb that lights cyan while the pointer
      is over that scroll area (user, 2026-10-08: blended in and on brand) */
-  * { scrollbar-width:thin; scrollbar-color:#333 transparent; }
-  *:hover { scrollbar-color:rgba(38,198,218,.6) transparent; }
+  * { scrollbar-width:thin; scrollbar-color:var(--scroll) transparent; }
+  *:hover { scrollbar-color:rgba(var(--sup-rgb),.6) transparent; }
   /* export dialog: limit-buy levels. The banner holds the range and strength
      filters and Download CSV; the left column picks tickers (group tabs on top),
      the right column shows the levels live. */
@@ -411,7 +448,7 @@
   #exportGroupTabs { display:flex; flex-wrap:wrap; align-items:center; gap:6px; padding:10px 20px; border-bottom:1px solid var(--grid);
                      flex-shrink:0; max-height:118px; overflow-y:auto; }
   #exportGroupTabs .xp-tab { color:var(--mut); }
-  #exportGroupTabs .xp-tab[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); background:rgba(38,198,218,.10); }
+  #exportGroupTabs .xp-tab[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); background:rgba(var(--sup-rgb),.10); }
   #exportGroupTabs .xp-tab:hover { color:var(--fg); border-color:var(--sup); }
   /* a group tab and its edit button are one bordered unit, so neither border
      covers the other and the whole unit lights up when that group is open */
@@ -420,9 +457,9 @@
   #exportGroupTabs .xp-tabwrap .xp-edit { display:inline-flex; align-items:center; padding:0 10px; border:0;
                                           border-left:1px solid var(--grid); background:none; color:var(--mut); }
   #exportGroupTabs .xp-tabwrap:hover { border-color:var(--sup); }
-  #exportGroupTabs .xp-tabwrap .xp-edit:hover { color:var(--fg); background:rgba(38,198,218,.08); }
-  #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) { border-color:var(--sup); background:rgba(38,198,218,.10); }
-  #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) .xp-edit { border-left-color:rgba(38,198,218,.45); color:var(--sup); }
+  #exportGroupTabs .xp-tabwrap .xp-edit:hover { color:var(--fg); background:rgba(var(--sup-rgb),.08); }
+  #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) { border-color:var(--sup); background:rgba(var(--sup-rgb),.10); }
+  #exportGroupTabs .xp-tabwrap:has(.xp-tab[aria-pressed="true"]) .xp-edit { border-left-color:rgba(var(--sup-rgb),.45); color:var(--sup); }
   #exportGroupTabs .xp-edit svg { width:13px; height:13px; }
   #exportGroupTabs .xp-new { color:var(--sup); border-style:dashed; }
   #exportGroupsNote { flex-basis:100%; min-height:0; margin:0; color:var(--mut); font:14px monospace; }
@@ -473,7 +510,7 @@
   #exportDialog #exportPicks .xp-sym { font-size:15px; }
   #exportDialog #exportPicks .xp-name { font-size:14px; }
   #exportPicks .xp-pick:last-child { border-bottom:0; }
-  #exportPicks .xp-pick:hover, #exportPicks .xp-pick:focus-within { background:rgba(38,198,218,.08); }
+  #exportPicks .xp-pick:hover, #exportPicks .xp-pick:focus-within { background:rgba(var(--sup-rgb),.08); }
   #exportPicks .xp-pick input { margin:0; accent-color:var(--sup); }
   #exportPicks .xp-empty { padding:10px; color:var(--mut); font:14px monospace; }
   /* add a ticker without leaving the dialog */
@@ -504,13 +541,13 @@
   /* the buttons overlap by 1px, so the selected one, and above it the hovered or
      focused one, is lifted over its neighbours to keep all four edges visible */
   #exportStrengthWrap button { position:relative; margin-left:-1px; color:var(--mut); }
-  #exportStrengthWrap button.active { border-color:var(--sup); color:var(--sup); background:rgba(38,198,218,.12); z-index:1; }
+  #exportStrengthWrap button.active { border-color:var(--sup); color:var(--sup); background:rgba(var(--sup-rgb),.12); z-index:1; }
   #exportStrengthWrap button:hover, #exportStrengthWrap button:focus-visible { z-index:2; }
   /* combine nearby levels (left column) */
   #exportDialog .xp-combine { display:flex; flex-direction:column; gap:8px; padding-top:12px; border-top:1px solid var(--grid); }
   #exportCombineToggle { position:relative; width:38px; height:20px; padding:0; margin-left:auto; border:1px solid var(--grid); background:var(--bg); }
   #exportCombineToggle::after { content:""; position:absolute; top:3px; left:3px; width:12px; height:12px; background:var(--mut); }
-  #exportCombineToggle[aria-checked="true"] { border-color:var(--sup); background:rgba(38,198,218,.18); }
+  #exportCombineToggle[aria-checked="true"] { border-color:var(--sup); background:rgba(var(--sup-rgb),.18); }
   #exportCombineToggle[aria-checked="true"]::after { left:21px; background:var(--sup); }
   #exportCombinePct { flex:1 1 auto; accent-color:var(--sup); }
   #exportCombinePct:disabled { opacity:.4; }
@@ -525,7 +562,7 @@
   /* legend: what the colours and "stacked" mean */
   /* results: ticker cards, two or more across */
   #exportResult .xp-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(420px,100%), 1fr)); gap:12px; align-items:start; }
-  #exportResult .xp-card { border:1px solid var(--grid); background:rgba(255,255,255,.015); }
+  #exportResult .xp-card { border:1px solid var(--grid); background:rgba(var(--ink-rgb),.015); }
   #exportResult .xp-cardhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; padding:9px 14px; border-bottom:1px solid var(--grid); }
   #exportResult .xp-cardhead .xp-sym { font-size:39px; }   /* same as the table view's group header */
   #exportResult .xp-cardhead .xp-name { flex:1 1 140px; color:var(--fg); white-space:normal; }
@@ -550,11 +587,11 @@
                            background:none; color:var(--sup); text-align:left; font:14px monospace; }
   #exportDialog .xp-more::after { content:" ›"; }
   #exportDialog .xp-more[aria-expanded="true"]::after { content:" ‹"; }
-  #exportDialog .xp-more:hover { background:rgba(38,198,218,.06); }
+  #exportDialog .xp-more:hover { background:rgba(var(--sup-rgb),.06); }
   /* other prices: price | % below, one aligned row each */
   #exportDialog .xp-rrow { display:grid; grid-template-columns:minmax(100px,max-content) minmax(110px,max-content); align-items:center; gap:4px 18px; width:100%;
                            padding:8px 14px; border:0; border-top:1px solid var(--grid); background:none; text-align:left; cursor:pointer; }
-  #exportDialog .xp-hero:hover, #exportDialog .xp-rrow:hover { background:rgba(38,198,218,.06); }
+  #exportDialog .xp-hero:hover, #exportDialog .xp-rrow:hover { background:rgba(var(--sup-rgb),.06); }
   #exportDialog .xp-hero:focus-visible, #exportDialog .xp-rrow:focus-visible { outline:2px solid var(--sup); outline-offset:-2px; }
   .xp-rpx { font:bold 19px Verdana,Geneva,sans-serif; white-space:nowrap; }
   .xp-rpct { font:14px Verdana,Geneva,sans-serif; color:var(--fg); white-space:nowrap; }
@@ -562,22 +599,22 @@
   #exportDialog .xp-viewbar { display:flex; align-items:center; gap:10px; margin:0 0 12px; }
   #exportDialog .xp-seg { display:inline-flex; }
   #exportDialog .xp-seg button { position:relative; margin-left:-1px; padding:4px 12px; color:var(--mut); }
-  #exportDialog .xp-seg button[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); background:rgba(38,198,218,.12); z-index:1; }
+  #exportDialog .xp-seg button[aria-pressed="true"] { color:var(--sup); border-color:var(--sup); background:rgba(var(--sup-rgb),.12); z-index:1; }
   #exportDialog .xp-seg button:hover, #exportDialog .xp-seg button:focus-visible { z-index:2; }
   /* table view: every price for every ticker, one tight list */
   .xp-table { width:100%; max-width:820px; border-collapse:collapse; }
   .xp-table thead th { padding:0 12px 8px; color:var(--mut); font:13px monospace; letter-spacing:.08em; text-transform:uppercase; text-align:left; font-weight:normal; }
   .xp-tgroup th { padding:14px 12px 6px; border-top:1px solid var(--grid); text-align:left; font-weight:normal; }
   #exportResult [data-first] { cursor:pointer; }
-  .xp-tgroup:hover th { background:rgba(38,198,218,.04); }
+  .xp-tgroup:hover th { background:rgba(var(--sup-rgb),.04); }
   #exportResult .xp-tgroup .xp-sym { font-size:39px; margin-right:12px;
                                      text-decoration:underline 3px; text-underline-offset:7px; }   /* in the ticker's own colour */
   .xp-tgroup .xp-name { color:var(--fg); font:14px monospace; }
   .xp-trow { cursor:pointer; }
-  .xp-trow td { padding:6px 12px; border-top:1px solid rgba(38,38,38,.7); white-space:nowrap; }
-  .xp-trow:hover td { background:rgba(38,198,218,.06); }
+  .xp-trow td { padding:6px 12px; border-top:1px solid rgba(var(--grid-rgb),.7); white-space:nowrap; }
+  .xp-trow:hover td { background:rgba(var(--sup-rgb),.06); }
   .xp-trow:focus-visible { outline:2px solid var(--sup); outline-offset:-2px; }
-  .xp-trow.sel td, #exportDialog .xp-rrow.sel, #exportDialog .xp-hero.sel { background:rgba(38,198,218,.12); }
+  .xp-trow.sel td, #exportDialog .xp-rrow.sel, #exportDialog .xp-hero.sel { background:rgba(var(--sup-rgb),.12); }
   .xp-trow.sel td:first-child { box-shadow:inset 2px 0 0 var(--sup); }
   .xp-tpx { width:1%; font:bold 34px Verdana,Geneva,sans-serif; }
   .xp-tpct { font:14px Verdana,Geneva,sans-serif; color:var(--fg); }
@@ -608,7 +645,7 @@
   .xp-tgroup .xp-fact[data-xp-fact="yield"], .xp-tgroup .xp-fact[data-xp-fact="cadence"] { font-weight:normal; }
   .xp-tgroup .xp-fact[data-xp-fact="cadence"] { font-size:13px; }
   .xp-table.has-facts .xp-tgroup th, .xp-table.has-facts .xp-tpct { padding-right:4px; }
-  .xp-tgroup:hover .xp-fact { background:rgba(38,198,218,.04); }
+  .xp-tgroup:hover .xp-fact { background:rgba(var(--sup-rgb),.04); }
   .xp-tgroup .xp-fact.is-up { color:var(--cbuy); }
   .xp-tgroup .xp-fact.is-down { color:var(--csell); }
   .xp-tgroup .xp-fact.is-none { color:var(--mut); font-weight:normal; }
@@ -633,12 +670,12 @@
   .xp-whychart .now { fill:var(--fg); }
   .xp-whychart text { font:13px monospace; fill:var(--mut); }
   .xp-whychart text.lvl { fill:var(--cbuy); stroke:none; } .xp-whychart text.now { fill:var(--fg); }
-  .xp-whychart .spy { fill:none; stroke:#f5a623; stroke-width:1.3; } .xp-whychart circle.spy { fill:#f5a623; stroke:none; }
-  .xp-whychart text.spy { fill:#f5a623; stroke:none; } .xp-whychart .zero { stroke:var(--grid); stroke-width:1; }
+  .xp-whychart .spy { fill:none; stroke:var(--spy); stroke-width:1.3; } .xp-whychart circle.spy { fill:var(--spy); stroke:none; }
+  .xp-whychart text.spy { fill:var(--spy); stroke:none; } .xp-whychart .zero { stroke:var(--grid); stroke-width:1; }
   .xp-whycmp { display:inline-flex; align-items:center; gap:8px; color:var(--fg); font:14px Verdana,Geneva,sans-serif; cursor:pointer; }
   .xp-whycmp input { margin:0; accent-color:var(--sup); }
   .xp-whylegend { color:var(--mut); font:13px Verdana,Geneva,sans-serif; margin:-6px 0 12px; }
-  .xp-whylegend b { font-weight:normal; color:var(--fg); } .xp-whylegend b.spy { color:#f5a623; }
+  .xp-whylegend b { font-weight:normal; color:var(--fg); } .xp-whylegend b.spy { color:var(--spy); }
   .xp-whylist { margin:0 0 12px; padding-left:18px; color:var(--fg); font:15px Verdana,Geneva,sans-serif; line-height:1.55; }
   .xp-whylist li { margin-bottom:6px; }
   @media (max-width:900px) {
@@ -647,8 +684,8 @@
   .export-badge { display:inline-block; padding:1px 6px; border:1px solid var(--lvl); color:var(--lvl); font:13px monospace; }
   .xp-limit.tier-strong .export-badge { font-weight:bold; }
   /* the purple wash reads as "strong LEVEL" — keep it off the green zone badges */
-  .xp-limit.tier-strong .export-badge:not(.gap):not(.ob):not(.confl):not(.pd):not(.stack) { background:rgba(157,107,255,.14); }
-  .export-badge.stack { border-color:#fff; color:#fff; background:rgba(255,255,255,.12); font-weight:bold; }
+  .xp-limit.tier-strong .export-badge:not(.gap):not(.ob):not(.confl):not(.pd):not(.stack) { background:rgba(var(--struct-rgb),.14); }
+  .export-badge.stack { border-color:var(--ink-hi); color:var(--ink-hi); background:rgba(var(--ink-rgb),.12); font-weight:bold; }
   #exportDialog button.export-badge.stack { padding:1px 6px; font:bold 11px monospace; cursor:help; }
   .export-badge.gap { border-color:var(--gap); color:var(--gap); }
   .export-badge.ob { border-color:var(--cbuy); color:var(--cbuy); }
@@ -660,7 +697,7 @@
   #exportGapMsg[hidden] { display:none; }
   #exportDialog .xp-primary { padding:9px 22px; border-color:var(--sup); background:var(--sup);
                               color:var(--bg); font-weight:bold; font-size:14px; }
-  #exportDialog .xp-primary:hover { background:#5fd8e6; }
+  #exportDialog .xp-primary:hover { background:var(--sup-hi); }
   #exportDialog .xp-primary:disabled { background:transparent; color:var(--mut); border-color:var(--grid); cursor:not-allowed; }
   /* group editor (replaces the two columns while open) */
   #exportEditor { flex:1 1 auto; min-height:0; overflow:auto; padding:16px 20px; display:flex; flex-direction:column; gap:14px; }
@@ -668,10 +705,10 @@
   #exportEditor > * { flex-shrink:0; }   /* sections keep their size and the editor scrolls; on phones they overlapped */
   /* the first thing to fill in: label above, a large lit field that cannot be missed */
   #exportEditor .xp-namefield { display:flex; flex-direction:column; align-items:flex-start; gap:6px; color:var(--fg); font:bold 13px monospace; letter-spacing:.03em; }
-  #exportDialog #exportGroupName { width:min(420px,100%); box-sizing:border-box; padding:10px 12px; border:1px solid rgba(38,198,218,.6);
-                                   background:rgba(38,198,218,.06); color:var(--fg); font:bold 16px Verdana,Geneva,sans-serif; }
+  #exportDialog #exportGroupName { width:min(420px,100%); box-sizing:border-box; padding:10px 12px; border:1px solid rgba(var(--sup-rgb),.6);
+                                   background:rgba(var(--sup-rgb),.06); color:var(--fg); font:bold 16px Verdana,Geneva,sans-serif; }
   #exportDialog #exportGroupName::placeholder { color:var(--mut); font-weight:normal; }
-  #exportDialog #exportGroupName:focus { border-color:var(--sup); background:rgba(38,198,218,.10); box-shadow:0 0 0 1px var(--sup); }
+  #exportDialog #exportGroupName:focus { border-color:var(--sup); background:rgba(var(--sup-rgb),.10); box-shadow:0 0 0 1px var(--sup); }
   #exportEditor .xp-cols { display:grid; grid-template-columns:1fr 1fr; gap:16px; min-height:0; }
   #exportEditor .xp-col { display:flex; flex-direction:column; gap:8px; min-width:0; }
   #exportEditor .xp-col h4 { margin:0; font-size:15px; letter-spacing:.04em; }
@@ -679,7 +716,7 @@
   #exportEditor .xp-edlist { display:flex; flex-direction:column; height:min(46vh,420px); overflow:auto; border:1px solid var(--grid); }
   #exportEditor .xp-edrow { display:grid; grid-template-columns:116px minmax(0,1fr) 64px; align-items:center; gap:8px; width:100%;
                             padding:6px 10px; border:0; border-bottom:1px solid var(--grid); background:none; color:var(--fg); text-align:left; }
-  #exportEditor .xp-edrow:hover, #exportEditor .xp-edrow:focus-visible { background:rgba(38,198,218,.08); }
+  #exportEditor .xp-edrow:hover, #exportEditor .xp-edrow:focus-visible { background:rgba(var(--sup-rgb),.08); }
   #exportEditor .xp-edrow .act { color:var(--sup); font-size:14px; text-align:right; }
   /* rows read at a glance: ticker twice the list size, name in full-contrast text (user, 2026-10-11) */
   #exportEditor .xp-edrow .xp-sym { font-size:26px; }
@@ -719,7 +756,7 @@
   #factTip dt { color:var(--mut); }
   #factTip dd { margin:0; }
   #factBand [data-buytip] { cursor:help; }
-  #factBand [data-fact="nearestBuy"]:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand [data-fact="nearestBuy"]:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
   #exportDialog button:focus-visible, #exportDialog .xp-pick:focus-within, #exportDialog input:focus-visible {
     outline:2px solid var(--sup); outline-offset:-2px; }
   #exportDialog #exportPicks .xp-go:focus-visible, #exportDialog #exportPicks input:focus-visible { outline:none; }   /* the row's outline shows */
@@ -785,7 +822,7 @@
                     background:none; color:var(--mut); font:bold 11px/16px Verdana,Geneva,sans-serif; letter-spacing:0;
                     vertical-align:1px; cursor:help; }
   #factBand .fb-q:hover { color:var(--sup); border-color:var(--sup); }
-  #factBand .fb-q:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #factBand .fb-q:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
   #factBand .fb-trendrow { display:flex; flex-wrap:wrap; align-items:center; gap:6px 16px; }
   #factBand .fb-cells { display:flex; flex:1 1 250px; min-width:0; max-width:360px; border:1px solid var(--grid); }
   #factBand .fb-cell { flex:1 1 0; min-width:0; display:flex; flex-direction:column; align-items:center;
@@ -805,19 +842,19 @@
   #factBand .fb-msg.error { color:var(--csell); }
   #factBand .fb-msg:not(.shown) { display:none; }
   #factBand .fb-retry { min-height:26px; padding:3px 10px; font:inherit; color:var(--fg); }
-  #factBand .fb-retry:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #factBand .fb-retry:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
   /* trend cells are toggle buttons: pressed = that window is shaded on the chart */
   #factBand button.fb-cell { background:transparent; border:0; border-right:1px solid var(--grid); border-radius:0;
                              font:inherit; color:inherit; cursor:pointer; min-height:24px; }
   #factBand button.fb-cell:last-child { border-right:0; }
-  #factBand button.fb-cell:hover { background:rgba(38,198,218,.08); }
+  #factBand button.fb-cell:hover { background:rgba(var(--sup-rgb),.08); }
   #factBand button.fb-cell[aria-disabled="true"] { cursor:default; }
   #factBand button.fb-cell[aria-disabled="true"]:hover { background:transparent; }
-  #factBand button.fb-cell[aria-pressed="true"] { background:rgba(38,198,218,.12); box-shadow:inset 0 0 0 2px var(--sup); }
-  #factBand button.fb-cell:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand button.fb-cell[aria-pressed="true"] { background:rgba(var(--sup-rgb),.12); box-shadow:inset 0 0 0 2px var(--sup); }
+  #factBand button.fb-cell:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
   #factBand .fb-hlnote { display:flex; align-items:center; gap:8px; margin:0; color:var(--fg); font-size:12px; }
   #factBand .fb-hlclear { min-height:24px; padding:2px 10px; font:inherit; color:var(--sup); border-color:var(--sup); }
-  #factBand .fb-hlclear:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #factBand .fb-hlclear:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
   /* linked highlight over the chart pane: JS sets left/width/height from the chart's
      own time and price scales after every pan, zoom, resize and redraw */
   #trendHighlight { position:absolute; top:0; z-index:3; pointer-events:none; box-sizing:border-box;
@@ -826,9 +863,9 @@
   #trendHighlight[hidden] { display:none; }
   #trendHighlight.cut-l { border-left-color:transparent; }
   #trendHighlight.cut-r { border-right-color:transparent; }
-  #trendHighlight.is-down { --hl:var(--csell); background:rgba(255,91,91,.11); }
-  #trendHighlight.is-up { --hl:var(--cbuy); background:rgba(33,208,122,.10); }
-  #trendHighlight.is-flat { --hl:var(--fg); background:rgba(230,230,230,.07); }
+  #trendHighlight.is-down { --hl:var(--csell); background:rgba(var(--csell-rgb),.11); }
+  #trendHighlight.is-up { --hl:var(--cbuy); background:rgba(var(--cbuy-rgb),.10); }
+  #trendHighlight.is-flat { --hl:var(--fg); background:rgba(var(--fg-rgb),.07); }
   #trendHighlight .th-label { position:absolute; top:6px; white-space:nowrap; padding:0 6px;
                               background:var(--bg); letter-spacing:.04em; }
   #trendHighlight .th-span { position:absolute; left:0; right:0; top:30px; height:0; border-top:1px solid var(--hl); }
@@ -861,8 +898,8 @@
   #factBand .fb-toggle { flex:1 1 auto; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 20px;
                          min-height:32px; padding:3px 14px; border:0; border-radius:0; background:transparent;
                          font:inherit; color:var(--fg); text-align:left; cursor:pointer; }
-  #factBand .fb-toggle:hover { background:rgba(38,198,218,.08); }
-  #factBand .fb-toggle:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand .fb-toggle:hover { background:rgba(var(--sup-rgb),.08); }
+  #factBand .fb-toggle:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
   #factBand .fb-sumsym { font:bold 14px Verdana,Geneva,sans-serif; }
   #factBand .fb-sumnote { color:var(--mut); }
   #factBand .fb-sumnote:empty { display:none; }
@@ -891,8 +928,8 @@
      need not open to retry; expanded, the message row below has its own */
   #factBand .fb-sumretry { flex:0 0 auto; min-height:44px; padding:0 12px; border:0; border-left:1px solid var(--grid);
                            border-radius:0; background:transparent; font:inherit; color:var(--fg); cursor:pointer; }
-  #factBand .fb-sumretry:hover { background:rgba(38,198,218,.08); }
-  #factBand .fb-sumretry:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #factBand .fb-sumretry:hover { background:rgba(var(--sup-rgb),.08); }
+  #factBand .fb-sumretry:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
   #factBand .fb-sumretry[hidden], #factBand.is-expanded .fb-sumretry { display:none; }
   /* ASK AI dock (signed in): fixed to the right edge under the toolbar. Open it is
      --askW wide, collapsed it is a 52px rail; the band and the chart get the same
@@ -908,9 +945,9 @@
     body.ask-open #factBand .fb-trend { flex-basis:420px; }
   }
   #topActions #askAiBtn { font:bold 11px monospace; letter-spacing:1.5px; color:var(--sup); border-color:var(--sup); }
-  #topActions #askAiBtn:hover { background:rgba(38,198,218,.12); }
-  #topActions #askAiBtn[aria-expanded="true"] { background:var(--sup); color:#03181c; }
-  #askAiBtn:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #topActions #askAiBtn:hover { background:rgba(var(--sup-rgb),.12); }
+  #topActions #askAiBtn[aria-expanded="true"] { background:var(--sup); color:var(--on-sup); }
+  #askAiBtn:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
   #askDock { position:fixed; top:var(--askTop); right:0; bottom:0; z-index:30; width:var(--askW);
              display:flex; flex-direction:column; background:var(--panel); border-left:1px solid var(--grid);
              font:13px "JetBrains Mono","IBM Plex Mono",monospace; color:var(--fg); }
@@ -918,7 +955,7 @@
   #askDock[data-mode="rail"] { width:52px; }
   #askDock[data-mode="rail"] .ask-panel, #askDock[data-mode="open"] .ask-rail { display:none; }
   #askDock button { font:inherit; color:inherit; }
-  #askDock button:focus-visible, #askDock input:focus-visible { outline:2px solid #00ff88; outline-offset:-2px; }
+  #askDock button:focus-visible, #askDock input:focus-visible { outline:2px solid var(--brand); outline-offset:-2px; }
   #askDock svg { width:22px; height:22px; flex:0 0 auto; fill:none; stroke:currentColor; stroke-width:1.8;
                  stroke-linecap:round; stroke-linejoin:round; }
   /* rail: the label opens the dock; each icon opens it and runs its question */
@@ -927,8 +964,8 @@
                             font-weight:bold; font-size:15px; line-height:1.2; letter-spacing:.06em; }
   #askDock .ask-raillabel span { display:block; }
   #askDock .ask-railbtn { position:relative; width:44px; height:44px; padding:0; display:flex;
-                          align-items:center; justify-content:center; color:var(--sup); border-color:rgba(38,198,218,.45); }
-  #askDock .ask-railbtn:hover { border-color:var(--sup); background:rgba(38,198,218,.10); }
+                          align-items:center; justify-content:center; color:var(--sup); border-color:rgba(var(--sup-rgb),.45); }
+  #askDock .ask-railbtn:hover { border-color:var(--sup); background:rgba(var(--sup-rgb),.10); }
   #askDock .ask-railbtn[hidden] { display:none; }
   #askDock .ask-railbtn::after { content:attr(data-tip); position:absolute; right:calc(100% + 8px); top:50%;
                                  transform:translateY(-50%); display:none; white-space:nowrap; z-index:66;
@@ -1009,7 +1046,7 @@
   #askAnswer .ask-tile-s { grid-area:s; padding-bottom:4px; color:var(--mut); font-size:14px; text-align:right; }
   #askAnswer .ask-rulerbox { flex:1 1 auto; display:flex; gap:16px; min-height:200px; }
   #askAnswer .ask-scale { position:relative; flex:0 0 34px; margin:10px 0; border-left:2px solid var(--mut); }
-  #askAnswer .ask-band { position:absolute; left:0; right:0; bottom:0; background:rgba(38,198,218,.12); border-top:1px dashed var(--sup); }
+  #askAnswer .ask-band { position:absolute; left:0; right:0; bottom:0; background:rgba(var(--sup-rgb),.12); border-top:1px dashed var(--sup); }
   #askAnswer .ask-tick { position:absolute; left:-2px; width:20px; height:3px; transform:translateY(-50%); background:var(--fg); }
   #askAnswer .ask-tick.tier-strong { background:var(--cbuy); }
   #askAnswer .ask-tick.tier-light { background:var(--mut); opacity:.7; }
@@ -1025,8 +1062,8 @@
   #askAnswer .ask-level-pct, #askAnswer .ask-level-st { color:var(--mut); }
   #askAnswer .ask-actions { display:flex; flex-wrap:wrap; gap:8px; }
   #askAnswer .ask-btn { min-height:40px; padding:0 14px; border:1px solid var(--sup); background:none; color:var(--sup); font:inherit; cursor:pointer; }
-  #askAnswer .ask-btn:hover { background:rgba(38,198,218,.10); }
-  #askAnswer .ask-btn.is-primary { background:var(--sup); color:#03181c; }
+  #askAnswer .ask-btn:hover { background:rgba(var(--sup-rgb),.10); }
+  #askAnswer .ask-btn.is-primary { background:var(--sup); color:var(--on-sup); }
   #askAnswer .ask-how summary { color:var(--sup); cursor:pointer; }
   #askAnswer .ask-how ul { margin:8px 0 0; padding-left:18px; color:var(--mut); }
   #askAnswer .ask-how li { margin:0 0 4px; }
@@ -1042,7 +1079,7 @@
   #askDock .ask-web, #xpAssist .ask-web { display:flex; align-items:center; gap:8px; min-height:32px; margin:6px 0 0;
                                           color:var(--fg); font-size:13px; cursor:pointer; }
   #askDock .ask-web input, #xpAssist .ask-web input { width:18px; height:18px; margin:0; accent-color:var(--sup); }
-  #askDock .ask-web input:focus-visible, #xpAssist .ask-web input:focus-visible { outline:2px solid #00ff88; outline-offset:2px; }
+  #askDock .ask-web input:focus-visible, #xpAssist .ask-web input:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
   @media (max-width:600px) { #askDock .ask-web, #xpAssist .ask-web { min-height:44px; } }
   #askAnswer .is-up { color:var(--cbuy); }
   #askAnswer .is-down { color:var(--csell); }
@@ -1051,7 +1088,7 @@
   #askInput { flex:1 1 auto; min-width:0; min-height:44px; padding:8px 10px; background:var(--bg); color:var(--fg);
               border:1px solid var(--grid); border-right:0; border-radius:0; font:inherit; }
   #askDock .ask-send { flex:0 0 auto; width:48px; min-height:44px; padding:0; display:flex; align-items:center;
-                       justify-content:center; background:var(--sup); color:#03181c; border-color:var(--sup); }
+                       justify-content:center; background:var(--sup); color:var(--on-sup); border-color:var(--sup); }
   #askDock .ask-send svg { stroke-width:2.4; }
   #askDock .ask-send:disabled { opacity:.5; cursor:default; }
   #askAnswer .ask-card .ask-q, #xpAssistAnswer .ask-card .ask-q { margin:0 0 10px; padding-left:8px; border-left:2px solid var(--sup); color:var(--fg); }
@@ -1087,7 +1124,7 @@
   #exportDialog #xpAssist .xp-check { min-height:44px; padding:8px 10px; text-align:left; border-color:var(--grid); background:var(--bg);
                                       color:var(--fg); font:13px "JetBrains Mono","IBM Plex Mono",monospace; line-height:1.3; }
   #exportDialog #xpAssist .xp-check:hover { border-color:var(--sup); }
-  #exportDialog #xpAssist .xp-check.is-active { border-color:var(--sup); background:rgba(38,198,218,.10); color:var(--sup); }
+  #exportDialog #xpAssist .xp-check.is-active { border-color:var(--sup); background:rgba(var(--sup-rgb),.10); color:var(--sup); }
   #xpAssist[data-busy="true"] .xp-check { cursor:progress; }
   #xpAssistProgress { margin:0; color:var(--sup); }
   #xpAssistProgress:empty { display:none; }
@@ -1099,7 +1136,7 @@
                               border:1px solid var(--grid); border-right:0; border-radius:0; font:13px "JetBrains Mono","IBM Plex Mono",monospace; }
   #exportDialog #xpAskInput:focus { border-color:var(--sup); }
   #exportDialog #xpAssist .ask-send { flex:0 0 auto; width:48px; min-height:44px; padding:0; display:flex; align-items:center;
-                                      justify-content:center; background:var(--sup); color:#03181c; border-color:var(--sup); }
+                                      justify-content:center; background:var(--sup); color:var(--on-sup); border-color:var(--sup); }
   #xpAssist .ask-send svg { width:22px; height:22px; fill:none; stroke:currentColor; stroke-width:2.4; stroke-linecap:round; stroke-linejoin:round; }
   #exportDialog #xpAssist .ask-send:disabled { opacity:.5; cursor:default; }
   /* the up-in-all-three filter: chip above the table, misses by one window below it */
@@ -1108,7 +1145,7 @@
   #exportDialog #xpFilterChip button { min-width:30px; min-height:30px; padding:0 8px; border:0; background:none; color:var(--sup); font-size:17px; line-height:1; }
   #exportDialog #xpFilterChip button:hover { color:var(--fg); }
   #xpCloseSection { margin-top:18px; max-width:1180px; border:1px solid var(--grid); }
-  #exportDialog #xpCloseSection h3 { padding:10px 12px; border-bottom:1px solid var(--grid); background:rgba(255,255,255,.03); font-size:16px; font-weight:normal; }
+  #exportDialog #xpCloseSection h3 { padding:10px 12px; border-bottom:1px solid var(--grid); background:rgba(var(--ink-rgb),.03); font-size:16px; font-weight:normal; }
   #xpCloseSection .xp-tgroup th, #xpCloseSection .xp-tgroup .xp-fact { border-top:0; }
   #exportResult .xp-filterempty { margin:10px 12px 0; color:var(--mut); font:14px monospace; }
   @media (max-width:1280px) {
@@ -1135,7 +1172,7 @@
 <body>
 <div id="bar">
   <span class="kf-brand" title="KineFractal">KINEFRACTAL</span>
-  <span id="topActions"><span id="topUtil"><button id="tourBtn" class="symbtn tip-right" data-tip="Guided tour: flow through each overlay with a plain-English explanation (key: t).">&#9654;</button><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="askAiBtn" type="button" aria-expanded="false" aria-controls="askDock" hidden>ASK AI</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
+  <span id="topActions"><span id="topUtil"><button id="tourBtn" class="symbtn tip-right" data-tip="Guided tour: flow through each overlay with a plain-English explanation (key: t).">&#9654;</button><button id="legendBtn" class="symbtn tip-right" data-tip="Legend: what each overlay means.">?</button><button id="themeBtn" class="symbtn tip-right" type="button" aria-pressed="false" aria-label="Light theme" data-tip="Light theme: a soft light background with larger text. Click again for the dark theme.">&#9728;</button><button id="emailBtn" class="symbtn tip-right" data-tip="Email settings: choose which tickers appear in the weekly buy-limit email and tune what qualifies." onclick="location.href='email_settings.html'">&#9993;</button></span><button id="tickerReorderBtn" type="button" aria-haspopup="dialog" aria-expanded="false">REORDER</button><button id="askAiBtn" type="button" aria-expanded="false" aria-controls="askDock" hidden>ASK AI</button><button id="exportBtn" type="button" aria-haspopup="dialog" aria-expanded="false" title="limit-buy levels for your tickers, on screen or as a CSV for Excel">Limit Buy Levels</button></span>
   <span id="tickerStrip"><span id="superBtns" title="super (MTF) charts"></span></span>
   <input id="addSym" placeholder="add ticker" maxlength="40" autocomplete="off" spellcheck="false" style="width:88px" aria-label="Add a ticker, by name or symbol" title="add a ticker by name or symbol (live build)"><button id="addBtn">+ Add</button><span id="addMsg" class="addmsg"></span>
   <button id="cmpBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="cmpMenu" title="compare other tickers as % change">+ Compare</button>
@@ -1158,6 +1195,7 @@
   <label title="tested / mitigated order blocks"><input type="checkbox" id="tOBM"><span class="swatch" style="background:var(--mut)"></span>tOB</label>
   <label title="premium / discount range"><input type="checkbox" id="tPD"><span class="swatch" style="background:var(--pdeq)"></span>PD</label>
   <label title="log price scale"><input type="checkbox" id="tLog" checked>log</label>
+  <label title="hide the names and prices at the right edge of each line until you point at the line or its price"><input type="checkbox" id="tHoverTags">labels on hover</label>
   <label title="my hand-drawn lines"><input type="checkbox" id="tMine" checked><span class="swatch" style="background:var(--mine)"></span>mine</label>
   <span id="drawGrp">
     <button id="drawBtn" class="symbtn" data-tip="Draw a line: click two points. Off = edit mode: drag the round endpoints or square midpoint, click any line to select, Delete removes it (u restores a hidden system line).">&#9998;</button>
@@ -1545,6 +1583,81 @@ function savePrefs() {
   try { localStorage.setItem(PREFS_KEY, JSON.stringify(saved)); } catch (e) {}
 }
 
+// Theme (dark by default; the sun button switches to light) and "labels on hover": two
+// display choices kept in this browser and, for a signed-in visitor, in the account through
+// /api/chart-prefs (viewPrefs), so they follow the visitor to another browser. The <head>
+// script applies the saved theme before the first paint.
+var THEME_KEY = 'kf-chart-theme-v1';
+var HOVER_TAGS_KEY = 'kf-chart-hover-labels-v1';
+var _viewEdited = false;   // a click this page load; the account's copy, when it answers later, does not undo it
+var _viewSaving = false, _viewQueued = false;
+var _viewUnsaved = false;  // a click made before /api/me answered; flushViewPrefs saves it once signed in
+function lightTheme() { return document.documentElement.getAttribute('data-theme') === 'light'; }
+function hoverTagsOn() { var el = document.getElementById('tHoverTags'); return !!(el && el.checked); }
+function renderThemeBtn() {
+  var b = document.getElementById('themeBtn');
+  if (!b) return;
+  var light = lightTheme();
+  b.setAttribute('aria-pressed', light ? 'true' : 'false');
+  b.innerHTML = light ? '&#9790;' : '&#9728;';   // the moon leads back to dark, the sun to light
+  b.setAttribute('data-tip', light ? 'Light theme is on. Click for the dark theme.'
+                                   : 'Light theme: a soft light background with larger text.');
+}
+function setTheme(light, byUser) {
+  if (light !== lightTheme()) {
+    if (light) document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+    try { localStorage.setItem(THEME_KEY, light ? 'light' : 'dark'); } catch (e) {}
+    // the chart reads its colours and fonts from the CSS when it is made, so make it again
+    if (current) redraw();
+  }
+  renderThemeBtn();
+  if (byUser) { _viewEdited = true; saveViewPrefs(); }
+}
+function setHoverTags(on, byUser) {
+  document.getElementById('tHoverTags').checked = on;
+  try { localStorage.setItem(HOVER_TAGS_KEY, on ? '1' : '0'); } catch (e) {}
+  applyLineTags();
+  if (byUser) { _viewEdited = true; saveViewPrefs(); }
+}
+function restoreViewPrefs() {
+  var on = false;
+  try { on = localStorage.getItem(HOVER_TAGS_KEY) === '1'; } catch (e) {}
+  document.getElementById('tHoverTags').checked = on;
+  renderThemeBtn();
+}
+// the account's copy, from the /api/chart-prefs answer loadAccountGapPlacement gets at page start
+function applyAccountViewPrefs(v) {
+  if (_viewEdited) return;   // the click already saved this browser's choice to the account
+  if (!v || typeof v !== 'object') return;   // nothing saved there yet: this browser's choice stands
+  if (v.theme === 'light' || v.theme === 'dark') setTheme(v.theme === 'light', false);
+  if (typeof v.hoverLabels === 'boolean' && v.hoverLabels !== hoverTagsOn()) setHoverTags(v.hoverLabels, false);
+}
+function saveViewPrefs() {
+  if (SITE && siteUser === null) { _viewUnsaved = true; return; }
+  if (!(SITE && siteUser === true)) return;
+  if (_viewSaving) { _viewQueued = true; return; }
+  _viewSaving = true;
+  var body = JSON.stringify({ viewPrefs: { theme: lightTheme() ? 'light' : 'dark', hoverLabels: hoverTagsOn() } });
+  putExportGroups(body, false, '/api/chart-prefs')
+    .catch(function () {})   // this browser keeps the choice; the next change tries the account again
+    .then(function () {
+      _viewSaving = false;
+      if (_viewQueued) { _viewQueued = false; saveViewPrefs(); }
+    });
+}
+// called once /api/me answers: a click made while it was pending goes to the account now
+function flushViewPrefs() {
+  if (!_viewUnsaved) return;
+  _viewUnsaved = false;
+  saveViewPrefs();
+}
+// the checkbox and the button reflect this browser's copy from the start, before chart data
+// or the account answer arrive, so the account's copy is compared against the right value
+restoreViewPrefs();
+document.getElementById('themeBtn').onclick = function () { setTheme(!lightTheme(), true); };
+document.getElementById('tHoverTags').onchange = function () { setHoverTags(this.checked, true); };
+
 // --- guided layer tour state (see the TOUR engine block after redraw) ---
 var _tourActive = false, _tourIdx = 0, _tourPlaying = false, _tourTimer = null, _tourScale = 1;
 var _tourSaved = null, _tourSavedView = null, _tourPresent = [], tourCard = null;
@@ -1851,13 +1964,20 @@ function layerTarget(ch, cs) {
     }
   };
 }
+// the chart's background, text colour and type from the page theme: the dark theme keeps the
+// library's own font at 16px, the light theme sets Verdana a size up like the rest of the page
+function chartLayout() {
+  var l = { background: { color: getCss('--bg') }, textColor: getCss('--fg'), fontSize: 16 };
+  if (lightTheme()) { l.fontSize = 18; l.fontFamily = 'Verdana, Geneva, sans-serif'; }
+  return l;
+}
 // price axis: percent while comparing, else log or linear (the LOG toggle)
 function priceAxisMode(comparing, log) { return comparing ? 2 : (log ? 1 : 0); }
 // the price chart's options: the main chart, and the legend's live screen (lg2LiveOpts)
 function priceChartOptions(el, mode) {
   return {
     width: el.clientWidth, height: el.clientHeight,  // main chart: owned after this by redraw()'s ResizeObserver
-    layout: { background: { color: getCss('--bg') }, textColor: getCss('--fg'), fontSize: 16 },
+    layout: chartLayout(),
     grid: { vertLines: { color: getCss('--grid') }, horzLines: { color: getCss('--grid') } },
     // crosshair tooltip time in ET (axis ticks handled by tickMarkFormatter below)
     localization: { timeFormatter: etCrosshairTime },
@@ -1909,8 +2029,8 @@ function drawTrendlines(T, lines, selId, each) {
     });
     var _gt = T.grid || gridTime, _tt1 = _gt(t.t1), _tt2 = _gt(t.t2);   // snap onto the bar grid -> no phantom scale point
     ls.setData([{ time: _tt1, value: t.p1 }, { time: _tt2, value: t.p2 }]);
-    if (sel) ls.setMarkers([{ time: _tt1, position: 'inBar', color: '#fff', shape: 'circle' },
-                            { time: _tt2, position: 'inBar', color: '#fff', shape: 'circle' }]);
+    if (sel) ls.setMarkers([{ time: _tt1, position: 'inBar', color: getCss('--ink-hi'), shape: 'circle' },
+                            { time: _tt2, position: 'inBar', color: getCss('--ink-hi'), shape: 'circle' }]);
     if (each) each(t);
   });
 }
@@ -1933,8 +2053,8 @@ function drawStructural(T, list, selId, each) {
     });
     var _sg = T.grid || gridTime, _st1 = _sg(s.t1), _st2 = _sg(s.t2);   // snap onto the bar grid -> no phantom scale point
     ls2.setData([{ time: _st1, value: s.p1 }, { time: _st2, value: s.p2 }]);
-    if (sel) ls2.setMarkers([{ time: _st1, position: 'inBar', color: '#fff', shape: 'circle' },
-                             { time: _st2, position: 'inBar', color: '#fff', shape: 'circle' }]);
+    if (sel) ls2.setMarkers([{ time: _st1, position: 'inBar', color: getCss('--ink-hi'), shape: 'circle' },
+                             { time: _st2, position: 'inBar', color: getCss('--ink-hi'), shape: 'circle' }]);
     if (each) each(s);
   });
 }
@@ -1971,17 +2091,18 @@ function drawLevels(T, levels, each) {
 // price, projected through T's price scale on every paint
 function paintLevelTags(ctx, T, tags) {
   ctx.save();
-  ctx.font = 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+  ctx.font = lightTheme() ? 'bold 13px Verdana, Geneva, sans-serif'
+                         : 'bold 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
   ctx.textBaseline = 'middle';
-  var edge = T.chart.timeScale().width(), col = getCss('--lvl');
+  var edge = T.chart.timeScale().width(), col = getCss('--lvl'), ink = getCss('--tag-ink');
   tags.forEach(function (g) {
     var y = T.cs.priceToCoordinate(g.p);
     if (y == null) return;
-    var w = ctx.measureText(g.text).width, hh = 15, x = edge - w - 10;
+    var w = ctx.measureText(g.text).width, hh = lightTheme() ? 18 : 15, x = edge - w - 10;
     ctx.fillStyle = col;
     if (ctx.roundRect) { ctx.beginPath(); ctx.roundRect(x - 4, y - hh / 2, w + 8, hh, 3); ctx.fill(); }
     else ctx.fillRect(x - 4, y - hh / 2, w + 8, hh);
-    ctx.fillStyle = '#0b0e15';
+    ctx.fillStyle = ink;
     ctx.fillText(g.text, x, y + 0.5);
   });
   ctx.restore();
@@ -2193,7 +2314,7 @@ function scheduleOverlayPaint() {
 var dpLabels = [];
 function drawBlockArrow(ctx, x, y, side, col) {
   ctx.save();
-  ctx.fillStyle = col; ctx.strokeStyle = 'rgba(8,11,18,0.9)'; ctx.lineWidth = 1.5;
+  ctx.fillStyle = col; ctx.strokeStyle = getCss('--halo'); ctx.lineWidth = 1.5;
   var s = 7;
   ctx.beginPath();
   if (side === 'SELL') { ctx.moveTo(x, y + s); ctx.lineTo(x + s, y - s * 0.7); ctx.lineTo(x - s, y - s * 0.7); }      // ▼
@@ -2206,7 +2327,8 @@ function drawBlockLabels(ctx) {
   if (!dpLabels.length || !chart || !candleSeries) return;
   if (!document.getElementById('tDpoolBlk').checked) return;
   ctx.save();
-  ctx.font = 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
+  ctx.font = lightTheme() ? 'bold 16px Verdana, Geneva, sans-serif'
+                         : 'bold 14px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif';
   ctx.textBaseline = 'middle';
   var GAP = 18, LH = 17, placed = [];   // GAP = text offset from the arrow; LH = stack row height
   var items = dpLabels.map(function (L) { var pt = project(L.t, L.p); return pt ? { L: L, x: pt.x, y: pt.y } : null; })
@@ -2226,7 +2348,7 @@ function drawBlockLabels(ctx) {
     placed.push({ x0: tx - 3, x1: tx + w + 3, y0: ty - LH / 2, y1: ty + LH / 2 });
     ctx.strokeStyle = L.col + '66'; ctx.lineWidth = 1;   // leader: arrow point -> label
     ctx.beginPath(); ctx.moveTo(it.x, it.y); ctx.lineTo(it.x, ty - dir * LH / 2); ctx.stroke();
-    ctx.lineWidth = 3.5; ctx.strokeStyle = 'rgba(8,11,18,0.88)'; ctx.strokeText(L.text, tx, ty);  // halo
+    ctx.lineWidth = 3.5; ctx.strokeStyle = getCss('--halo'); ctx.strokeText(L.text, tx, ty);  // halo
     ctx.fillStyle = L.col; ctx.fillText(L.text, tx, ty);
   });
   ctx.restore();
@@ -2240,8 +2362,49 @@ var lvlTags = [];
 function drawLevelTags(ctx) {
   if (!lvlTags.length || !chart || !candleSeries) return;
   if (!document.getElementById('tLevels').checked) return;
-  paintLevelTags(ctx, layerTarget(chart, candleSeries), lvlTags);
+  var tags = hoverTagsOn() ? lvlTags.filter(function (g) { return lineTagHit(g.p); }) : lvlTags;
+  if (tags.length) paintLevelTags(ctx, layerTarget(chart, candleSeries), tags);
 }
+
+// LABELS ON HOVER (#tHoverTags): the names and price pills at the right edge of the overlay
+// lines ("conf ×3", "3TF ×20", gap prices, EQ, ...) stay hidden until the pointer is on a
+// line or on its price in the axis. redraw() routes the main chart's price lines through
+// trackLineTags, which keeps each line with the label it was made with; applyLineTags()
+// shows the ones under the pointer. Hover tips (#tipBox) are unchanged.
+var lineTags = [];        // { line, p, title, axis, shown }
+var _tagHoverY = null;    // pointer y inside #chart (pane or price axis); null when outside
+var TAG_HIT_PX = 6;
+function lineTagHit(price) {
+  if (_tagHoverY == null || !candleSeries) return false;
+  var y = candleSeries.priceToCoordinate(price);
+  return y != null && Math.abs(y - _tagHoverY) <= TAG_HIT_PX;
+}
+function trackLineTags(cs) {
+  var make = cs.createPriceLine.bind(cs);
+  cs.createPriceLine = function (o) {
+    if (!o.title && !o.axisLabelVisible) return make(o);
+    var show = !hoverTagsOn();
+    var line = make(show ? o : Object.assign({}, o, { title: '', axisLabelVisible: false }));
+    lineTags.push({ line: line, p: o.price, title: o.title || '', axis: !!o.axisLabelVisible, shown: show });
+    return line;
+  };
+}
+function applyLineTags() {
+  var hide = hoverTagsOn();
+  lineTags.forEach(function (t) {
+    var show = !hide || lineTagHit(t.p);
+    if (t.shown === show) return;
+    t.shown = show;
+    t.line.applyOptions(show ? { title: t.title, axisLabelVisible: t.axis } : { title: '', axisLabelVisible: false });
+  });
+  scheduleOverlayPaint();   // the sub-×20 level badges follow the same rule
+}
+function onTagHover(ev) {
+  _tagHoverY = ev.type === 'mousemove' ? ev.clientY - document.getElementById('chart').getBoundingClientRect().top : null;
+  if (hoverTagsOn()) applyLineTags();
+}
+document.getElementById('chart').addEventListener('mousemove', onTagHover);
+document.getElementById('chart').addEventListener('mouseleave', onTagHover);
 
 function paintOverlay() {
   var cv = document.getElementById('preview'); if (!cv) return;
@@ -2828,6 +2991,7 @@ function initSiteAccount() {
         renderFactBand();
         loadAccountGapPlacement();
         xpAccountKnown();
+        flushViewPrefs();
       })
       .catch(function () {});
   } catch (e) {}
@@ -3298,6 +3462,7 @@ function loadAccountGapPlacement() {
   fetch('/api/chart-prefs', { credentials: 'same-origin', cache: 'no-store' })
     .then(function (r) { return r.ok ? r.json() : Promise.reject(new Error('HTTP ' + r.status)); })
     .then(function (j) {
+      if (j && j.account) applyAccountViewPrefs(j.viewPrefs);
       if (!j || !j.account || !j.stored || !GAP_PLACEMENT_HINTS[j.gapPlacement]) return;
       if (document.getElementById('exportDialog').classList.contains('open')) return;
       var was = _gapPlacement, local = null;
@@ -8830,6 +8995,7 @@ function redraw() {
   var cs = addPriceCandles(chart, current.candles);
   var mainT = layerTarget(chart, cs);        // what the shared per-layer drawing functions draw on
   candleSeries = cs;                         // used by the draw tool to read click prices
+  lineTags = []; trackLineTags(cs);          // labels on hover: every price line below is kept with its label
   tipItems = []; hideTip();                  // hover-tip registry rebuilds with the marks below
   cs.attachPrimitive(rayPrimitive);          // draws each visible line's forward RAY to the right edge
   cs.attachPrimitive(trendHlPrimitive);      // re-projects a shaded trend window on every repaint
@@ -9164,7 +9330,9 @@ function redraw() {
   // a frame). requestAnimationFrame(positionHandles) -> dots track the line cleanly.
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { requestAnimationFrame(positionHandles); });
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (measure) scheduleOverlayPaint(); });  // ruler re-projects on pan/zoom
-  chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });  // block arrows/labels + level badges re-project on pan/zoom
+  chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });
+  // labels on hover: pan and zoom move the lines under a still pointer, so look again
+  chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (_tagHoverY != null && hoverTagsOn()) requestAnimationFrame(applyLineTags); });  // block arrows/labels + level badges re-project on pan/zoom
   chart.subscribeCrosshairMove(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });  // ...and stay glued during any interaction (incl vertical price drag)
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (_tourActive) requestAnimationFrame(positionTourCard); });
   chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleTrendHighlight);   // a shaded trend window follows pan/zoom
@@ -10241,7 +10409,7 @@ function lg2ChartOpts(el, schematic) {
   var log = document.getElementById('tLog').checked;
   return {
     width: el.clientWidth, height: el.clientHeight,
-    layout: { background: { color: getCss('--bg') }, textColor: getCss('--fg'), fontSize: 16 },
+    layout: chartLayout(),
     grid: { vertLines: { color: getCss('--grid') }, horzLines: { color: getCss('--grid') } },
     rightPriceScale: { mode: log ? 1 : 0, scaleMargins: { top: 0.08, bottom: 0.08 } },
     // schematic: bars are appended every frame; without shiftVisibleRangeOnNewBar:false the

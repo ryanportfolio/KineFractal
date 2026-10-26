@@ -98,3 +98,7 @@ Read logs with the GraphQL query `deploymentLogs(deploymentId, limit)`: `railway
 ### 2026-10-23: Local ticker checks share production's Tiingo key and can get it throttled
 
 Local checks of the ticker assistant run the dev server under the production `web` Railway variables, so `/api/ticker-facts` calls Tiingo with production's key (`VITE_T`). The facts cache lives in memory (`server/ticker-facts.ts`), so every server restart empties it and the next check fetches every symbol again. Back-to-back check runs got `Tiingo answered 429`, and that limit is on the shared key: it can throttle the live site's Tiingo features too. In UI checks, serve `/api/ticker-facts` from a recorded fixture with Playwright `page.route`, and keep live Tiingo runs to one per change.
+
+### 2026-10-26: Railway Postgres has no public URL; run migrations from inside `web`
+
+The `Postgres` service has no TCP proxy, so its `DATABASE_PUBLIC_URL` has an empty host (`...@:/railway`) and `railway run node <script>` fails with `ERR_INVALID_URL`. Run additive migrations inside the `web` container, which reaches the private host and has `pg` installed: base64 the script and run `MSYS_NO_PATHCONV=1 railway ssh -s web -e production "cd /app; node -e \"eval(Buffer.from('<b64>','base64').toString())\""`, with the script connecting through `process.env.DATABASE_URL`. When checking which variables exist, print names and lengths only; even a short prefix of `PGPASSWORD` is part of the secret.
