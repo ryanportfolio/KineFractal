@@ -48,8 +48,11 @@ test("the theme switch is a labelled toggle that remakes the chart and saves to 
   assert.match(fnBody("renderThemeBtn"), /b\.setAttribute\('aria-pressed', light \? 'true' : 'false'\);/);
 });
 
-test("labels on hover hides line labels and shows the ones under the pointer", () => {
-  assert.match(html, /<input type="checkbox" id="tHoverTags">labels on hover<\/label>/);
+test("unticking labels hides line labels and shows the ones under the pointer", () => {
+  // ticked (the default) = labels show, like the other layer toggles
+  assert.match(html, /<input type="checkbox" id="tHoverTags" checked>labels<\/label>/);
+  assert.match(fnBody("hoverTagsOn"), /return !!\(el && !el\.checked\);/);
+  assert.match(html, /\.onchange = function \(\) \{ setHoverTags\(!this\.checked, true\); \};/);
   assert.match(html, /var HOVER_TAGS_KEY = 'kf-chart-hover-labels-v1';/);
   assert.match(html, /lineTags = \[\]; trackLineTags\(cs\);/);
   const track = fnBody("trackLineTags");
@@ -80,4 +83,17 @@ test("the toggles are restored before the account answers, and an early click is
   assert.match(html, /\nrestoreViewPrefs\(\);\r?\ndocument\.getElementById\('themeBtn'\)\.onclick/);
   // pan and zoom move the lines under a still pointer
   assert.match(html, /subscribeVisibleLogicalRangeChange\(function \(\) \{ if \(_tagHoverY != null && hoverTagsOn\(\)\) requestAnimationFrame\(applyLineTags\); \}\);/);
+});
+
+test("translucent lines keep more colour on the light theme", () => {
+  const body = fnBody("lineRgba");
+  assert.match(body, /if \(lightTheme\(\)\) alpha = /);
+  // run it: dark leaves the alpha alone, light keeps 60% more of the colour
+  const lineRgba = (light) => new Function("lightTheme", "return function lineRgba(hex, alpha) " + body)(() => light);
+  assert.equal(lineRgba(false)("#caa84a", "44"), "#caa84a44");
+  assert.equal(lineRgba(true)("#7d5f0c", "44"), "#7d5f0cb4");
+  assert.equal(lineRgba(true)("#7d5f0c", "88"), "#7d5f0ccf");
+  assert.equal(lineRgba(true)("#7d5f0c", "ff"), "#7d5f0cff");
+  assert.match(fnBody("gapLineSpecs"), /color: lineRgba\(col, isFill \? 'cc' : '44'\)/);
+  assert.doesNotMatch(html, /getCss\('--[a-z]+'\) \+ '[0-9a-f]{2}'/);
 });
