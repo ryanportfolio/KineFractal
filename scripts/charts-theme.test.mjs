@@ -72,3 +72,12 @@ test("signed in, the theme and labels choice load from and save to /api/chart-pr
   assert.match(save, /JSON\.stringify\(\{ viewPrefs: \{ theme: lightTheme\(\) \? 'light' : 'dark', hoverLabels: hoverTagsOn\(\) \} \}\)/);
   assert.match(save, /putExportGroups\(body, false, '\/api\/chart-prefs'\)/);
 });
+
+test("the toggles are restored before the account answers, and an early click is saved once signed in", () => {
+  assert.match(fnBody("saveViewPrefs"), /if \(SITE && siteUser === null\) \{ _viewUnsaved = true; return; \}/);
+  assert.match(fnBody("initSiteAccount"), /xpAccountKnown\(\);\s*flushViewPrefs\(\);/);
+  // restoreViewPrefs runs at script start, not after chart data loads
+  assert.match(html, /\nrestoreViewPrefs\(\);\r?\ndocument\.getElementById\('themeBtn'\)\.onclick/);
+  // pan and zoom move the lines under a still pointer
+  assert.match(html, /subscribeVisibleLogicalRangeChange\(function \(\) \{ if \(_tagHoverY != null && hoverTagsOn\(\)\) requestAnimationFrame\(applyLineTags\); \}\);/);
+});

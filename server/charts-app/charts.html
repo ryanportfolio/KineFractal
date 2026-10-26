@@ -1591,6 +1591,7 @@ var THEME_KEY = 'kf-chart-theme-v1';
 var HOVER_TAGS_KEY = 'kf-chart-hover-labels-v1';
 var _viewEdited = false;   // a click this page load; the account's copy, when it answers later, does not undo it
 var _viewSaving = false, _viewQueued = false;
+var _viewUnsaved = false;  // a click made before /api/me answered; flushViewPrefs saves it once signed in
 function lightTheme() { return document.documentElement.getAttribute('data-theme') === 'light'; }
 function hoverTagsOn() { var el = document.getElementById('tHoverTags'); return !!(el && el.checked); }
 function renderThemeBtn() {
@@ -1633,6 +1634,7 @@ function applyAccountViewPrefs(v) {
   if (typeof v.hoverLabels === 'boolean' && v.hoverLabels !== hoverTagsOn()) setHoverTags(v.hoverLabels, false);
 }
 function saveViewPrefs() {
+  if (SITE && siteUser === null) { _viewUnsaved = true; return; }
   if (!(SITE && siteUser === true)) return;
   if (_viewSaving) { _viewQueued = true; return; }
   _viewSaving = true;
@@ -1644,6 +1646,17 @@ function saveViewPrefs() {
       if (_viewQueued) { _viewQueued = false; saveViewPrefs(); }
     });
 }
+// called once /api/me answers: a click made while it was pending goes to the account now
+function flushViewPrefs() {
+  if (!_viewUnsaved) return;
+  _viewUnsaved = false;
+  saveViewPrefs();
+}
+// the checkbox and the button reflect this browser's copy from the start, before chart data
+// or the account answer arrive, so the account's copy is compared against the right value
+restoreViewPrefs();
+document.getElementById('themeBtn').onclick = function () { setTheme(!lightTheme(), true); };
+document.getElementById('tHoverTags').onchange = function () { setHoverTags(this.checked, true); };
 
 // --- guided layer tour state (see the TOUR engine block after redraw) ---
 var _tourActive = false, _tourIdx = 0, _tourPlaying = false, _tourTimer = null, _tourScale = 1;
@@ -2387,10 +2400,7 @@ function applyLineTags() {
   scheduleOverlayPaint();   // the sub-×20 level badges follow the same rule
 }
 function onTagHover(ev) {
-  var y = null;
-  if (ev.type === 'mousemove') y = ev.clientY - document.getElementById('chart').getBoundingClientRect().top;
-  if (y === _tagHoverY) return;
-  _tagHoverY = y;
+  _tagHoverY = ev.type === 'mousemove' ? ev.clientY - document.getElementById('chart').getBoundingClientRect().top : null;
   if (hoverTagsOn()) applyLineTags();
 }
 document.getElementById('chart').addEventListener('mousemove', onTagHover);
@@ -2981,6 +2991,7 @@ function initSiteAccount() {
         renderFactBand();
         loadAccountGapPlacement();
         xpAccountKnown();
+        flushViewPrefs();
       })
       .catch(function () {});
   } catch (e) {}
@@ -8185,9 +8196,6 @@ function buildDropdown() {
   wireCompare();
   var addSearch = wireTickerSearch(document.getElementById('addSym'), document.body, function () { doAddTicker(); });
   document.getElementById('addBtn').onclick = addSearch.submit;
-  restoreViewPrefs();
-  document.getElementById('themeBtn').onclick = function () { setTheme(!lightTheme(), true); };
-  document.getElementById('tHoverTags').onchange = function () { setHoverTags(this.checked, true); };
   PREF_IDS.forEach(function (id) {
     document.getElementById(id).onchange = function () {
       savePrefs();
@@ -9322,7 +9330,9 @@ function redraw() {
   // a frame). requestAnimationFrame(positionHandles) -> dots track the line cleanly.
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { requestAnimationFrame(positionHandles); });
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (measure) scheduleOverlayPaint(); });  // ruler re-projects on pan/zoom
-  chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });  // block arrows/labels + level badges re-project on pan/zoom
+  chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });
+  // labels on hover: pan and zoom move the lines under a still pointer, so look again
+  chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (_tagHoverY != null && hoverTagsOn()) requestAnimationFrame(applyLineTags); });  // block arrows/labels + level badges re-project on pan/zoom
   chart.subscribeCrosshairMove(function () { if (dpLabels.length || lvlTags.length) scheduleOverlayPaint(); });  // ...and stay glued during any interaction (incl vertical price drag)
   chart.timeScale().subscribeVisibleLogicalRangeChange(function () { if (_tourActive) requestAnimationFrame(positionTourCard); });
   chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleTrendHighlight);   // a shaded trend window follows pan/zoom
