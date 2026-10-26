@@ -22,10 +22,10 @@ test("fact band exposes the stable hooks the checks read", () => {
   for (const fact of ["yield", "cadence", "trend", "vs6mHigh", "nearestBuy"]) {
     const tile = html.match(new RegExp(`<div class="fb-tile[^"]*" data-fact="${fact}"[^>]*>([\\s\\S]*?)\\n  </div>`));
     assert.ok(tile, `tile ${fact}`);
-    assert.match(tile[1], /class="fact-value"/, `${fact} has a .fact-value`);
+    if (fact !== "trend") assert.match(tile[1], /class="fact-value"/, `${fact} has a .fact-value`);
     assert.match(tile[1], /class="fact-source">[^<]+</, `${fact} has a non-empty .fact-source`);
   }
-  assert.match(html, /data-fact="overall">\s*<span class="fact-value">/);
+  assert.doesNotMatch(html, /data-fact="overall"/);
   for (const w of ["d21", "m3", "m6"]) {
     assert.match(html, new RegExp(`data-window="${w}">.*<span class="fact-change">.*<span class="fact-verdict">`));
   }

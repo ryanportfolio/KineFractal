@@ -529,8 +529,6 @@
   #exportResult .xp-cardhead { display:flex; align-items:baseline; flex-wrap:wrap; gap:4px 10px; padding:9px 14px; border-bottom:1px solid var(--grid); }
   #exportResult .xp-cardhead .xp-sym { font-size:39px; }   /* same as the table view's group header */
   #exportResult .xp-cardhead .xp-name { flex:1 1 140px; color:var(--fg); white-space:normal; }
-  #exportResult .xp-meta { margin-left:auto; color:var(--mut); font:14px monospace; }
-  #exportResult .xp-meta b { color:var(--fg); font:bold 13px Verdana,Geneva,sans-serif; }
   #exportResult .xp-none, #exportResult .xp-help { margin:0; padding:10px 14px; color:var(--mut); font:14px monospace; }
   #exportResult .xp-secfoot { display:flex; align-items:center; gap:8px; padding:6px 14px; border-top:1px solid var(--grid); color:var(--mut); font:14px monospace; }
   /* the lead price: nearest strong price, biggest thing in the card */
@@ -575,8 +573,6 @@
   #exportResult .xp-tgroup .xp-sym { font-size:39px; margin-right:12px;
                                      text-decoration:underline 3px; text-underline-offset:7px; }   /* in the ticker's own colour */
   .xp-tgroup .xp-name { color:var(--fg); font:14px monospace; }
-  .xp-tgroup .xp-meta { float:right; color:var(--mut); font:14px monospace; }
-  .xp-tgroup .xp-meta b { color:var(--fg); font:bold 13px Verdana,Geneva,sans-serif; }
   .xp-trow { cursor:pointer; }
   .xp-trow td { padding:6px 12px; border-top:1px solid rgba(38,38,38,.7); white-space:nowrap; }
   .xp-trow:hover td { background:rgba(38,198,218,.06); }
@@ -792,8 +788,6 @@
   #factBand .fb-wlabel { font-size:12px; font-weight:bold; color:var(--fg); }
   #factBand .fact-change { font-weight:bold; font-size:19px; line-height:1.2; white-space:nowrap; }
   #factBand .fact-verdict { font-weight:bold; font-size:11px; letter-spacing:.06em; }
-  #factBand .fb-overall { display:flex; flex-direction:column; gap:1px; }
-  #factBand .fb-overall .fact-value { font-size:26px; letter-spacing:.04em; }
   #factBand .is-up { color:var(--cbuy); }
   #factBand .is-down { color:var(--csell); }
   #factBand .is-mixed { color:var(--thr); }
@@ -848,7 +842,6 @@
     #factBand .fb-tile { flex-basis:40%; padding:5px 10px; }
     #factBand .fb-trend { flex-basis:100%; border-right:0; }
     #factBand .fact-value { font-size:18px; }
-    #factBand .fb-overall .fact-value { font-size:20px; }
     #factBand .fact-change { font-size:16px; }
     #factBand .fb-cells { max-width:none; }
     #factBand .fb-retry { min-height:44px; }
@@ -953,7 +946,7 @@
   #askDock .ask-chip:hover { color:var(--fg); }
   #askDock .ask-chip.is-active { color:var(--sup); border-bottom-color:var(--sup); }
   #askDock .ask-chip[hidden] { display:none; }
-  #askAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; font-size:15px; }
+  #askAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; font:15px Verdana,Geneva,sans-serif; }
   #askAnswer .ask-view { min-height:100%; box-sizing:border-box; display:flex; flex-direction:column; gap:16px; padding:4px 0 2px; }
   #askAnswer .ask-hero-top { display:flex; align-items:center; flex-wrap:wrap; gap:6px 12px; }
   #askAnswer .ask-hero-v { font-size:36px; font-weight:bold; line-height:1.1; font-variant-numeric:tabular-nums; }
@@ -1094,7 +1087,7 @@
   #xpAssist[data-busy="true"] .xp-check { cursor:progress; }
   #xpAssistProgress { margin:0; color:var(--sup); }
   #xpAssistProgress:empty { display:none; }
-  #xpAssistAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  #xpAssistAnswer { flex:1 1 auto; min-height:0; overflow-y:auto; font-family:Verdana,Geneva,sans-serif; }
   #xpAssistAnswer:empty { display:none; }
   #xpAssistAnswer .xp-partial { color:var(--thr); }
   #xpAssist .ask-form { display:flex; gap:0; margin:auto 0 0; }
@@ -1210,10 +1203,6 @@
         <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="d21"><span class="fb-wlabel">21D</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
         <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="m3"><span class="fb-wlabel">3M</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
         <button type="button" class="fb-cell" aria-pressed="false" aria-disabled="true" data-window="m6"><span class="fb-wlabel">6M</span><span class="fact-change">—</span><span class="fact-verdict"></span></button>
-      </div>
-      <div class="fb-overall" data-fact="overall">
-        <span class="fact-value">—</span>
-        <span class="fact-note"></span>
       </div>
     </div>
     <p class="fb-hlnote" aria-live="polite"><span class="fb-hltext"></span><button type="button" class="fb-hlclear" data-action="clear-highlight" hidden>Clear</button></p>
@@ -3017,9 +3006,6 @@ function fillFactBand(sym, state, facts, buy) {
   var wins = (f && f.windows) || {};
   ['d21', 'm3', 'm6'].forEach(function (w) { setFactWindow(w, wins[w] || null, !!f); });
   var overall = f && f.overall;
-  setFactTile('overall', overall || '—',
-    overall === 'UP' ? 'is-up' : overall === 'DOWN' ? 'is-down' : overall === 'MIXED' ? 'is-mixed' : 'is-none',
-    !f ? '' : overall ? f.upCount + ' of 3 periods up' : 'needs all three periods', '');
   document.querySelector('#factBand [data-fact="trend"] > .fact-source').textContent =
     f ? 'Tiingo daily closes through ' + day : why;
   // VS 6M HIGH
@@ -7144,7 +7130,6 @@ function exportTableHtml(sections) {
     html += '<tbody data-sec="' + escHtml(sec.sym) + '"><tr class="xp-tgroup" data-first="' + escHtml(sec.sym) + '"><th colspan="2" scope="rowgroup">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
-      + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
       + '</th>'
       + (facts ? XP_FACT_KEYS.map(function (key) { return xpFactCellHtml(sec.sym, key); }).join('') : '')
       + '</tr>';
@@ -7178,7 +7163,6 @@ function exportCardsHtml(sections) {
       + '<div class="xp-cardhead" data-first="' + escHtml(sec.sym) + '">'
       + '<span class="xp-sym" style="color:hsl(' + hue + ',60%,78%)">' + escHtml(sec.sym) + '</span>'
       + '<span class="xp-name">' + escHtml(tickerName(sec.sym)) + '</span>'
-      + (sec.close != null ? '<span class="xp-meta">' + closeLabel(sec) + ' <b>' + px2(sec.close) + '</b></span>' : '')
       + '</div>';
     if (!limits.length) {
       html += '<p class="xp-none">No buy prices in this range at this strength.</p>';
