@@ -91,9 +91,22 @@ test("translucent lines keep more colour on the light theme", () => {
   // run it: dark leaves the alpha alone, light keeps 60% more of the colour
   const lineRgba = (light) => new Function("lightTheme", "return function lineRgba(hex, alpha) " + body)(() => light);
   assert.equal(lineRgba(false)("#caa84a", "44"), "#caa84a44");
-  assert.equal(lineRgba(true)("#7d5f0c", "44"), "#7d5f0cb4");
-  assert.equal(lineRgba(true)("#7d5f0c", "88"), "#7d5f0ccf");
+  assert.equal(lineRgba(true)("#7d5f0c", "44"), "#7d5f0cd0");
+  assert.equal(lineRgba(true)("#7d5f0c", "88"), "#7d5f0ce1");
   assert.equal(lineRgba(true)("#7d5f0c", "ff"), "#7d5f0cff");
   assert.match(fnBody("gapLineSpecs"), /color: lineRgba\(col, isFill \? 'cc' : '44'\)/);
   assert.doesNotMatch(html, /getCss\('--[a-z]+'\) \+ '[0-9a-f]{2}'/);
+});
+
+test("dashed and dotted lines draw a pixel wider on the light theme, over a softer grid", () => {
+  const body = fnBody("themedLineSpec");
+  const themed = (light) => new Function("lightTheme", "return function themedLineSpec(o) " + body)(() => light);
+  assert.deepEqual(themed(true)({ lineWidth: 1, lineStyle: 2 }), { lineWidth: 2, lineStyle: 2 });
+  assert.deepEqual(themed(true)({ lineWidth: 2, lineStyle: 0 }), { lineWidth: 2, lineStyle: 0 });
+  assert.deepEqual(themed(false)({ lineWidth: 1, lineStyle: 2 }), { lineWidth: 1, lineStyle: 2 });
+  assert.match(fnBody("trackLineTags"), /o = themedLineSpec\(o\);/);
+  assert.match(html, /cs\.createPriceLine\(themedLineSpec\(o\)\)/);
+  assert.match(fnBody("lg2BuildLive"), /return makeLine\(themedLineSpec\(o\)\);/);
+  assert.match(css, /--chart-grid:#262626;/);
+  assert.equal(html.match(/horzLines: \{ color: getCss\('--chart-grid'\) \}/g).length, 2);
 });
