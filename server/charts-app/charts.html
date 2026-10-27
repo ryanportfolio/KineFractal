@@ -23,7 +23,7 @@
           --brand:#00ff88; --brand-rgb:0,255,136; --sup-rgb:38,198,218; --panel-rgb:13,13,13; --grid-rgb:38,38,38;
           --fg-rgb:230,230,230; --ink-rgb:255,255,255; --ink-hi:#ffffff; --cbuy-rgb:33,208,122; --csell-rgb:255,91,91;
           --struct-rgb:157,107,255; --mine-rgb:198,255,0; --on-sup:#03181c; --sup-hi:#5fd8e6; --tour-detail:#b6bcc9;
-          --spy:#f5a623; --scroll:#333; --tag-ink:#0b0e15; --halo:rgba(8,11,18,0.88); }
+          --spy:#f5a623; --scroll:#333; --tag-ink:#0b0e15; --chart-grid:#262626; --halo:rgba(8,11,18,0.88); }
   /* LIGHT THEME (html[data-theme="light"], the sun button in the top bar; kf-chart-theme-v1).
      Warm off-white chrome, Verdana for every element, text set larger through
      font-size-adjust. Data colours keep their hue and only get darker where they would wash
@@ -36,7 +36,7 @@
           --brand:#00874f; --brand-rgb:0,135,79; --sup-rgb:0,132,154; --panel-rgb:235,230,219; --grid-rgb:211,204,189;
           --fg-rgb:38,35,30; --ink-rgb:38,35,30; --ink-hi:#26231e; --cbuy-rgb:14,138,74; --csell-rgb:204,48,48;
           --struct-rgb:110,63,224; --mine-rgb:79,125,0; --on-sup:#ffffff; --sup-hi:#006d80; --tour-detail:#5f594f;
-          --spy:#c26a00; --scroll:#bfb6a4; --tag-ink:#ffffff; --halo:rgba(244,241,234,0.92); }
+          --spy:#c26a00; --scroll:#bfb6a4; --tag-ink:#ffffff; --chart-grid:#e6e0d4; --halo:rgba(244,241,234,0.92); }
   /* the font shorthand resets font-size-adjust, so both carry !important to reach every element */
   html[data-theme="light"] body, html[data-theme="light"] body *,
   html[data-theme="light"] body *::before, html[data-theme="light"] body *::after {
@@ -1967,10 +1967,17 @@ function layerTarget(ch, cs) {
 }
 // a price line's colour with its transparency (two hex digits). On the light theme a
 // translucent line fades far more against the pale ground than against black, so it keeps
-// 60% more of its colour: 44 -> b4, 88 -> cf, cc -> eb.
+// 75% more of its colour: 44 -> d0, 88 -> e1, cc -> f2.
 function lineRgba(hex, alpha) {
-  if (lightTheme()) alpha = ('0' + Math.round(255 - (255 - parseInt(alpha, 16)) * 0.4).toString(16)).slice(-2);
+  if (lightTheme()) alpha = ('0' + Math.round(255 - (255 - parseInt(alpha, 16)) * 0.25).toString(16)).slice(-2);
   return hex + alpha;
+}
+// every price line passes through here (the main chart's trackLineTags and the legend's
+// target). On the light theme a 1px dashed or dotted line breaks up into specks about as
+// faint as the grid, so those lines draw one pixel wider there.
+function themedLineSpec(o) {
+  if (!lightTheme() || !o.lineStyle) return o;
+  return Object.assign({}, o, { lineWidth: (o.lineWidth || 1) + 1 });
 }
 // the chart's background, text colour and type from the page theme: the dark theme keeps the
 // library's own font at 16px, the light theme sets Verdana a size up like the rest of the page
@@ -1986,7 +1993,7 @@ function priceChartOptions(el, mode) {
   return {
     width: el.clientWidth, height: el.clientHeight,  // main chart: owned after this by redraw()'s ResizeObserver
     layout: chartLayout(),
-    grid: { vertLines: { color: getCss('--grid') }, horzLines: { color: getCss('--grid') } },
+    grid: { vertLines: { color: getCss('--chart-grid') }, horzLines: { color: getCss('--chart-grid') } },
     // crosshair tooltip time in ET (axis ticks handled by tickMarkFormatter below)
     localization: { timeFormatter: etCrosshairTime },
     timeScale: { timeVisible: true, secondsVisible: false, minBarSpacing: 0.04, rightOffset: 8, tickMarkFormatter: etTickMark },
@@ -2390,6 +2397,7 @@ function lineTagHit(price) {
 function trackLineTags(cs) {
   var make = cs.createPriceLine.bind(cs);
   cs.createPriceLine = function (o) {
+    o = themedLineSpec(o);
     if (!o.title && !o.axisLabelVisible) return make(o);
     var show = !hoverTagsOn();
     var line = make(show ? o : Object.assign({}, o, { title: '', axisLabelVisible: false }));
@@ -10418,7 +10426,7 @@ function lg2ChartOpts(el, schematic) {
   return {
     width: el.clientWidth, height: el.clientHeight,
     layout: chartLayout(),
-    grid: { vertLines: { color: getCss('--grid') }, horzLines: { color: getCss('--grid') } },
+    grid: { vertLines: { color: getCss('--chart-grid') }, horzLines: { color: getCss('--chart-grid') } },
     rightPriceScale: { mode: log ? 1 : 0, scaleMargins: { top: 0.08, bottom: 0.08 } },
     // schematic: bars are appended every frame; without shiftVisibleRangeOnNewBar:false the
     // library scrolls the view by the bars added and the frame drifts. minBarSpacing as the main
@@ -10589,7 +10597,7 @@ function lg2BuildDemo(code) {
     // its time axis, whose width() is then 0, so the demo gives it the pane's width
     T.chart = { addLineSeries: function (opts) { return lg2PoolTake(d, opts); },
                 timeScale: function () { return { width: function () { return lc.paneSize().width; } }; } };
-    T.cs = { createPriceLine: function (o) { var h = cs.createPriceLine(o); d.lines.push(h); return h; },
+    T.cs = { createPriceLine: function (o) { var h = cs.createPriceLine(themedLineSpec(o)); d.lines.push(h); return h; },
              setMarkers: function (m) { return cs.setMarkers(m); },
              priceToCoordinate: function (p) { return cs.priceToCoordinate(p); } };
     d.T = T;
