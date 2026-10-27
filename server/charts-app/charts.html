@@ -10739,6 +10739,8 @@ function lg2BuildLive(code) {
   var mode = priceAxisMode(comparing, code === 'log' || document.getElementById('tLog').checked);
   var lc = LightweightCharts.createChart(el, lg2LiveOpts(el, mode));
   var cs = addPriceCandles(lc, current.candles);
+  var makeLine = cs.createPriceLine.bind(cs);   // the light theme's wider dashed lines, as on the main chart
+  cs.createPriceLine = function (o) { return makeLine(themedLineSpec(o)); };
   var T = layerTarget(lc, cs);
   var L = { lc: lc, cs: cs, T: T, rays: [], mirrors: (LG2_LIVE[code] || []).slice(), overlay: null };
   lg2.live = L;

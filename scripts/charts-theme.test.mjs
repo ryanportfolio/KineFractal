@@ -106,6 +106,7 @@ test("dashed and dotted lines draw a pixel wider on the light theme, over a soft
   assert.deepEqual(themed(false)({ lineWidth: 1, lineStyle: 2 }), { lineWidth: 1, lineStyle: 2 });
   assert.match(fnBody("trackLineTags"), /o = themedLineSpec\(o\);/);
   assert.match(html, /cs\.createPriceLine\(themedLineSpec\(o\)\)/);
+  assert.match(fnBody("lg2BuildLive"), /return makeLine\(themedLineSpec\(o\)\);/);
   assert.match(css, /--chart-grid:#262626;/);
   assert.equal(html.match(/horzLines: \{ color: getCss\('--chart-grid'\) \}/g).length, 2);
 });
