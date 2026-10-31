@@ -8138,6 +8138,7 @@ function renderTfBtns(entry, activeKey) {
     b.textContent = tf;
     b.title = entry.sym + ' super on ' + tf + ' candles';
     b.onclick = function () {
+      try { localStorage.setItem(TF_KEY, tf); } catch (e) {}   // the next ticker opens on it too
       if (current && current.key === k) return;
       show(variantOf(entry, k), true);
       renderTfBtns(entry, k);
@@ -8145,8 +8146,21 @@ function renderTfBtns(entry, activeKey) {
     wrap.appendChild(b);
   });
 }
+// A ticker opens on the timeframe last picked with the 2h/4h/1d buttons (kept in this
+// browser), or on 1d before any pick. entry.key is the 2h variant.
+var DEFAULT_TF = '1d';
+var TF_KEY = 'kf-chart-tf-v1';
+function preferredTf() {
+  var tf = null;
+  try { tf = localStorage.getItem(TF_KEY); } catch (e) {}
+  return TF_ORDER.indexOf(tf) >= 0 ? tf : DEFAULT_TF;
+}
+function defaultSuperKey(entry) {
+  var keys = entry.tf_keys || {};
+  return keys[preferredTf()] || keys[DEFAULT_TF] || entry.key;
+}
 function showSuper(entry, key, jumpToLatest) {   // one path for every super activation site
-  key = key || entry.key;
+  key = key || defaultSuperKey(entry);
   var sel = document.getElementById('combo');
   sel.selectedIndex = -1;   // dropdown shows nothing while a super view is active
   setActiveSuper((entry.sym || '').toUpperCase());
@@ -8322,7 +8336,11 @@ function buildDropdown() {
     return Object.keys(tk).some(function (t) { return tk[t] === saved; });
   })[0];
   var savedIdx = saved ? combos.map(function (c) { return c.key; }).indexOf(saved) : -1;
-  if (savedSym) { showSuper(superMap[savedSym], saved); }
+  // the saved timeframe counts only once a 2h/4h/1d button set one: a saved 2h key from
+  // before 1d became the default reopens on 1d
+  var tfPicked = false;
+  try { tfPicked = TF_ORDER.indexOf(localStorage.getItem(TF_KEY)) >= 0; } catch (e) {}
+  if (savedSym) { showSuper(superMap[savedSym], tfPicked ? saved : null); }
   else if (savedIdx >= 0) { setActiveSuper(null); renderTfBtns(null); sel.selectedIndex = savedIdx; show(combos[savedIdx]); }
   else {
     var defSym = superMap['SPY'] ? 'SPY' : SUPER_SYMS[0];
