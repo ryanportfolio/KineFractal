@@ -4099,12 +4099,14 @@ function readAskStream(r, live, add) {
 // unticking it skips the web for this page only
 function askWebOn(id) { var c = document.getElementById(id); return !!(c && c.checked); }
 // Browsers can restore an unticked box on reload (Firefox form restore) or on Back
-// (page cache), so it is ticked at start and on every pageshow.
+// (page cache), so it is ticked at start and when the page comes back from the page
+// cache. Not on the first load's pageshow: it fires after the data scripts load, and
+// would undo an untick made while they loaded.
 function wireAskWeb(id) {
   var c = document.getElementById(id);
   var reset = function () { c.checked = true; };
   reset();
-  window.addEventListener('pageshow', reset);
+  window.addEventListener('pageshow', function (e) { if (e.persisted) reset(); });
 }
 // The server's source line names the price data, then the web results (when the
 // question searched the web). Only the web results show, as links; with none, nothing.
