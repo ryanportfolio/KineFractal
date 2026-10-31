@@ -8139,7 +8139,9 @@ function renderTfBtns(entry, activeKey) {
     b.title = entry.sym + ' super on ' + tf + ' candles';
     b.onclick = function () {
       try { localStorage.setItem(TF_KEY, tf); } catch (e) {}   // the next ticker opens on it too
-      if (_shownKey === k) return;
+      // nothing to do only when k is on screen and nothing newer was asked for; a
+      // failed load leaves k asked for but not shown, so a second click retries it
+      if (_shownKey === k && current && current.key === k) return;
       show(variantOf(entry, k), true);
       renderTfBtns(entry, k);
     };
@@ -8783,7 +8785,7 @@ function show(c, jumpToLatest) {
     }
     loadOnce(window.FEARLAB_OVERLAYS, 'overlays-', c.key, go,
              function () { go({ trendlines: [], hlevels: [] }); });  // no sidecar yet — still show candles
-  }, fail('data-' + c.key + '.js'));
+  }, function () { if (c.key === _shownKey) fail('data-' + c.key + '.js')(); });
 }
 
 // Time-axis localization to US Eastern. lightweight-charts v4 has no built-in
