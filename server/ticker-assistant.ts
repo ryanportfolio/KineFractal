@@ -27,7 +27,8 @@ export interface TickerAssistantAdapter {
   stream(input: OpenRouterRatioInput, opts?: OpenRouterStreamOptions): AsyncIterable<string>;
 }
 
-// Web search, only when the user ticks it: OpenRouter's web plugin through Exa
+// Web search, only when the "Search the web" box is ticked (it is by default; the
+// visitor can untick it): OpenRouter's web plugin through Exa
 // (about $0.007 a search, 5 results). Exa receives the search built from the
 // question. The model is told to name the site in plain words; the server lists
 // the result links on the source line.

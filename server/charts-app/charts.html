@@ -1074,7 +1074,7 @@
   #askAnswer .ask-hint, #xpAssistAnswer .ask-hint { margin:0; color:var(--mut); line-height:1.5; }
   #askAnswer .ask-src, #xpAssistAnswer .ask-src { margin:8px 0 0; color:var(--mut); font-size:12px; overflow-wrap:anywhere; }
   #askAnswer .ask-src a, #xpAssistAnswer .ask-src a { color:var(--sup); }
-  /* "Search the web" under each question box: off on every page load; the checkbox
+  /* "Search the web" under each question box: on at every page load; the checkbox
      and its words are one target */
   #askDock .ask-web, #xpAssist .ask-web { display:flex; align-items:center; gap:8px; min-height:32px; margin:6px 0 0;
                                           color:var(--fg); font-size:13px; cursor:pointer; }
@@ -1289,7 +1289,7 @@
       <input id="askInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about this ticker" placeholder="Ask about this ticker…">
       <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
     </form>
-    <label class="ask-web"><input type="checkbox" id="askWeb" autocomplete="off"> Search the web</label>
+    <label class="ask-web"><input type="checkbox" id="askWeb" autocomplete="off" checked> Search the web</label>
   </div>
 </aside>
 <div id="cmpMenu" role="dialog" aria-label="Compare a ticker" hidden>
@@ -1460,7 +1460,7 @@
           <input id="xpAskInput" type="text" maxlength="300" autocomplete="off" aria-label="Ask a question about the selected tickers" placeholder="Ask about these tickers…">
           <button type="submit" class="ask-send" aria-label="Send question"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12h15M13 6l6 6-6 6"/></svg></button>
         </form>
-        <label class="ask-web"><input type="checkbox" id="xpAskWeb" autocomplete="off"> Search the web</label>
+        <label class="ask-web"><input type="checkbox" id="xpAskWeb" autocomplete="off" checked> Search the web</label>
       </aside>
     </div>
     <div id="exportEditor" role="region" aria-labelledby="exportEditorTitle" hidden>
@@ -4095,13 +4095,14 @@ function readAskStream(r, live, add) {
   };
   return pump();
 }
-// "Search the web" under a question box (#askWeb, #xpAskWeb): off on every page load
+// "Search the web" under a question box (#askWeb, #xpAskWeb): on at every page load;
+// unticking it skips the web for this page only
 function askWebOn(id) { var c = document.getElementById(id); return !!(c && c.checked); }
-// Browsers can restore a ticked box on reload (Firefox form restore) or on Back
-// (page cache), so it is cleared at start and on every pageshow.
+// Browsers can restore an unticked box on reload (Firefox form restore) or on Back
+// (page cache), so it is ticked at start and on every pageshow.
 function wireAskWeb(id) {
   var c = document.getElementById(id);
-  var reset = function () { c.checked = false; };
+  var reset = function () { c.checked = true; };
   reset();
   window.addEventListener('pageshow', reset);
 }
