@@ -5230,7 +5230,7 @@ function confirmTickerRemoval() {
         renderTickerReorderList();
       }
       if (current && current.key && current.key.indexOf(state.symbol.toLowerCase() + '-super') === 0 && superMap.SPY) {
-        showSuper(superMap.SPY);
+        showSuper(superMap.SPY, null, true);
       }
       closeRemoveTickerDialog(true);
     })
@@ -8139,7 +8139,7 @@ function renderTfBtns(entry, activeKey) {
     b.title = entry.sym + ' super on ' + tf + ' candles';
     b.onclick = function () {
       try { localStorage.setItem(TF_KEY, tf); } catch (e) {}   // the next ticker opens on it too
-      if (current && current.key === k) return;
+      if (_shownKey === k) return;
       show(variantOf(entry, k), true);
       renderTfBtns(entry, k);
     };
@@ -8336,15 +8336,26 @@ function buildDropdown() {
     return Object.keys(tk).some(function (t) { return tk[t] === saved; });
   })[0];
   var savedIdx = saved ? combos.map(function (c) { return c.key; }).indexOf(saved) : -1;
-  // the saved timeframe counts only once a 2h/4h/1d button set one: a saved 2h key from
-  // before 1d became the default reopens on 1d
-  var tfPicked = false;
-  try { tfPicked = TF_ORDER.indexOf(localStorage.getItem(TF_KEY)) >= 0; } catch (e) {}
-  if (savedSym) { showSuper(superMap[savedSym], tfPicked ? saved : null); }
+  if (savedSym) {
+    // The saved 2h key from before 1d became the default was never a pick: it reopens on
+    // 1d. A saved 4h or 1d key was a button click, so it stands and becomes the pick.
+    var bootEntry = superMap[savedSym], tfPicked = false;
+    try { tfPicked = TF_ORDER.indexOf(localStorage.getItem(TF_KEY)) >= 0; } catch (err) {}
+    if (!tfPicked && saved !== bootEntry.key) {
+      var tk = bootEntry.tf_keys || {};
+      var savedTf = Object.keys(tk).filter(function (t) { return tk[t] === saved; })[0];
+      if (savedTf) { try { localStorage.setItem(TF_KEY, savedTf); } catch (err) {} }
+      tfPicked = true;
+    }
+    var bootKey = tfPicked ? saved : defaultSuperKey(bootEntry);
+    // the saved pan/zoom is a bar-index range from the saved key's candles: on other candles
+    // it lands on other dates, so a changed key opens on the latest bars
+    showSuper(bootEntry, bootKey, bootKey !== saved);
+  }
   else if (savedIdx >= 0) { setActiveSuper(null); renderTfBtns(null); sel.selectedIndex = savedIdx; show(combos[savedIdx]); }
   else {
     var defSym = superMap['SPY'] ? 'SPY' : SUPER_SYMS[0];
-    if (defSym && superMap[defSym]) { showSuper(superMap[defSym]); }
+    if (defSym && superMap[defSym]) { showSuper(superMap[defSym], null, true); }
     else if (combos.length) show(combos[0]);
     else fail('any combos')();
   }
@@ -8459,7 +8470,7 @@ function doAddTicker(from) {
         }
         addMsg.textContent = restored ? 'added ' + e.sym : e.sym + ' already added';
         if (inDialog) exportTickerAdded(e.sym);
-        else showSuper(superMap[e.sym] || e);
+        else showSuper(superMap[e.sym] || e, null, true);
         return;
       }
       inject(DATA + 'data-' + e.key + '.js', function () {
@@ -8752,7 +8763,9 @@ function wireTickerSearch(input, host, onPick) {
 }
 
 var current = null;  // {candles, overlays}
+var _shownKey = null;   // the key last asked for; a slower earlier load never replaces it
 function show(c, jumpToLatest) {
+  _shownKey = c.key;
   try { localStorage.setItem(SEL_KEY, c.key); } catch (e) {}   // remember selection for next reload
   factBandShow(c.sym);   // signed in: facts for the ticker now on screen
   clearTrendHighlight();  // a ticker or timeframe change drops any shaded trend window
@@ -8760,6 +8773,7 @@ function show(c, jumpToLatest) {
   setHint('loading ' + c.key + ' …');
   loadOnce(window.FEARLAB_REG, 'data-', c.key, function (payload) {
     function go(ov) {
+      if (c.key !== _shownKey) return;   // clicked elsewhere while this one loaded
       current = { key: c.key, candles: payload.candles || [], overlays: ov };
       pending = null;
       loadMine(c.key);   // userLines from localStorage (sync) + server copy if present (async)
@@ -9681,10 +9695,10 @@ var CHART_LEGEND = [
   { id:'bars', name:'Candles (the super chart)', toggle:'always on', colors:['#26a69a','#ef5350'],
     plain:'The actual price candles — one zoom level, with clues from bigger zoom levels stacked on top.',
     one:'Display-TF candles carrying merged 2h+4h+1d cross-TF structure on one chart.',
-    what:'The price candlesticks every overlay draws on. On a *-super combo the candles are ONE display timeframe (2h default; the toolbar TF buttons swap to 4h/1d siblings) but the chart fuses S/R levels, trendlines, gaps, order blocks and premium/discount from THREE timeframes (2h+4h+1d) onto it. Green up / red down; the current-price line tints to the last bar.',
+    what:'The price candlesticks every overlay draws on. On a *-super combo the candles are ONE display timeframe (1d by default, or the last one picked; the toolbar TF buttons swap to the 2h/4h/1d siblings) but the chart fuses S/R levels, trendlines, gaps, order blocks and premium/discount from THREE timeframes (2h+4h+1d) onto it. Green up / red down; the current-price line tints to the last bar.',
     how:'SUPERS sets display TF + merged TFs (emit_super.py:38-40). Raw OHLCV is read from the CACHED csv only and resampled in-memory to 2h/4h buckets, never refetched (_raw_bars, emit_super.py:119-134). Per-bar volume (_attach_volume :137-154) and thrust (THRUST_LOOKBACK=20 :157-202) ride on the same candle objects. Written as window.FEARLAB_REG[<sym>-super].candles (:372-375); charts.html renders addCandlestickSeries (up #26a69a / down #ef5350) at :775-789. FUTURE_BARS=250 whitespace bars are appended so the axis shows the future dates the rays project into, without affecting vertical autoscale (:122-123,784-789).',
     intent:'Docstring: "Merge a symbol’s horizontal S/R levels across timeframes into ONE chart, weighted by cross-TF CONFLUENCE: a price that is S/R on 2h AND 4h AND 1d is far stronger than any single-TF level" (emit_super.py:2-6). You read one TF of candles but see where multi-TF structure stacks.',
-    caveat:'"Viz-only and additive" — the backtest board (data-index.js) and report.py are untouched (emit_super.py:8-11). This path never refetches the cache (:120); a missing cache makes volume/thrust a silent no-op (:127-128). Pipeline order matters: emit_super (stage 2) then supertrend.py (stage 3), or the super+/swings/confluence layers go missing (:17-20). Default display TF is 2h; the toolbar TF buttons switch to the 4h/1d variants (lines refit per TF).',
+    caveat:'"Viz-only and additive" — the backtest board (data-index.js) and report.py are untouched (emit_super.py:8-11). This path never refetches the cache (:120); a missing cache makes volume/thrust a silent no-op (:127-128). Pipeline order matters: emit_super (stage 2) then supertrend.py (stage 3), or the super+/swings/confluence layers go missing (:17-20). Default display TF is 1d (or the last one picked); the toolbar TF buttons switch to the 2h/4h/1d variants (lines refit per TF).',
     src:['emit_super.py:2-20','emit_super.py:38-44','emit_super.py:107-202','emit_super.py:309-392','data.py:100-134','charts.html:760-794'] },
   { id:'tl', name:'Trendlines (auto-detected)', toggle:'TL · tTrend', colors:['--sup','--res'],
     plain:'Auto-drawn slanted lines linking the points price keeps bouncing off.',
