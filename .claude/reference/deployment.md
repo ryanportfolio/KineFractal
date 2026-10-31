@@ -9,7 +9,7 @@
 | `web` | this repo, branch `main`, root `/` | The site. Serves kinefractal.com, www.kinefractal.com and web-production-781bd.up.railway.app. Builds `Dockerfile` (config: `railway.json`). |
 | `worker` | `ryanportfolio/range`, branch `prod` | FearLab end-of-day run. Cron `0 11 * * 2-6` (UTC). Publishes board, signals, combos and `/charts` data to the S3 bucket. |
 | `chart-builder` | range, `prod` | Builds per-account "+ Add" tickers for `/charts` (reached via `CHART_BUILDER_URL`). |
-| `chart-refresh` | range, `prod` | `python worker/chart_refresh.py`, cron `0 21 * * 1-5` (UTC). |
+| `chart-refresh` | range, `prod` | `python worker/chart_refresh.py`, cron `*/30 21-23 * * 1-5` (UTC). Writes the day's candles into the current `/charts` data from 17:00 ET; a slot that fails or is stopped by a range `prod` redeploy is retried by the next slot. Until a slot lands, `/charts` shows the previous session. |
 | `Postgres` | Railway image | Accounts, alerts, chart lines and preferences, market-data cache. |
 
 A merge to this repo's `main` redeploys `web` only. Engine changes ship from range: merge to range `main`, a GitHub Action fast-forwards `prod`, and the next cron run publishes.
