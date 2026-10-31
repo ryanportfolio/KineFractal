@@ -1114,12 +1114,11 @@ test("a visible tab redraws the band and the dock from new facts once they expir
   assert.equal(page.factBandStale(), false, "facts for another ticker are not the band's");
 });
 
-test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends web: true only when ticked", () => {
+test("ASK AI and Limit Buy: a Search the web checkbox, on at every load, sends web: true only when ticked", () => {
   for (const id of ["askWeb", "xpAskWeb"]) {
-    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" autocomplete="off"> Search the web</label>`));
+    assert.match(html, new RegExp(`<label class="ask-web"><input type="checkbox" id="${id}" autocomplete="off" checked> Search the web</label>`));
     assert.match(html, new RegExp(`wireAskWeb\\('${id}'\\);`));
   }
-  assert.doesNotMatch(html, /id="(xp)?[aA]skWeb"[^>]*checked/, "never ticked by default");
   assert.doesNotMatch(html, /localStorage\.setItem\([^)]*[wW]eb/, "the choice is not saved");
   const dock = fnBody("sendAskQuestion"), xp = fnBody("sendXpQuestion");
   assert.match(dock, /var web = askWebOn\('askWeb'\);/);
@@ -1128,10 +1127,11 @@ test("ASK AI and Limit Buy: a Search the web checkbox, off on every load, sends 
   assert.match(xp, /if \(web\) payload\.web = true;/);
   assert.match(xp, /card\.appendChild\(askSourceNode\(last\)\);/);
   assert.doesNotMatch(html, /ask-webnote|WebNote/, "no note under the checkbox");
-  // a box the browser restored on reload or Back starts unticked again
+  // a box the browser restored on reload or Back starts ticked again; the first load's
+  // pageshow does not re-tick it, so an untick made while the page loaded stands
   const wire = fnBody("wireAskWeb");
-  assert.match(wire, /var reset = function \(\) \{ c\.checked = false; \};\s*reset\(\);/);
-  assert.match(wire, /window\.addEventListener\('pageshow', reset\);/);
+  assert.match(wire, /var reset = function \(\) \{ c\.checked = true; \};\s*reset\(\);/);
+  assert.match(wire, /window\.addEventListener\('pageshow', function \(e\) \{ if \(e\.persisted\) reset\(\); \}\);/);
 });
 
 test("source line links: only http and https become links, opened safely, as text nodes", () => {
