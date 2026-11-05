@@ -8291,6 +8291,7 @@ function syncMirrors() {
         if (!m.lc) return;
         m.lc.resize(m.el.clientWidth, m.el.clientHeight);
         if (m.paint) requestAnimationFrame(m.paint);
+        if (m.applyTags && m.hoverY != null && hoverTagsOn()) requestAnimationFrame(m.applyTags);
       });
       m.ro.observe(m.el);
       // labels on hover: the pointer's y in this pane, as onTagHover keeps it for the main chart
@@ -8384,6 +8385,8 @@ function drawMirror(m, sig, payload, ov) {
   var n = candles.length, ts = lc.timeScale();
   ts.setVisibleLogicalRange(m.view || { from: Math.max(0, n - DEFAULT_BARS), to: n - 1 + 8 });
   ts.subscribeVisibleLogicalRangeChange(function (lr) { if (lr && m.lc === lc) m.view = lr; });
+  // labels on hover: pan and zoom move the lines under a still pointer, so look again (as the main chart does)
+  ts.subscribeVisibleLogicalRangeChange(function () { if (m.hoverY != null && hoverTagsOn()) requestAnimationFrame(m.applyTags); });
   // the sub-x20 level chips, on a canvas over the pane like the main chart's
   var cv = document.createElement('canvas');
   cv.style.cssText = 'position:absolute;inset:0;z-index:4;pointer-events:none';
