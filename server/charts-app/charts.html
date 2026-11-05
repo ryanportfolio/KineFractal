@@ -2445,6 +2445,8 @@ function applyLineTags() {
     t.line.applyOptions(show ? { title: t.title, axisLabelVisible: t.axis } : { title: '', axisLabelVisible: false });
   });
   scheduleOverlayPaint();   // the sub-×20 level badges follow the same rule
+  // the side-by-side view-only panes follow the same checkbox (each with its own pointer)
+  Object.keys(_mirrors).forEach(function (k) { if (_mirrors[k].applyTags) _mirrors[k].applyTags(); });
 }
 function onTagHover(ev) {
   _tagHoverY = ev.type === 'mousemove' ? ev.clientY - document.getElementById('chart').getBoundingClientRect().top : null;
@@ -8291,6 +8293,13 @@ function syncMirrors() {
         if (m.paint) requestAnimationFrame(m.paint);
       });
       m.ro.observe(m.el);
+      // labels on hover: the pointer's y in this pane, as onTagHover keeps it for the main chart
+      var onMirrorHover = function (ev) {
+        m.hoverY = ev.type === 'mousemove' ? ev.clientY - m.el.getBoundingClientRect().top : null;
+        if (hoverTagsOn() && m.applyTags) m.applyTags();
+      };
+      m.el.addEventListener('mousemove', onMirrorHover);
+      m.el.addEventListener('mouseleave', onMirrorHover);
     }
     // DOM order = screen order, so Tab walks the panes left to right
     if (i < mainIdx) panes.insertBefore(m.pane, main);
@@ -8329,8 +8338,32 @@ function drawMirror(m, sig, payload, ov) {
   var el = m.el;
   var lc = LightweightCharts.createChart(el, priceChartOptions(el, priceAxisMode(false, on('tLog'))));
   var cs = addPriceCandles(lc, candles);
-  var makeLine = cs.createPriceLine.bind(cs);   // the light theme's wider dashed lines, as on the main chart
-  cs.createPriceLine = function (o) { return makeLine(themedLineSpec(o)); };
+  // the light theme's wider dashed lines, and labels on hover, as trackLineTags does on the main chart
+  var makeLine = cs.createPriceLine.bind(cs), lineTagsHere = [];
+  function tagHit(price) {
+    if (m.hoverY == null) return false;
+    var y = cs.priceToCoordinate(price);
+    return y != null && Math.abs(y - m.hoverY) <= TAG_HIT_PX;
+  }
+  cs.createPriceLine = function (o) {
+    o = themedLineSpec(o);
+    if (!o.title && !o.axisLabelVisible) return makeLine(o);
+    var show = !hoverTagsOn();
+    var line = makeLine(show ? o : Object.assign({}, o, { title: '', axisLabelVisible: false }));
+    lineTagsHere.push({ line: line, p: o.price, title: o.title || '', axis: !!o.axisLabelVisible, shown: show });
+    return line;
+  };
+  m.applyTags = function () {
+    if (m.lc !== lc) return;
+    var hide = hoverTagsOn();
+    lineTagsHere.forEach(function (t) {
+      var show = !hide || tagHit(t.p);
+      if (t.shown === show) return;
+      t.shown = show;
+      t.line.applyOptions(show ? { title: t.title, axisLabelVisible: t.axis } : { title: '', axisLabelVisible: false });
+    });
+    requestAnimationFrame(m.paint);   // the sub-x20 level chips follow the same rule
+  };
   var T = layerTarget(lc, cs, candles), C = linePalette(), rays = [];
   if (on('tThrust')) drawThrust(T, candles);
   var tls = (ov.trendlines || []).filter(function (t) { return on(trendlineToggle(t)); });
@@ -8362,7 +8395,8 @@ function drawMirror(m, sig, payload, ov) {
     cv.style.width = w + 'px'; cv.style.height = h + 'px';
     var ctx = cv.getContext('2d');
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    if (tags.length) paintLevelTags(ctx, T, tags);
+    var shown = hoverTagsOn() ? tags.filter(function (g) { return tagHit(g.p); }) : tags;
+    if (shown.length) paintLevelTags(ctx, T, shown);
   };
   if (tags.length) {
     ts.subscribeVisibleLogicalRangeChange(function () { requestAnimationFrame(m.paint); });
