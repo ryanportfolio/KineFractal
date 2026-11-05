@@ -119,7 +119,30 @@
   /* tour sits flush against the right edge of its toolbar row (#meta carried the
      old auto margin but is hidden, so the row just packed left) */
   #dpAggBadge.hot { color:var(--dpool); font-weight:700; }
-  #chart { flex:1 1 auto; min-height:0; position:relative; }
+  /* chart area: the main chart's pane, plus one view-only pane per other timeframe while
+     "side by side" is on (syncMirrors). Narrow screens stack the panes. */
+  #panes { flex:1 1 auto; min-height:0; display:flex; }
+  .pane { flex:1 1 0; min-width:0; min-height:0; display:flex; flex-direction:column; }
+  #panes.multi .pane + .pane { border-left:1px solid var(--grid); }
+  .paneHead { flex:0 0 auto; display:flex; align-items:baseline; gap:8px; min-height:26px; box-sizing:border-box;
+              padding:3px 8px; border:0; border-bottom:1px solid var(--grid); background:var(--panel);
+              color:var(--mut); font:12px Verdana,Geneva,sans-serif; text-align:left; white-space:nowrap; overflow:hidden; }
+  .paneHead b { color:var(--fg); font-size:14px; }
+  .paneHead .ph-tf { color:var(--sup); }
+  .paneHead .ph-note { overflow:hidden; text-overflow:ellipsis; }
+  button.paneHead { width:100%; cursor:pointer; }
+  button.paneHead:hover, button.paneHead:focus-visible { border-bottom-color:var(--sup); color:var(--fg); }
+  button.paneHead:focus-visible { outline:2px solid var(--sup); outline-offset:-2px; }
+  #mainPane.multi-active .paneHead { border-bottom-color:var(--sup); }
+  .paneHead[hidden] { display:none; }
+  #chart, .mirror { flex:1 1 auto; min-height:0; position:relative; }
+  .mirror .mirrorNote { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+                        padding:12px; color:var(--mut); font-size:13px; text-align:center; pointer-events:none; }
+  @media (max-width:700px) {
+    #panes.multi { flex-direction:column; }
+    #panes.multi .pane + .pane { border-left:0; border-top:1px solid var(--grid); }
+    button.paneHead { min-height:44px; align-items:center; }
+  }
   /* drawing overlay: a canvas (lines) + DOM handle dots, layered above the chart.
      pointer-events:none everywhere EXCEPT the dots, so the chart still pans/zooms. */
   #preview { position:absolute; inset:0; z-index:4; pointer-events:none; }   /* rubber-band / drag ghost (cheap 2D canvas) */
@@ -936,8 +959,8 @@
      right margin, so they shrink beside it instead of sitting under it. JS keeps
      --askTop at the toolbar's bottom edge as the toolbar wraps. */
   :root { --askW:clamp(280px, 30vw, 460px); --askTop:44px; }
-  body.ask-open #factBand, body.ask-open #chart { margin-right:var(--askW); }
-  body.ask-rail #factBand, body.ask-rail #chart { margin-right:52px; }
+  body.ask-open #factBand, body.ask-open #panes { margin-right:var(--askW); }
+  body.ask-rail #factBand, body.ask-rail #panes { margin-right:52px; }
   /* with the dock open the band is narrower: small tiles give room to TREND so the
      band stays one row at 1440 and two at 1024, leaving the chart its height */
   @media (min-width:701px) {
@@ -1159,7 +1182,7 @@
   @media (max-width:700px) {
     /* phones: no room for both, and the wrapped toolbar can fill most of the
        screen, so the open dock is a full-screen sheet (collapse button or Esc) */
-    body.ask-open #factBand, body.ask-open #chart { margin-right:0; }
+    body.ask-open #factBand, body.ask-open #panes { margin-right:0; }
     #askDock[data-mode="open"] { top:0; z-index:50; width:100%; border-left:0; }
   }
   @media (max-width:600px) {
@@ -1260,7 +1283,7 @@
   <span id="factBuyWhy" hidden></span>
 </section>
 <div id="factTip" role="tooltip" hidden></div>
-<div id="chart"><div id="handles"></div><div id="measureBox"></div><div id="tipBox"></div><div id="cmpLegend"></div></div>
+<div id="panes"><div class="pane" id="mainPane"><div class="paneHead" id="mainPaneHead" hidden></div><div id="chart"><div id="handles"></div><div id="measureBox"></div><div id="tipBox"></div><div id="cmpLegend"></div></div></div></div>
 <aside id="askDock" aria-label="Ask about this ticker" data-mode="rail" hidden>
   <div class="ask-rail">
     <button type="button" class="ask-raillabel" aria-label="Open Ask AI"><span>ASK</span><span>AI</span></button>
@@ -1792,8 +1815,10 @@ function fmtUsd(n) { return n >= 1e9 ? (n / 1e9).toFixed(1) + 'B' : Math.round(n
 // nearest candle index for a time (anchors sit on bar times) — bisection.
 // CLAMPS to [0, n-1]: a time past the last real bar returns n-1. Use this for the
 // integer "which bar" (bar counts, magnet snap) — NOT for projecting an x (see below).
-function timeIndexOf(t) {
-  var ct = current.candles, lo = 0, hi = ct.length - 1;
+// ct: the candles to index into; current.candles when left out (the side-by-side panes pass their own)
+function timeIndexOf(t, ct) {
+  ct = ct || current.candles;
+  var lo = 0, hi = ct.length - 1;
   if (!ct.length) return 0;
   while (lo < hi) { var mid = (lo + hi) >> 1; if (ct[mid].time < t) lo = mid + 1; else hi = mid; }
   if (lo > 0 && Math.abs(ct[lo - 1].time - t) <= Math.abs(ct[lo].time - t)) return lo - 1;
@@ -1807,11 +1832,12 @@ function timeIndexOf(t) {
 // future time to n-1, putting the projected x at the LAST real bar while the library drew
 // the series endpoint further right -> the segment and its ray/handles diverged (a kink
 // whenever an anchor sat right of the last candle). Scale-independent (log and linear).
-function logicalIndexOfTime(t) {
-  var ct = current.candles, n = ct.length;
+function logicalIndexOfTime(t, ct) {
+  ct = ct || current.candles;
+  var n = ct.length;
   if (!n) return 0;
   var lastT = ct[n - 1].time;
-  if (t <= lastT || n < 2) return timeIndexOf(t);
+  if (t <= lastT || n < 2) return timeIndexOf(t, ct);
   var barDt = Math.round((lastT - ct[0].time) / (n - 1)) || 1;   // matches redraw()'s whitespace spacing
   return (n - 1) + (t - lastT) / barDt;
 }
@@ -1824,11 +1850,12 @@ function logicalIndexOfTime(t) {
 // PR #367 on merged super lines; recurs whenever a candle reseed shifts bar times under a
 // stored anchor — e.g. a hand-drawn line, or a stale overlay data file). Snapping is a
 // NO-OP for anchors already on the grid, so on-grid auto lines render byte-identically.
-function gridTime(t) {
-  var ct = current.candles, n = ct.length;
+function gridTime(t, ct) {
+  ct = ct || current.candles;
+  var n = ct.length;
   if (!n || t == null) return t;
   var lastT = ct[n - 1].time;
-  if (t <= lastT) return ct[timeIndexOf(t)].time;                // nearest real candle time
+  if (t <= lastT) return ct[timeIndexOf(t, ct)].time;            // nearest real candle time
   if (n < 2) return lastT;
   var barDt = Math.round((lastT - ct[0].time) / (n - 1)) || 1;   // same spacing redraw() gives the whitespace
   var k = Math.round((t - lastT) / barDt);                       // nearest future whitespace slot
@@ -1956,14 +1983,18 @@ function withFutureBars(ct) {
    price) -> pixel projection through THAT chart's own scales, and optionally grid(t), that chart's
    bar-grid snap (the legend's replay charts; without it, the main chart's gridTime). `each`, when
    given, is called once per drawn item; redraw() registers its hover tips there. ---- */
-function layerTarget(ch, cs) {
-  return {
+// candles, when given, are the chart's own (a side-by-side pane's other timeframe): projection
+// and grid snap use them instead of the main chart's
+function layerTarget(ch, cs, candles) {
+  var T = {
     chart: ch, cs: cs,
     project: function (t, p) {
-      var x = ch.timeScale().logicalToCoordinate(logicalIndexOfTime(t)), y = cs.priceToCoordinate(p);
+      var x = ch.timeScale().logicalToCoordinate(logicalIndexOfTime(t, candles)), y = cs.priceToCoordinate(p);
       return (x == null || y == null) ? null : { x: x, y: y };
     }
   };
+  if (candles) T.grid = function (t) { return gridTime(t, candles); };
+  return T;
 }
 // a price line's colour with its transparency (two hex digits). On the light theme a
 // translucent line fades far more against the pale ground than against black, so it keeps
@@ -3572,7 +3603,7 @@ function collapseAskDock() {
 // keyboard like a dialog. Tab and Shift+Tab wrap inside it and the page behind it is
 // inert; both end when it collapses, hides or the screen grows past 700px.
 var ASK_SHEET_MQ = window.matchMedia ? window.matchMedia('(max-width:700px)') : null;
-var ASK_BEHIND = ['#bar', '#factBand', '#chart', '#cmpMenu', '#msg'];
+var ASK_BEHIND = ['#bar', '#factBand', '#panes', '#cmpMenu', '#msg'];
 function askSheetOpen() {
   var dock = document.getElementById('askDock');
   return !!(ASK_SHEET_MQ && ASK_SHEET_MQ.matches && dock && !dock.hidden && dock.getAttribute('data-mode') === 'open');
@@ -8140,15 +8171,207 @@ function renderTfBtns(entry, activeKey) {
     b.className = 'tfbtn' + (k === activeKey ? ' active' : '');
     b.textContent = tf;
     b.title = entry.sym + ' super on ' + tf + ' candles';
-    b.onclick = function () {
-      try { localStorage.setItem(TF_KEY, tf); } catch (e) {}   // the next ticker opens on it too
-      // nothing to do only when k is on screen and nothing newer was asked for; a
-      // failed load leaves k asked for but not shown, so a second click retries it
-      if (_shownKey === k && current && current.key === k) return;
-      show(variantOf(entry, k), true);
-      renderTfBtns(entry, k);
-    };
+    b.onclick = function () { pickTf(entry, tf); };
     wrap.appendChild(b);
+  });
+  var m = document.createElement('button');
+  m.type = 'button';
+  m.id = 'multiTfBtn';
+  m.className = 'tfbtn' + (_multiTf ? ' active' : '');
+  m.textContent = 'side by side';
+  m.setAttribute('aria-pressed', _multiTf ? 'true' : 'false');
+  m.title = 'Show the ' + tfs.slice().reverse().join(', ') + ' charts of ' + entry.sym + ' side by side.'
+          + ' The one picked with the timeframe buttons stays fully interactive; click another pane\'s header to switch to it.';
+  m.onclick = function () {
+    _multiTf = !_multiTf;
+    try { localStorage.setItem(MULTI_KEY, _multiTf ? '1' : '0'); } catch (e) {}
+    // the main chart's pane changes width: keep the same bars in view instead of the
+    // library's default of keeping the bar spacing (which would show a third of them)
+    var lr = chart && chart.timeScale().getVisibleLogicalRange();
+    renderTfBtns(entry, activeKey);
+    syncMirrors();
+    if (lr) requestAnimationFrame(function () {
+      if (!chart) return;
+      var el = document.getElementById('chart');
+      chart.resize(el.clientWidth, el.clientHeight);
+      chart.timeScale().setVisibleLogicalRange(lr);
+    });
+    var again = document.getElementById('multiTfBtn');
+    if (again) again.focus();   // the row was rebuilt; keep the keyboard on the toggle
+  };
+  wrap.appendChild(m);
+}
+// switch the ticker's candles to tf: the timeframe buttons and a side-by-side pane's header
+function pickTf(entry, tf) {
+  var k = entry.tf_keys[tf];
+  try { localStorage.setItem(TF_KEY, tf); } catch (e) {}   // the next ticker opens on it too
+  // nothing to do only when k is on screen and nothing newer was asked for; a
+  // failed load leaves k asked for but not shown, so a second click retries it
+  if (_shownKey === k && current && current.key === k) return;
+  show(variantOf(entry, k), true);
+  renderTfBtns(entry, k);
+}
+
+// ---- side by side: every timeframe of the ticker at once -------------------------
+// Off by default; the "side by side" toggle in the timeframe row turns it on and this
+// browser keeps the choice. The main chart stays the one picked with the timeframe
+// buttons (drawing, hover details, compare, the tour all work there). Each other
+// timeframe gets a view-only pane with the same layer toggles, drawn by the shared
+// per-layer functions on its own candles. Longest candles on the left, like a
+// weekly / daily / hourly layout. Not drawn on the view-only panes: hand-drawn lines,
+// the dark-pool, block-print, gamma-flip and options-activity layers, lines hidden
+// with Delete, and compare lines.
+var MULTI_KEY = 'kf-chart-multi-tf-v1';
+var _multiTf = false;
+try { _multiTf = localStorage.getItem(MULTI_KEY) === '1'; } catch (e) {}
+var _mirrors = {};   // data key -> {key, tf, pane, el, lc, ro, sig, view, paint}
+var MIRROR_TOGGLES = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tGaps', 'tThrust',
+                      'tConfl', 'tOB', 'tOBM', 'tPD', 'tLog'];
+// the ticker on screen when side by side applies to it, else null
+function multiTfEntry() {
+  if (!_multiTf || !current) return null;
+  var cur = currentSuper();
+  var e = cur && superMap[cur.sym];
+  return e && tfList(e).length >= 2 ? e : null;
+}
+function paneHeadHtml(sym, tf, note) {
+  return '<b>' + escHtml(sym) + ' <span class="ph-tf">' + escHtml(tf) + '</span></b><span class="ph-note">' + note + '</span>';
+}
+function dropMirror(m) {
+  if (m.ro) m.ro.disconnect();
+  if (m.lc) m.lc.remove();
+  m.lc = null;
+  m.pane.remove();
+  delete _mirrors[m.key];
+}
+function syncMirrors() {
+  var entry = multiTfEntry();
+  var panes = document.getElementById('panes'), main = document.getElementById('mainPane');
+  var head = document.getElementById('mainPaneHead');
+  panes.classList.toggle('multi', !!entry);
+  main.classList.toggle('multi-active', !!entry);
+  if (!entry) {
+    Object.keys(_mirrors).forEach(function (k) { dropMirror(_mirrors[k]); });
+    head.hidden = true;
+    return;
+  }
+  var tfs = tfList(entry).slice().reverse();   // longest candles on the left
+  var mainIdx = -1;
+  tfs.forEach(function (tf, i) { if (entry.tf_keys[tf] === current.key) mainIdx = i; });
+  var mainTf = mainIdx >= 0 ? tfs[mainIdx] : '2h';
+  head.innerHTML = paneHeadHtml(entry.sym, mainTf, 'interactive');
+  head.hidden = false;
+  // what the panes draw: a change rebuilds them, anything else leaves them (and their pan/zoom) alone
+  var sig = [lightTheme() ? 'L' : 'D'].concat(MIRROR_TOGGLES.map(function (id) {
+    return document.getElementById(id).checked ? 1 : 0;
+  })).join('');
+  var keep = {};
+  tfs.forEach(function (tf, i) {
+    var key = entry.tf_keys[tf];
+    if (key === current.key) return;
+    keep[key] = true;
+    var m = _mirrors[key];
+    if (!m) {
+      m = _mirrors[key] = { key: key, tf: tf, sym: entry.sym, sig: null, lc: null, view: null };
+      m.pane = document.createElement('div');
+      m.pane.className = 'pane';
+      var hb = document.createElement('button');
+      hb.type = 'button';
+      hb.className = 'paneHead';
+      hb.innerHTML = paneHeadHtml(entry.sym, tf, 'view only · click to make it the interactive chart');
+      hb.setAttribute('aria-label', entry.sym + ' ' + tf + ' chart, view only. Make it the interactive chart');
+      hb.onclick = function () { pickTf(entry, tf); };
+      m.el = document.createElement('div');
+      m.el.className = 'mirror';
+      m.pane.appendChild(hb);
+      m.pane.appendChild(m.el);
+      m.ro = new ResizeObserver(function () {
+        if (!m.lc) return;
+        m.lc.resize(m.el.clientWidth, m.el.clientHeight);
+        if (m.paint) requestAnimationFrame(m.paint);
+      });
+      m.ro.observe(m.el);
+    }
+    // DOM order = screen order, so Tab walks the panes left to right
+    if (i < mainIdx) panes.insertBefore(m.pane, main);
+    else panes.appendChild(m.pane);
+    if (m.sig !== sig) buildMirror(m, sig);
+  });
+  Object.keys(_mirrors).forEach(function (k) { if (!keep[k]) dropMirror(_mirrors[k]); });
+}
+function mirrorNote(m, text) {
+  var n = document.createElement('p');
+  n.className = 'mirrorNote';
+  n.textContent = text;
+  m.el.appendChild(n);
+}
+function buildMirror(m, sig) {
+  m.sig = sig;
+  if (!m.lc) { m.el.innerHTML = ''; mirrorNote(m, 'loading ' + m.sym + ' ' + m.tf + ' …'); }
+  loadOnce(window.FEARLAB_REG, 'data-', m.key, function (payload) {
+    loadOnce(window.FEARLAB_OVERLAYS, 'overlays-', m.key,
+      function (ov) { drawMirror(m, sig, payload, ov); },
+      function () { drawMirror(m, sig, payload, { trendlines: [], hlevels: [] }); });   // no sidecar yet: still show candles
+  }, function () {
+    if (_mirrors[m.key] !== m || m.sig !== sig) return;
+    m.sig = null;   // the next redraw tries again
+    m.el.innerHTML = '';
+    mirrorNote(m, 'Could not load the ' + m.tf + ' chart. Click its header to open it on the interactive chart.');
+  });
+}
+function drawMirror(m, sig, payload, ov) {
+  if (_mirrors[m.key] !== m || m.sig !== sig) return;   // the pane closed or changed while this loaded
+  var candles = payload.candles || [];
+  if (m.lc) { m.view = m.lc.timeScale().getVisibleLogicalRange() || m.view; m.lc.remove(); m.lc = null; }
+  m.el.innerHTML = '';
+  if (!candles.length) { mirrorNote(m, 'No ' + m.tf + ' candles for ' + m.sym + ' yet.'); return; }
+  function on(id) { return document.getElementById(id).checked; }
+  var el = m.el;
+  var lc = LightweightCharts.createChart(el, priceChartOptions(el, priceAxisMode(false, on('tLog'))));
+  var cs = addPriceCandles(lc, candles);
+  var makeLine = cs.createPriceLine.bind(cs);   // the light theme's wider dashed lines, as on the main chart
+  cs.createPriceLine = function (o) { return makeLine(themedLineSpec(o)); };
+  var T = layerTarget(lc, cs, candles), C = linePalette(), rays = [];
+  if (on('tThrust')) drawThrust(T, candles);
+  var tls = (ov.trendlines || []).filter(function (t) { return on(trendlineToggle(t)); });
+  drawTrendlines(T, tls, null, null);
+  rays = rays.concat(trendlineRays(tls, C, null));
+  if (on('tStruct')) {
+    var rx = ov.structural || [];
+    drawStructural(T, rx, null, null);
+    rays = rays.concat(structuralRays(rx, C, null));
+  }
+  cs.attachPrimitive(rayPrimitiveFor(function () { return rays; }, T.project, T.grid));
+  var tags = on('tLevels') ? drawLevels(T, ov.hlevels || []) : [];
+  if (on('tGaps')) drawGaps(T, ov.gaps || []);
+  if (on('tConfl')) drawConfluences(T, ov.confluences || []);
+  if (on('tOB') || on('tOBM')) drawOrderBlocks(T, ov.orderblocks || [], on('tOB'), on('tOBM'));
+  if (on('tPD') && ov.pd) drawPremiumDiscount(T, ov.pd);
+  m.lc = lc;
+  var n = candles.length, ts = lc.timeScale();
+  ts.setVisibleLogicalRange(m.view || { from: Math.max(0, n - DEFAULT_BARS), to: n - 1 + 8 });
+  ts.subscribeVisibleLogicalRangeChange(function (lr) { if (lr && m.lc === lc) m.view = lr; });
+  // the sub-x20 level chips, on a canvas over the pane like the main chart's
+  var cv = document.createElement('canvas');
+  cv.style.cssText = 'position:absolute;inset:0;z-index:4;pointer-events:none';
+  el.appendChild(cv);
+  m.paint = function () {
+    if (m.lc !== lc) return;
+    var w = el.clientWidth, h = el.clientHeight, dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    cv.style.width = w + 'px'; cv.style.height = h + 'px';
+    var ctx = cv.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (tags.length) paintLevelTags(ctx, T, tags);
+  };
+  if (tags.length) {
+    ts.subscribeVisibleLogicalRangeChange(function () { requestAnimationFrame(m.paint); });
+    lc.subscribeCrosshairMove(function () { requestAnimationFrame(m.paint); });   // stays glued during a price-axis drag
+  }
+  requestAnimationFrame(function () {
+    if (m.lc !== lc) return;
+    lc.resize(el.clientWidth, el.clientHeight);
+    m.paint();
   });
 }
 // A ticker opens on the timeframe last picked with the 2h/4h/1d buttons (kept in this
@@ -9028,6 +9251,9 @@ function wireCompare() {
 
 function redraw() {
   if (!current) return;
+  // side by side: the other timeframes' panes follow this chart's ticker and toggles. Laid
+  // out first, so the chart below is made at its pane's width and opens on its full window.
+  syncMirrors();
   var el = document.getElementById('chart');
   if (ro) { ro.disconnect(); ro = null; }
   if (chart) { chart.remove(); chart = null; }
