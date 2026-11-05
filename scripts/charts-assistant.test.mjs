@@ -13,7 +13,7 @@ function fnBody(name) {
 
 test("fact band sits between the toolbar and the chart, hidden until signed in", () => {
   assert.match(html, /<\/div>\s*<section id="factBand"[^>]*data-state="loading"[^>]*hidden>/);
-  assert.match(html, /<\/section>\s*<div id="factTip" role="tooltip" hidden><\/div>\s*<div id="chart">/);
+  assert.match(html, /<\/section>\s*<div id="factTip" role="tooltip" hidden><\/div>\s*<div id="panes"><div class="pane" id="mainPane">.*?<div id="chart">/);
   assert.match(html, /#factBand\[hidden\] \{ display:none; \}/);
   assert.match(html, /#factBand \{[^}]*flex:0 0 auto;[^}]*flex-wrap:wrap/s);
 });
@@ -131,8 +131,8 @@ test("ASK AI: a top-row button toggles a right-side dock and a 52px rail, signed
   assert.match(html, /<button id="askAiBtn" type="button" aria-expanded="false" aria-controls="askDock" hidden>ASK AI<\/button>/);
   assert.match(html, /<aside id="askDock"[^>]*data-mode="rail" hidden>/);
   assert.match(html, /#askDock\[data-mode="rail"\] \{ width:52px; \}/);
-  assert.match(html, /body\.ask-open #factBand, body\.ask-open #chart \{ margin-right:var\(--askW\); \}/);
-  assert.match(html, /body\.ask-rail #factBand, body\.ask-rail #chart \{ margin-right:52px; \}/);
+  assert.match(html, /body\.ask-open #factBand, body\.ask-open #panes \{ margin-right:var\(--askW\); \}/);
+  assert.match(html, /body\.ask-rail #factBand, body\.ask-rail #panes \{ margin-right:52px; \}/);
   const render = fnBody("renderAskDock");
   assert.match(render, /var on = SITE && siteUser === true;/);
   assert.match(render, /btn\.hidden = !on;\s*dock\.hidden = !on;/);
@@ -598,7 +598,7 @@ test("Limit Buy answers carry no stale buy prices while Min/Max is invalid or th
 
 test("phones: the full-screen dock keeps keyboard focus inside it", () => {
   assert.match(html, /var ASK_SHEET_MQ = window\.matchMedia \? window\.matchMedia\('\(max-width:700px\)'\) : null;/);
-  assert.match(html, /var ASK_BEHIND = \['#bar', '#factBand', '#chart'/);
+  assert.match(html, /var ASK_BEHIND = \['#bar', '#factBand', '#panes'/);
   assert.match(fnBody("askSheetOpen"), /dock\.getAttribute\('data-mode'\) === 'open'/);
   const upd = fnBody("updateAskSheet");
   assert.match(upd, /ASK_BEHIND\.forEach/);
