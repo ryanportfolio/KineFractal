@@ -7,3 +7,8 @@
 
 # The /charts/ page: kept LF so edits never produce a whole-file diff.
 server/charts-app/charts.html text eol=lf
+# The envelope math file the page loads: LF too, so the bytes the server hashes match on every checkout.
+server/charts-app/nwe-envelope.js text eol=lf
+# The envelope's expected numbers, a byte-for-byte copy of the engine repo's file that a test checks
+# by sha256: never convert its line endings.
+scripts/fixtures/nwe_expected.v1.json -text

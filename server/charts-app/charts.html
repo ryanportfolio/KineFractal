@@ -46,7 +46,7 @@
   html[data-theme="light"] #removeTickerDialog, html[data-theme="light"] #tickerReorderDialog,
   html[data-theme="light"] #exportDialog { background:rgba(58,50,38,.36); }
   html[data-theme="light"] .symbtn::after, html[data-theme="light"] #measureBox, html[data-theme="light"] #tipBox,
-  html[data-theme="light"] #cmpMenu, html[data-theme="light"] .tkfind, html[data-theme="light"] .tour-card,
+  html[data-theme="light"] #cmpMenu, html[data-theme="light"] #nweMenu, html[data-theme="light"] .tkfind, html[data-theme="light"] .tour-card,
   html[data-theme="light"] #siteMenu, html[data-theme="light"] #acctMenu, html[data-theme="light"] .box,
   html[data-theme="light"] #askDock .ask-railbtn::after { box-shadow:0 8px 24px rgba(58,50,38,.18); }
   html[data-theme="light"] #legend2 { --lg-txt:var(--fg); --lg-sec:var(--mut); --lg-rule:var(--grid); background:var(--bg); }
@@ -186,6 +186,30 @@
   #cmpList .sym { font-weight:bold; }
   #cmpList .nm { overflow:hidden; color:var(--mut); font-size:14px; white-space:nowrap; text-overflow:ellipsis; }
   #cmpList .note { margin:4px; color:var(--mut); font-size:14px; }
+  /* NW envelope: the settings button beside its toggle, and the settings panel under it
+     (built like the compare picker above) */
+  #nweGrp { display:inline-flex; gap:4px; align-items:center; }
+  #nweSetBtn { padding:1px 5px; font-size:14px; line-height:1.2; }
+  #nweSetBtn[aria-expanded="true"] { border-color:var(--sup); color:var(--sup); }
+  #nweMenu { position:fixed; z-index:70; display:flex; flex-direction:column; gap:5px; width:290px; max-width:calc(100vw - 8px);
+             overflow:auto; padding:10px; background:var(--panel); border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5);
+             font-size:14px; white-space:normal; }
+  #nweMenu[hidden] { display:none; }
+  #nweMenu label { display:block; margin-top:3px; color:var(--mut); cursor:default; }
+  #nweMenu input, #nweMenu select { width:100%; background:var(--bg); color:var(--fg); border:1px solid var(--grid);
+                                    border-radius:0; padding:5px 6px; font:inherit; }
+  #nweMenu input[aria-invalid="true"] { border-color:var(--csell); }
+  #nweMenu p { margin:0; line-height:1.4; }
+  #nweMenu .nwe-msg { color:var(--csell); }
+  #nweMenu .nwe-note { color:var(--mut); }
+  #nweMenu #nweReset { margin-top:5px; padding:5px 8px; }
+  #nweMenu input:disabled, #nweMenu select:disabled, #nweMenu button:disabled { opacity:.5; cursor:not-allowed; }
+  #nweSetBtn:focus-visible, #nweMenu input:focus-visible, #nweMenu select:focus-visible,
+  #nweMenu button:focus-visible { outline:2px solid var(--sup); outline-offset:1px; }
+  @media (max-width:600px) {
+    #nweSetBtn { min-width:44px; min-height:44px; }
+    #nweMenu input, #nweMenu select, #nweMenu button { min-height:44px; }
+  }
   /* ticker search under an add box: "netflix" or "NF" lists the tickers it could be */
   .tkfind { position:fixed; z-index:95; width:360px; max-width:calc(100vw - 8px); overflow:auto; padding:4px 0; background:var(--panel);
             border:1px solid var(--grid); box-shadow:0 6px 18px rgba(0,0,0,.5); font:14px monospace; }
@@ -1213,6 +1237,27 @@
   <label title="unusual options activity — strikes with the most traded $-premium; ⚡/⚡⚡/⚡⚡⚡/⚡⚡⚡⚡ = vol/OI &gt;=1x/3x/10x/30x (escalating new positioning); green=call red=put (viz/context only)"><input type="checkbox" id="tUoa"><span class="swatch" style="background:linear-gradient(90deg,var(--uoac),var(--uoap))"></span>UOA</label>
   <label title="unfilled gaps"><input type="checkbox" id="tGaps" checked><span class="swatch" style="background:var(--gap)"></span>GP</label>
   <label title="high-conviction bars: price move, volatility, and volume all spike together"><input type="checkbox" id="tThrust"><span class="swatch" style="background:var(--thr)"></span>TH</label>
+  <span id="nweGrp"><label title="A band around a smoothed line of price. Price near or under the lower band is stretched down, and near or over the upper band it is stretched up."><input type="checkbox" id="tNwe"><span class="swatch" style="background:linear-gradient(90deg,var(--cbuy),var(--csell))"></span>NW</label><button id="nweSetBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="nweMenu" aria-label="Envelope settings" title="envelope settings">&#9881;&#xFE0E;</button></span>
+  <!-- The settings panel sits right after its button so that Tab and Shift+Tab move between the
+       toolbar and the panel in order. It is position:fixed, so it takes no room in the toolbar. -->
+  <div id="nweMenu" role="dialog" aria-label="Envelope settings" hidden>
+    <p id="nweFor" class="nwe-note"></p>
+    <label for="nweBw">Bandwidth (how much the price is smoothed)</label>
+    <input id="nweBw" type="number" min="1" max="200" step="0.5" autocomplete="off" aria-describedby="nweBwMsg">
+    <p id="nweBwMsg" class="nwe-msg" role="alert" hidden>Enter a number from 1 to 200. The last good value is still in use.</p>
+    <label for="nweMult">Multiplier (how far the bands sit from the smoothed price)</label>
+    <input id="nweMult" type="number" min="0" max="10" step="0.1" autocomplete="off" aria-describedby="nweMultMsg">
+    <p id="nweMultMsg" class="nwe-msg" role="alert" hidden>Enter a number from 0 to 10. The last good value is still in use.</p>
+    <label for="nweSrc">Price used</label>
+    <select id="nweSrc"></select>
+    <label for="nweWidth">Band width</label>
+    <select id="nweWidth" aria-describedby="nweWidthNote">
+      <option value="edge">Narrower band</option>
+      <option value="alert">Wider band</option>
+    </select>
+    <p id="nweWidthNote" class="nwe-note">Narrower is what the right-hand edge of the TradingView chart shows each day. Wider is what the TradingView alert uses.</p>
+    <button id="nweReset" type="button">Reset to defaults</button>
+  </div>
   <label title="confluence zones"><input type="checkbox" id="tConfl" checked><span class="swatch" style="background:var(--cbuy)"></span>CF</label>
   <label title="order blocks (fresh / unmitigated)"><input type="checkbox" id="tOB" checked><span class="swatch" style="background:var(--cbuy)"></span>OB</label>
   <label title="tested / mitigated order blocks"><input type="checkbox" id="tOBM"><span class="swatch" style="background:var(--mut)"></span>tOB</label>
@@ -1522,6 +1567,9 @@
   </div>
 </div>
 
+<!-- The NW envelope's math (window.NWEnvelope). The server swaps the token for the file's
+     content hash. If the file does not load, the page still works and the NW toggle draws nothing. -->
+<script src="nwe-envelope.js?v=__NWE_ENVELOPE_VERSION__"></script>
 <script>
 /* ---- bootstrap: ensure the chart lib, then the board index, then render ----
    Chart data comes from the engine worker's published run, proxied by the site at
@@ -1580,7 +1628,7 @@ var VIEW_KEY = 'fearlab_view';
 var SEL_KEY = 'fearlab_charts_sel';   // last-selected combo key, restored on reload
 var PREFS_KEY = 'fearlab_chart_prefs_v1';
 var PREF_IDS = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tDpool', 'tDpoolBlk',
-                'tGex', 'tUoa', 'tGaps', 'tThrust', 'tConfl', 'tOB', 'tOBM', 'tPD', 'tLog', 'tMine', 'tSnap'];
+                'tGex', 'tUoa', 'tGaps', 'tThrust', 'tNwe', 'tConfl', 'tOB', 'tOBM', 'tPD', 'tLog', 'tMine', 'tSnap'];
 
 // Display preferences are global across every symbol/timeframe. Restore only
 // recognized booleans so old/corrupt storage can never block chart startup.
@@ -2226,6 +2274,47 @@ function drawThrust(T, candles, each) {
   });
   T.cs.setMarkers(markers);
   return markers.length;
+}
+// NW: the envelope's lower and upper band as two line series on T, one point per candle at the
+// candle's own time, from settings s ({bandwidth, mult, source, width}). The marks are markers on
+// those two series (an up arrow under the lower band where the source crosses under it, a down
+// arrow over the upper band where it crosses over), so TH keeps the candle series' markers to
+// itself. The math is nwe-envelope.js (window.NWEnvelope). Returns what it drew, {lower, upper}
+// as given to the series and {up, down} as candle times, or null when it drew nothing.
+var _nweWarned = false;
+function nweWarn(text) {
+  if (_nweWarned) return;   // one console line at most, however often the chart is redrawn
+  _nweWarned = true;
+  if (window.console && console.warn) console.warn('NW envelope: ' + text);
+}
+function drawNwe(T, candles, s) {
+  var L = window.NWEnvelope;
+  if (!L) { nweWarn('its script did not load, so nothing is drawn. Reload the page to try again.'); return null; }
+  var n = candles.length, lower = [], upper = [], marks;
+  if (!n) return null;
+  try {
+    var src = L.source(candles, s.source), env = L.envelope(src, s.bandwidth, s.mult, s.width);
+    marks = L.marks(src, env.centre, env.half);
+    for (var i = 0; i < n; i++) {
+      var lo = env.centre[i] - env.half[i], hi = env.centre[i] + env.half[i];
+      if (!isFinite(lo) || !isFinite(hi)) throw new RangeError('no band value at bar ' + i);
+      lower.push({ time: candles[i].time, value: lo });
+      upper.push({ time: candles[i].time, value: hi });
+    }
+  } catch (e) {
+    nweWarn('the bands could not be worked out, so nothing is drawn (' + (e && e.message) + ').');
+    return null;
+  }
+  function band(color, data, bars, position, shape) {
+    var ls = T.chart.addLineSeries({ color: color, lineWidth: 2, priceLineVisible: false, crosshairMarkerVisible: false });
+    ls.setData(data);   // lastValueVisible stays on: the band's latest price shows on the price axis
+    var times = bars.map(function (i) { return candles[i].time; });
+    ls.setMarkers(times.map(function (t) { return { time: t, position: position, color: color, shape: shape, size: 1 }; }));
+    return times;
+  }
+  var up = band(getCss('--cbuy'), lower, marks.up, 'belowBar', 'arrowUp');
+  var down = band(getCss('--csell'), upper, marks.down, 'aboveBar', 'arrowDown');
+  return { lower: lower, upper: upper, up: up, down: down };
 }
 
 function rayLineList() {
@@ -3605,7 +3694,7 @@ function collapseAskDock() {
 // keyboard like a dialog. Tab and Shift+Tab wrap inside it and the page behind it is
 // inert; both end when it collapses, hides or the screen grows past 700px.
 var ASK_SHEET_MQ = window.matchMedia ? window.matchMedia('(max-width:700px)') : null;
-var ASK_BEHIND = ['#bar', '#factBand', '#panes', '#cmpMenu', '#msg'];
+var ASK_BEHIND = ['#bar', '#factBand', '#panes', '#cmpMenu', '#nweMenu', '#msg'];
 function askSheetOpen() {
   var dock = document.getElementById('askDock');
   return !!(ASK_SHEET_MQ && ASK_SHEET_MQ.matches && dock && !dock.hidden && dock.getAttribute('data-mode') === 'open');
@@ -5342,7 +5431,7 @@ function sendMine() {
 var _soloSnap = null;
 function toggleSolo() {
   var SYS = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tDpool', 'tDpoolBlk',
-             'tGex', 'tUoa', 'tGaps', 'tThrust', 'tConfl', 'tOB', 'tOBM', 'tPD'];
+             'tGex', 'tUoa', 'tGaps', 'tThrust', 'tNwe', 'tConfl', 'tOB', 'tOBM', 'tPD'];
   var btn = document.getElementById('soloBtn');
   if (_soloSnap) {                                   // restore the pre-solo layer state
     SYS.forEach(function (id) { document.getElementById(id).checked = _soloSnap[id]; });
@@ -8227,7 +8316,7 @@ var MULTI_KEY = 'kf-chart-multi-tf-v1';
 var _multiTf = false;
 try { _multiTf = localStorage.getItem(MULTI_KEY) === '1'; } catch (e) {}
 var _mirrors = {};   // data key -> {key, tf, pane, el, lc, ro, sig, view, paint}
-var MIRROR_TOGGLES = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tGaps', 'tThrust',
+var MIRROR_TOGGLES = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tGaps', 'tThrust', 'tNwe',
                       'tConfl', 'tOB', 'tOBM', 'tPD', 'tLog'];
 // the ticker on screen when side by side applies to it, else null
 function multiTfEntry() {
@@ -8267,6 +8356,8 @@ function syncMirrors() {
   var sig = [lightTheme() ? 'L' : 'D'].concat(MIRROR_TOGGLES.map(function (id) {
     return document.getElementById(id).checked ? 1 : 0;
   })).join('');
+  // each pane draws the NW envelope with its own timeframe's settings: a settings change rebuilds them
+  if (document.getElementById('tNwe').checked) sig += JSON.stringify(nweStore());
   var keep = {};
   tfs.forEach(function (tf, i) {
     var key = entry.tf_keys[tf];
@@ -8367,6 +8458,7 @@ function drawMirror(m, sig, payload, ov) {
   };
   var T = layerTarget(lc, cs, candles), C = linePalette(), rays = [];
   if (on('tThrust')) drawThrust(T, candles);
+  if (on('tNwe')) drawNwe(T, candles, nweSettings(nweKey(m.tf)));
   var tls = (ov.trendlines || []).filter(function (t) { return on(trendlineToggle(t)); });
   drawTrendlines(T, tls, null, null);
   rays = rays.concat(trendlineRays(tls, C, null));
@@ -8489,6 +8581,7 @@ function buildDropdown() {
   tickerReorderDialog.onclick = function (e) { if (e.target === tickerReorderDialog) closeTickerReorder(); };
   wireExportDialog();
   wireCompare();
+  wireNwe();
   var addSearch = wireTickerSearch(document.getElementById('addSym'), document.body, function () { doAddTicker(); });
   document.getElementById('addBtn').onclick = addSearch.submit;
   PREF_IDS.forEach(function (id) {
@@ -8564,6 +8657,14 @@ function buildDropdown() {
       return;
     }
     var onField = document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName);
+    // The envelope settings panel: Esc closes it and hands focus back to its button. A key
+    // pressed in one of its boxes is typing and goes no further (Backspace there must not
+    // delete a selected line). With focus on the panel's buttons, other keys reach the
+    // shortcuts below as usual.
+    if (nweMenuOpen()) {
+      if (e.key === 'Escape') { e.preventDefault(); closeNweMenu(true); return; }
+      if (onField) return;
+    }
     if (_tourActive) {                       // tour is modal: claim Esc/arrows before draw-mode logic
       if (e.key === 'Escape') { endTour(); return; }
       if (e.key === 'ArrowRight') { tourNext(); return; }
@@ -9286,6 +9387,177 @@ function wireCompare() {
   };
 }
 
+// ---- NW envelope: settings, kept per timeframe in this browser ---------------------
+// The NW toggle draws two bands around a smoothed price line (drawNwe). Its four settings
+// are kept under NWE_KEY as one entry per timeframe, each with all four fields:
+//   {"1d": {"bandwidth": 8, "mult": 3, "source": "close", "width": "alert"}, "4h": {...}}
+// A timeframe without a usable entry draws with NWEnvelope.DEFAULTS; a chart without a
+// 2h / 4h / 1d timeframe uses the entry "other". Nothing is kept in the account.
+var NWE_KEY = 'kf-nwe-settings-v1';
+var NWE_SOURCE_NAMES = { open: 'Open', high: 'High', low: 'Low', close: 'Close', hl2: 'Average of high and low',
+                         hlc3: 'Average of high, low and close', ohlc4: 'Average of open, high, low and close' };
+var _nweStore = null;       // what NWE_KEY holds, read once
+var _nweDrawn = null;       // what the main chart draws now (drawNwe's answer), or null
+var _nweFieldsKey = null;   // the entry the settings boxes show
+function nweKey(tf) { return TF_ORDER.indexOf(tf) >= 0 ? tf : 'other'; }
+// the timeframe on screen: '2h', '4h' or '1d', else null
+function nweTf() { var cur = currentSuper(); return cur && TF_ORDER.indexOf(cur.tf) >= 0 ? cur.tf : null; }
+// the literal is only what KFNwe.snapshot() reports if the math file did not load
+function nweDefaults() {
+  var d = (window.NWEnvelope && window.NWEnvelope.DEFAULTS) || { bandwidth: 17, mult: 2.4, source: 'low', width: 'edge' };
+  return { bandwidth: d.bandwidth, mult: d.mult, source: d.source, width: d.width };
+}
+// a number inside the allowed range of its box (the box's own min and max)
+function nweNumberOk(v, id) {
+  var el = document.getElementById(id);
+  return typeof v === 'number' && isFinite(v) && v >= Number(el.min) && v <= Number(el.max);
+}
+function nweValid(s) {
+  var L = window.NWEnvelope;
+  return !!L && !!s && typeof s === 'object' && nweNumberOk(s.bandwidth, 'nweBw') && nweNumberOk(s.mult, 'nweMult')
+    && L.SOURCES.indexOf(s.source) >= 0 && L.WIDTHS.indexOf(s.width) >= 0;
+}
+function nweStore() {
+  if (_nweStore) return _nweStore;
+  var v = null;
+  try { v = JSON.parse(localStorage.getItem(NWE_KEY) || 'null'); } catch (e) {}
+  _nweStore = (v && typeof v === 'object' && !Array.isArray(v)) ? v : {};
+  return _nweStore;
+}
+function nweSaveStore() { try { localStorage.setItem(NWE_KEY, JSON.stringify(nweStore())); } catch (e) {} }
+// the settings in force for one entry: the stored ones when every field is usable, else the defaults
+function nweSettings(key) {
+  var st = nweStore(), s = Object.prototype.hasOwnProperty.call(st, key) ? st[key] : null;
+  return nweValid(s) ? { bandwidth: s.bandwidth, mult: s.mult, source: s.source, width: s.width } : nweDefaults();
+}
+function nweMark(id, ok) {
+  var el = document.getElementById(id);
+  if (ok) el.removeAttribute('aria-invalid'); else el.setAttribute('aria-invalid', 'true');
+  document.getElementById(id + 'Msg').hidden = ok;
+}
+// show the settings of the timeframe on screen in the boxes
+function nweSyncFields() {
+  var key = nweKey(nweTf()), s = nweSettings(key);
+  _nweFieldsKey = key;
+  document.getElementById('nweBw').value = String(s.bandwidth);
+  document.getElementById('nweMult').value = String(s.mult);
+  document.getElementById('nweSrc').value = s.source;
+  document.getElementById('nweWidth').value = s.width;
+  nweMark('nweBw', true); nweMark('nweMult', true);
+  document.getElementById('nweFor').textContent = !window.NWEnvelope ? 'The envelope could not load. Reload the page to try again.'
+    : key === 'other' ? 'These settings are for charts without a 2h, 4h or 1d timeframe.'
+    : 'These settings are for ' + key + ' charts. Each timeframe keeps its own.';
+}
+// a box changed: every usable value applies at once; an empty, non-numeric or out-of-range
+// number is refused, its box is marked and the last good value stays in force and drawn.
+// A box emptied to retype its number is not marked while it still has focus: the error line
+// (which screen readers announce) waits until the visitor leaves the box empty.
+function nweApplyFields(e) {
+  var L = window.NWEnvelope;
+  if (!L) return;
+  var key = nweKey(nweTf()), cur = nweSettings(key);
+  var next = { bandwidth: cur.bandwidth, mult: cur.mult, source: cur.source, width: cur.width };
+  var typing = !!e && e.type === 'input';   // not change or blur: the visitor has not left the box
+  [['nweBw', 'bandwidth'], ['nweMult', 'mult']].forEach(function (f) {
+    var el = document.getElementById(f[0]), text = el.value.trim(), v = Number(text);   // '' when the box holds no number
+    var ok = text !== '' && nweNumberOk(v, f[0]);
+    var retyping = text === '' && typing && document.activeElement === el;
+    nweMark(f[0], ok || retyping);
+    if (ok) next[f[1]] = v;
+  });
+  var src = document.getElementById('nweSrc').value, width = document.getElementById('nweWidth').value;
+  if (L.SOURCES.indexOf(src) >= 0) next.source = src;
+  if (L.WIDTHS.indexOf(width) >= 0) next.width = width;
+  if (nweMenuOpen()) placeNweMenu();   // a message line changes the panel's height
+  if (next.bandwidth === cur.bandwidth && next.mult === cur.mult && next.source === cur.source && next.width === cur.width) return;
+  nweStore()[key] = next;
+  nweSaveStore();
+  if (current && document.getElementById('tNwe').checked) redraw();
+}
+function nweReset() {
+  delete nweStore()[nweKey(nweTf())];
+  nweSaveStore();
+  nweSyncFields();
+  if (nweMenuOpen()) placeNweMenu();
+  if (current && document.getElementById('tNwe').checked) redraw();
+}
+function nweMenuOpen() { return !document.getElementById('nweMenu').hidden; }
+// under the button, moved left or up as far as needed to stay on screen
+function placeNweMenu() {
+  var menu = document.getElementById('nweMenu'), r = document.getElementById('nweSetBtn').getBoundingClientRect();
+  menu.style.maxHeight = (window.innerHeight - 8) + 'px';
+  menu.style.left = Math.max(4, Math.min(window.innerWidth - menu.offsetWidth - 4, r.left)) + 'px';
+  menu.style.top = Math.max(4, Math.min(window.innerHeight - menu.offsetHeight - 4, r.bottom + 4)) + 'px';
+}
+function openNweMenu() {
+  nweSyncFields();
+  document.getElementById('nweMenu').hidden = false;
+  placeNweMenu();
+  document.getElementById('nweSetBtn').setAttribute('aria-expanded', 'true');
+  var first = document.getElementById('nweBw');
+  if (!first.disabled) first.focus();
+}
+function closeNweMenu(refocus) {
+  if (!nweMenuOpen()) return;
+  document.getElementById('nweMenu').hidden = true;
+  document.getElementById('nweSetBtn').setAttribute('aria-expanded', 'false');
+  if (refocus) document.getElementById('nweSetBtn').focus();
+}
+function wireNwe() {
+  var L = window.NWEnvelope, src = document.getElementById('nweSrc');
+  (L ? L.SOURCES : []).forEach(function (kind) {
+    var o = document.createElement('option');
+    o.value = kind;
+    o.textContent = NWE_SOURCE_NAMES[kind] || kind;
+    src.appendChild(o);
+  });
+  ['nweBw', 'nweMult', 'nweSrc', 'nweWidth', 'nweReset'].forEach(function (id) {
+    var el = document.getElementById(id);
+    if (!L) { el.disabled = true; return; }   // no math file: nothing to set
+    if (id === 'nweReset') {
+      el.onclick = nweReset;
+      // a press on Reset leaves focus where it is: taking it out of an emptied number box would show
+      // that box's error line first, which moves this button from under the pointer before the click lands
+      el.onmousedown = function (e) { e.preventDefault(); };
+      return;
+    }
+    el.addEventListener('input', nweApplyFields);
+    el.addEventListener('change', nweApplyFields);
+    // a number box that was empty when it took focus fires no change event when left empty again
+    if (el.type === 'number') el.addEventListener('blur', nweApplyFields);
+  });
+  nweSyncFields();
+  document.getElementById('nweSetBtn').onclick = function () { nweMenuOpen() ? closeNweMenu(false) : openNweMenu(); };
+  // a press or focus anywhere outside the panel closes it, as the compare picker does
+  document.addEventListener('mousedown', function (e) {
+    if (nweMenuOpen() && !e.target.closest('#nweMenu, #nweSetBtn')) closeNweMenu(false);
+  });
+  document.addEventListener('focusin', function (e) {
+    if (nweMenuOpen() && !e.target.closest('#nweMenu, #nweSetBtn')) closeNweMenu(false);
+  });
+  window.addEventListener('resize', function () { if (nweMenuOpen()) placeNweMenu(); });
+}
+// Read-only view of what the main chart draws for the envelope, for the owner's other tools
+// and checks. Always defined; never throws.
+window.KFNwe = {
+  snapshot: function () {
+    var out = { on: false, tf: null, settings: nweDefaults(), lower: [], upper: [], up: [], down: [] };
+    try {
+      out.on = document.getElementById('tNwe').checked;
+      out.tf = nweTf();
+      out.settings = nweSettings(nweKey(out.tf));
+      if (_nweDrawn) {
+        var point = function (p) { return { time: p.time, value: p.value }; };
+        out.lower = _nweDrawn.lower.map(point);
+        out.upper = _nweDrawn.upper.map(point);
+        out.up = _nweDrawn.up.slice();
+        out.down = _nweDrawn.down.slice();
+      }
+    } catch (e) {}
+    return out;
+  }
+};
+
 function redraw() {
   if (!current) return;
   // side by side: the other timeframes' panes follow this chart's ticker and toggles. Laid
@@ -9335,6 +9607,14 @@ function redraw() {
         'Thrust — joint ignition ' + (up ? '▲' : '▼'),
         'On this bar price, volatility AND volume all expanded together (top ~1.5% of bars, local peak). One of them spiking alone never draws this arrow.'));
     });
+  }
+  // NW envelope: two band lines with their own marks, drawn with the settings of the timeframe
+  // on screen. Not drawn while comparing: on the % axis each band would be rebased to its own
+  // first point and no longer sit on price.
+  _nweDrawn = null;
+  if (nweKey(nweTf()) !== _nweFieldsKey) nweSyncFields();   // a timeframe or ticker switch: the boxes follow
+  if (document.getElementById('tNwe').checked && !comparing) {
+    _nweDrawn = drawNwe(mainT, current.candles, nweSettings(nweKey(nweTf())));
   }
 
   var ov = current.overlays;
@@ -9699,7 +9979,7 @@ function redraw() {
 // data for the current combo are auto-skipped. Exit (✕ / Esc) restores your exact
 // toggle selection AND saved view, leaving zero state residue.
 // ===========================================================================
-var TOUR_OVL = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tConfl', 'tDpool', 'tDpoolBlk', 'tGex', 'tUoa', 'tGaps', 'tThrust', 'tOB', 'tOBM', 'tPD'];
+var TOUR_OVL = ['tTrend', 'tSS', 'tProm', 'tSpine', 'tStruct', 'tLevels', 'tConfl', 'tDpool', 'tDpoolBlk', 'tGex', 'tUoa', 'tGaps', 'tThrust', 'tNwe', 'tOB', 'tOBM', 'tPD'];
 var TOUR_ALL = TOUR_OVL.concat(['tLog', 'tMine']);   // full snapshot set so exit restores byte-for-byte
 var TOUR = [
   { toggle: null, name: 'The price', sw: '#26a69a',
@@ -9757,6 +10037,10 @@ var TOUR = [
     lead: "Rare bars where price, volatility, and volume all spike together",
     detail: "Marks a bar where price move, volatility, and volume are ALL far above their own recent norm at the same time — an unusually forceful, high-participation bar. Doesn't predict direction and doesn't mean a new trend is starting — it can show up mid-trend, at a blow-off top, or at a capitulation low. Context, not a signal.",
     tags: [] },
+  { toggle: 'tNwe', name: 'Nadaraya-Watson envelope (NW)', sw: '--cbuy',
+    lead: "A band around a smoothed line of price",
+    detail: "Price near or under the lower band is stretched down; near or over the upper band, stretched up. Each bar's band uses only prices known at that bar, so it never moves later. A band touch is not a signal on its own: in a strong trend price can stay beyond a band.",
+    tags: [{ color: '--cbuy', label: 'green = lower band' }, { color: '--csell', label: 'red = upper band' }] },
   { toggle: 'tOB', name: 'Order blocks — fresh (OB)', sw: '--cbuy',
     lead: "The last bar before an explosive move",
     detail: "A common technical pattern for where a strong move likely launched from — not confirmed institutional footprint. 'Fresh' = price hasn't returned, so it's still untouched.",
@@ -9792,6 +10076,7 @@ function tourPresent() {        // which steps have data for THIS combo (mirrors
     else if (t === 'tUoa') has = !!(ov.uoa && (ov.uoa.strikes || []).length);
     else if (t === 'tGaps') has = (ov.gaps || []).length > 0;
     else if (t === 'tThrust') has = (current.candles || []).filter(function (c) { return c.thrust != null; }).length > 20;
+    else if (t === 'tNwe') has = !!window.NWEnvelope && (current.candles || []).length > 0;   // drawNwe's own gates
     else if (t === 'tOB') has = (ov.orderblocks || []).filter(function (o) { return !o.mitigated; }).length > 0;
     else if (t === 'tOBM') has = (ov.orderblocks || []).filter(function (o) { return o.mitigated; }).length > 0;
     else if (t === 'tPD') has = !!ov.pd;
@@ -9802,6 +10087,7 @@ function tourPresent() {        // which steps have data for THIS combo (mirrors
 
 function startTour() {
   if (!current || _tourActive) return;
+  closeNweMenu(false);   // the envelope settings panel never stays open over the tour
   _tourSaved = {};
   TOUR_ALL.forEach(function (id) { _tourSaved[id] = document.getElementById(id).checked; });
   try { _tourSavedView = localStorage.getItem(VIEW_KEY); } catch (e) { _tourSavedView = null; }
@@ -10096,6 +10382,17 @@ var CHART_LEGEND = [
     intent:'Catch high-conviction joint-ignition bars (breakout/breakdown confirm). Comment: the multiplicative form "spikes only when ALL THREE expand together and is punished if any one is quiet… which an MA of any single series cannot express" (emit_super.py:171-173). Ratios are unitless so they are comparable across symbols and timeframes.',
     caveat:'Viz-only. Needs volume, which lives only in the raw cache; runs ONLY on the *-super build, so per-TF board charts never show thrust. The first 20 bars never get a value. The threshold is purely relative (98.5th percentile of THIS chart), so arrows always appear on a long enough series regardless of absolute magnitude — not edge-validated. The --thr swatch color does NOT match the on-chart green/red arrows.',
     src:['emit_super.py:137-202','emit_super.py:366-375','charts.html:9','charts.html:67','charts.html:796-823'] },
+  // nw has no replay scene, so the legend shows this card's own text (LG2_CARD_TEXT): what,
+  // intent and how as the "How to read it" list, one item per line (\n), and caveat as the
+  // note. Written for a visitor.
+  { id:'nw', name:'Nadaraya-Watson envelope', toggle:'NW · tNwe (off)', colors:['--cbuy','--csell'],
+    plain:'A smoothed line of price with a band below it and a band above it, to show when price is stretched away from that line.',
+    one:'A lower and an upper band around a smoothed line of price, worked out at each bar from the prices known at that bar.',
+    what:'Two lines are drawn: the lower band in green and the upper band in red. Both sit the same distance from a smoothed line of price, and that distance comes from how far price has typically strayed from the smoothed line. The smoothed line itself is not drawn.',
+    how:'Each bar\'s band uses only prices known at that bar, so a band already drawn never moves later. The well-known TradingView version, with its "Repainting Smoothing" setting on, redraws the past, so this one looks different from it: in a steady rise price can sit at the upper band for weeks.\nThe gear button next to the NW toggle sets the bandwidth, the multiplier, the price used and the band width, separately for each timeframe. They start at 17, 2.4, the low of each bar and the narrower band.',
+    intent:'Price near or under the lower band is stretched down. Price near or over the upper band is stretched up.\nAn arrow marks the bar where price first crosses a band: an up arrow under the lower band, a down arrow over the upper band. Bars that stay beyond the band get no further arrow. The price compared with the bands is the one chosen in the settings, the low of each bar to start with.',
+    caveat:'A band touch is not a signal on its own, and in a strong trend price can stay beyond a band. This layer describes price. It is not advice. The layer is off by default.',
+    src:['nwe-envelope.js','charts.html (drawNwe, tNwe wiring)'] },
   { id:'log', name:'Log price scale', toggle:'log · tLog', colors:['--mut'],
     plain:'Flips the up-down axis between percentage spacing and plain-dollar spacing.',
     one:'Toggle the price axis between logarithmic and linear scaling.',
@@ -10181,7 +10478,7 @@ function lg2Unpack(sceneData) {
    replays the engine's stored output on made-up candles (LG2_SCENES_DATA); "On the chart now" draws
    only this layer from the loaded data. */
 var LG2_FAMILIES = [
-  ['Price', ['bars', 'log']],
+  ['Price', ['bars', 'log', 'nw']],
   ['Diagonal lines', ['tl', 'ss', 'sw', 'rr', 'rx']],
   ['Flat levels and zones', ['lv', 'gp', 'cf', 'pd']],
   ['Order-flow footprints', ['ob', 'tob', 'th']],
@@ -10388,6 +10685,10 @@ var LG2_FIX = {
   tob: { plain: 'Order blocks that price has already traded back into, drawn as dashed lines.' },
   th: { plain: 'An arrow on a bar whose price move, range and volume, taken together, rank in the top 1.5% of this chart.' }
 };
+// layers with no replay scene whose CHART_LEGEND card is written for a visitor: the text column
+// shows the card's own what, intent and how as "How to read it" and its caveat as the note
+// (lg2BuildText)
+var LG2_CARD_TEXT = ['nw'];
 
 /* Captions, keyed to each scene's states (states.json, from the engine output). A state's caption
    shows while the frame is at or after the state's k AND its condition holds in this frame's stored
@@ -10997,7 +11298,8 @@ function lg2SetPlaying(on) {
 // the toolbar toggles each code's live screen mirrors: the main chart with only these on draws
 // the same picture (bars and log: candles only; ob falls back to tOBM, see lg2BuildLive)
 var LG2_LIVE = { bars: [], log: [], tl: ['tTrend'], ss: ['tSS'], sw: ['tProm'], rr: ['tSpine'], rx: ['tStruct'],
-                 lv: ['tLevels'], gp: ['tGaps'], cf: ['tConfl'], pd: ['tPD'], ob: ['tOB'], tob: ['tOBM'], th: ['tThrust'] };
+                 lv: ['tLevels'], gp: ['tGaps'], cf: ['tConfl'], pd: ['tPD'], ob: ['tOB'], tob: ['tOBM'], th: ['tThrust'],
+                 nw: ['tNwe'] };
 var LG2_LINE_NAMES = { tl: ['trendline', 'trendlines'], ss: ['super+ line', 'super+ lines'],
                        sw: ['prominent swing line', 'prominent swing lines'], rr: ['role-reversal spine', 'role-reversal spines'] };
 function lg2Count(n, one, many) { return n + ' ' + (n === 1 ? one : many); }
@@ -11116,6 +11418,12 @@ function lg2BuildLive(code) {
     msg = thN == null ? 'This chart carries too little thrust data to rank its bars, so no arrows are drawn.'
         : thN ? ('Thrust bars on this chart: ' + thN + '. Each is in the top 1.5% of bars by thrust and the largest within 3 bars on either side. Up arrows sit below up bars; down arrows, drawn twice the size, above down bars.')
         : 'No thrust bars on this chart right now.';
+  } else if (code === 'nw') {
+    // the starting settings, not the ones kept for this timeframe; hidden while comparing, as redraw() hides it
+    var nwSet = nweDefaults(), nwLive = comparing ? null : drawNwe(T, current.candles, nwSet);
+    if (comparing) msg = 'The envelope is hidden while a comparison is on, as on the main chart.';
+    else msg = nwLive ? ('The envelope on this chart with its starting settings: bandwidth ' + nwSet.bandwidth + ', multiplier ' + nwSet.mult + ', price used: ' + (NWE_SOURCE_NAMES[nwSet.source] || nwSet.source).toLowerCase() + ', band width: ' + (nwSet.width === 'edge' ? 'narrower' : 'wider') + '. Arrows on this chart: ' + nwLive.up.length + ' up, ' + nwLive.down.length + ' down. If you have changed the settings for this timeframe, the main chart draws the bands with yours.')
+                     : 'The envelope could not load, so nothing is drawn. Reload the page to try again.';
   }
   // same window as the main chart, so the two can be compared directly
   var vr = chart && chart.timeScale().getVisibleLogicalRange();
@@ -11160,6 +11468,9 @@ function lg2BuildText(e, spec) {
   add(hd, el('span', 'chip', fix.toggle || e.toggle));
   add(box, hd);
   add(box, el('p', 'plain', fix.plain || e.plain));
+  // no replay, and a card written for a visitor: what it is, how to read it, how it is worked
+  // out, one list item per line of those fields
+  if (!spec && LG2_CARD_TEXT.indexOf(e.id) >= 0) spec = { read: [e.what, e.intent, e.how].join('\n').split('\n'), note: e.caveat };
   if (spec && spec.read) {
     add(box, el('h3', null, 'How to read it'));
     var ul = el('ul');
