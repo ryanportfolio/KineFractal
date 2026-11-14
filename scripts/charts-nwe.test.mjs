@@ -138,7 +138,7 @@ test("settings are kept per timeframe in this browser, and a bad number is refus
   assert.match(fnBody("nweReset"), /delete nweStore\(\)\[nweKey\(nweTf\(\)\)\];/);
   const apply = fnBody("nweApplyFields");
   assert.match(apply, /var ok = text !== '' && nweNumberOk\(v, f\[0\]\);/);
-  assert.match(apply, /nweMark\(f\[0\], ok\);\s*if \(ok\) next\[f\[1\]\] = v;/);
+  assert.match(apply, /nweMark\(f\[0\], ok \|\| retyping\);\s*if \(ok\) next\[f\[1\]\] = v;/);
   assert.match(fnBody("nweMark"), /el\.setAttribute\('aria-invalid', 'true'\)/);
   // run the range check: numbers only, inside the box's own min and max
   const ok = new Function("document", "return function nweNumberOk(v, id) " + fnBody("nweNumberOk"))({
@@ -152,6 +152,89 @@ test("settings are kept per timeframe in this browser, and a bad number is refus
   assert.equal(ok(200.5, "nweBw"), false);
   assert.equal(ok(NaN, "nweBw"), false);
   assert.equal(ok("17", "nweBw"), false, "a number kept as text is not usable");
+});
+
+test("the settings panel comes right after its button in the page, so Tab moves between them in order", () => {
+  // Tab follows the markup: the NW toggle, the settings button, the panel's five controls, then the CF toggle
+  const m = /<input type="checkbox" id="tNwe">[^\n]*<button id="nweSetBtn"[^>]*>[^<]*<\/button><\/span>\s*(?:<!--[\s\S]*?-->\s*)?<div id="nweMenu"[^>]*>([\s\S]*?)<\/div>\s*<label title="[^"]*"><input type="checkbox" id="tConfl"/.exec(html);
+  assert.ok(m, "the panel is the next element after the settings button's group, and the CF toggle follows it");
+  const controls = Array.from(m[1].matchAll(/<(?:input|select|button|a|textarea)\b[^>]*?\bid="([^"]+)"/g), (x) => x[1]);
+  assert.deepEqual(controls, ["nweBw", "nweMult", "nweSrc", "nweWidth", "nweReset"]);
+  assert.doesNotMatch(m[1], /tabindex/, "nothing in the panel changes the Tab order");
+  assert.equal(html.split('<div id="nweMenu"').length, 2, "one panel in the page");
+  // focus landing outside the panel and its button closes the panel, so it is never left open behind
+  assert.match(fnBody("wireNwe"), /document\.addEventListener\('focusin', function \(e\) \{\s*if \(nweMenuOpen\(\) && !e\.target\.closest\('#nweMenu, #nweSetBtn'\)\) closeNweMenu\(false\);\s*\}\);/);
+  // the panel is placed against the window (position:fixed). That holds only while the toolbar around it
+  // does not become the box a fixed element is placed in, and does not clip it.
+  const css = html.slice(0, html.indexOf("</style>"));
+  assert.match(css, /#nweMenu \{ position:fixed; z-index:70;/);
+  const barRules = Array.from(css.matchAll(/(?:^|[\s,}])#bar \{([^}]*)\}/g), (x) => x[1]);
+  assert.ok(barRules.length >= 1, "the toolbar's own rule is found");
+  assert.match(barRules[0], /overflow:visible;/);
+  for (const rule of barRules) {
+    assert.doesNotMatch(rule, /transform|filter|contain|perspective|will-change|clip-path|overflow:(?!visible)|zoom/, "toolbar rule: " + rule.trim());
+  }
+});
+
+test("a number box emptied to retype it shows no error line until the visitor leaves it", () => {
+  const apply = fnBody("nweApplyFields");
+  assert.match(html, /function nweApplyFields\(e\) \{/);
+  assert.match(apply, /var typing = !!e && e\.type === 'input';/);
+  assert.match(apply, /var retyping = text === '' && typing && document\.activeElement === el;/);
+  // the error lines are still announced when they do show
+  assert.match(html, /<p id="nweBwMsg" class="nwe-msg" role="alert" hidden>/);
+  assert.match(html, /<p id="nweMultMsg" class="nwe-msg" role="alert" hidden>/);
+  // leaving a box counts through change, and through blur for a box that was already empty when it
+  // took focus (no change event fires for that one)
+  const wire = fnBody("wireNwe");
+  assert.match(wire, /el\.addEventListener\('input', nweApplyFields\);\s*el\.addEventListener\('change', nweApplyFields\);\s*(?:\/\/[^\n]*\n\s*)*if \(el\.type === 'number'\) el\.addEventListener\('blur', nweApplyFields\);/);
+  // a press on Reset does not take focus out of the box first (the error line would move the button)
+  assert.match(wire, /if \(id === 'nweReset'\) \{\s*el\.onclick = nweReset;\s*(?:\/\/[^\n]*\n\s*)*el\.onmousedown = function \(e\) \{ e\.preventDefault\(\); \};\s*return;\s*\}/);
+
+  // run the function against stand-ins for the page: which boxes get marked, and which value is kept
+  const boxes = {
+    nweBw: { min: "1", max: "200", value: "17" },
+    nweMult: { min: "0", max: "10", value: "2.4" },
+    nweSrc: { value: "low" },
+    nweWidth: { value: "edge" },
+  };
+  const doc = { activeElement: null, getElementById: (id) => boxes[id] };
+  const marks = {};
+  const store = {};
+  const numberOk = new Function("document", "return function nweNumberOk(v, id) " + fnBody("nweNumberOk"))(doc);
+  const applyFields = new Function(
+    "window", "document", "nweKey", "nweTf", "nweSettings", "nweNumberOk", "nweMark", "nweMenuOpen", "placeNweMenu",
+    "nweStore", "nweSaveStore", "current", "redraw", "return function nweApplyFields(e) " + apply,
+  )(
+    { NWEnvelope: { SOURCES: ["low", "close"], WIDTHS: ["edge", "alert"] } }, doc, () => "1d", () => "1d",
+    () => store["1d"] || { bandwidth: 17, mult: 2.4, source: "low", width: "edge" }, numberOk,
+    (id, ok) => { marks[id] = ok; }, () => false, () => {}, () => store, () => {}, null, () => {},
+  );
+  const mult = () => (store["1d"] ? store["1d"].mult : 2.4);
+
+  boxes.nweMult.value = "";
+  doc.activeElement = boxes.nweMult;
+  applyFields({ type: "input" });
+  assert.deepEqual([marks.nweMult, marks.nweBw, mult()], [true, true, 2.4], "emptied and still focused: no error, last good value kept");
+  applyFields({ type: "change" });
+  assert.deepEqual([marks.nweMult, mult()], [false, 2.4], "left empty (change): error, last good value kept");
+  applyFields({ type: "input" });
+  assert.equal(marks.nweMult, true, "typing in it again clears the error while it is empty");
+  applyFields({ type: "blur" });
+  assert.equal(marks.nweMult, false, "left empty (blur): error");
+  doc.activeElement = boxes.nweBw;
+  applyFields({ type: "input" });
+  assert.deepEqual([marks.nweMult, marks.nweBw], [false, true], "typing in another box does not clear an empty box's error");
+  doc.activeElement = boxes.nweMult;
+  boxes.nweMult.value = "50";
+  applyFields({ type: "input" });
+  assert.deepEqual([marks.nweMult, mult()], [false, 2.4], "a value out of range shows the error at once");
+  boxes.nweMult.value = "3";
+  applyFields({ type: "input" });
+  assert.deepEqual([marks.nweMult, mult()], [true, 3], "a usable value applies at once");
+  boxes.nweMult.value = "";
+  applyFields({ type: "input" });
+  assert.deepEqual([marks.nweMult, mult()], [true, 3], "emptied again: no error, 3 stays in use");
 });
 
 test("the bands are two line series with their own marks, hidden while comparing", () => {

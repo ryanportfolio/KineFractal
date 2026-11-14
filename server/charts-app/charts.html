@@ -1238,6 +1238,26 @@
   <label title="unfilled gaps"><input type="checkbox" id="tGaps" checked><span class="swatch" style="background:var(--gap)"></span>GP</label>
   <label title="high-conviction bars: price move, volatility, and volume all spike together"><input type="checkbox" id="tThrust"><span class="swatch" style="background:var(--thr)"></span>TH</label>
   <span id="nweGrp"><label title="A band around a smoothed line of price. Price near or under the lower band is stretched down, and near or over the upper band it is stretched up."><input type="checkbox" id="tNwe"><span class="swatch" style="background:linear-gradient(90deg,var(--cbuy),var(--csell))"></span>NW</label><button id="nweSetBtn" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="nweMenu" aria-label="Envelope settings" title="envelope settings">&#9881;&#xFE0E;</button></span>
+  <!-- The settings panel sits right after its button so that Tab and Shift+Tab move between the
+       toolbar and the panel in order. It is position:fixed, so it takes no room in the toolbar. -->
+  <div id="nweMenu" role="dialog" aria-label="Envelope settings" hidden>
+    <p id="nweFor" class="nwe-note"></p>
+    <label for="nweBw">Bandwidth (how much the price is smoothed)</label>
+    <input id="nweBw" type="number" min="1" max="200" step="0.5" autocomplete="off" aria-describedby="nweBwMsg">
+    <p id="nweBwMsg" class="nwe-msg" role="alert" hidden>Enter a number from 1 to 200. The last good value is still in use.</p>
+    <label for="nweMult">Multiplier (how far the bands sit from the smoothed price)</label>
+    <input id="nweMult" type="number" min="0" max="10" step="0.1" autocomplete="off" aria-describedby="nweMultMsg">
+    <p id="nweMultMsg" class="nwe-msg" role="alert" hidden>Enter a number from 0 to 10. The last good value is still in use.</p>
+    <label for="nweSrc">Price used</label>
+    <select id="nweSrc"></select>
+    <label for="nweWidth">Band width</label>
+    <select id="nweWidth" aria-describedby="nweWidthNote">
+      <option value="edge">Narrower band</option>
+      <option value="alert">Wider band</option>
+    </select>
+    <p id="nweWidthNote" class="nwe-note">Narrower is what the right-hand edge of the TradingView chart shows each day. Wider is what the TradingView alert uses.</p>
+    <button id="nweReset" type="button">Reset to defaults</button>
+  </div>
   <label title="confluence zones"><input type="checkbox" id="tConfl" checked><span class="swatch" style="background:var(--cbuy)"></span>CF</label>
   <label title="order blocks (fresh / unmitigated)"><input type="checkbox" id="tOB" checked><span class="swatch" style="background:var(--cbuy)"></span>OB</label>
   <label title="tested / mitigated order blocks"><input type="checkbox" id="tOBM"><span class="swatch" style="background:var(--mut)"></span>tOB</label>
@@ -1343,24 +1363,6 @@
 <div id="cmpMenu" role="dialog" aria-label="Compare a ticker" hidden>
   <input id="cmpFind" placeholder="find ticker" maxlength="40" autocomplete="off" aria-label="Find a ticker to compare">
   <div id="cmpList"></div>
-</div>
-<div id="nweMenu" role="dialog" aria-label="Envelope settings" hidden>
-  <p id="nweFor" class="nwe-note"></p>
-  <label for="nweBw">Bandwidth (how much the price is smoothed)</label>
-  <input id="nweBw" type="number" min="1" max="200" step="0.5" autocomplete="off" aria-describedby="nweBwMsg">
-  <p id="nweBwMsg" class="nwe-msg" role="alert" hidden>Enter a number from 1 to 200. The last good value is still in use.</p>
-  <label for="nweMult">Multiplier (how far the bands sit from the smoothed price)</label>
-  <input id="nweMult" type="number" min="0" max="10" step="0.1" autocomplete="off" aria-describedby="nweMultMsg">
-  <p id="nweMultMsg" class="nwe-msg" role="alert" hidden>Enter a number from 0 to 10. The last good value is still in use.</p>
-  <label for="nweSrc">Price used</label>
-  <select id="nweSrc"></select>
-  <label for="nweWidth">Band width</label>
-  <select id="nweWidth" aria-describedby="nweWidthNote">
-    <option value="edge">Narrower band</option>
-    <option value="alert">Wider band</option>
-  </select>
-  <p id="nweWidthNote" class="nwe-note">Narrower is what the right-hand edge of the TradingView chart shows each day. Wider is what the TradingView alert uses.</p>
-  <button id="nweReset" type="button">Reset to defaults</button>
 </div>
 <div id="msg"></div>
 <div id="legend2" role="dialog" aria-modal="true" aria-labelledby="lg2Title">
@@ -9447,16 +9449,20 @@ function nweSyncFields() {
     : 'These settings are for ' + key + ' charts. Each timeframe keeps its own.';
 }
 // a box changed: every usable value applies at once; an empty, non-numeric or out-of-range
-// number is refused, its box is marked and the last good value stays in force and drawn
-function nweApplyFields() {
+// number is refused, its box is marked and the last good value stays in force and drawn.
+// A box emptied to retype its number is not marked while it still has focus: the error line
+// (which screen readers announce) waits until the visitor leaves the box empty.
+function nweApplyFields(e) {
   var L = window.NWEnvelope;
   if (!L) return;
   var key = nweKey(nweTf()), cur = nweSettings(key);
   var next = { bandwidth: cur.bandwidth, mult: cur.mult, source: cur.source, width: cur.width };
+  var typing = !!e && e.type === 'input';   // not change or blur: the visitor has not left the box
   [['nweBw', 'bandwidth'], ['nweMult', 'mult']].forEach(function (f) {
-    var text = document.getElementById(f[0]).value.trim(), v = Number(text);   // '' when the box holds no number
+    var el = document.getElementById(f[0]), text = el.value.trim(), v = Number(text);   // '' when the box holds no number
     var ok = text !== '' && nweNumberOk(v, f[0]);
-    nweMark(f[0], ok);
+    var retyping = text === '' && typing && document.activeElement === el;
+    nweMark(f[0], ok || retyping);
     if (ok) next[f[1]] = v;
   });
   var src = document.getElementById('nweSrc').value, width = document.getElementById('nweWidth').value;
@@ -9508,9 +9514,17 @@ function wireNwe() {
   ['nweBw', 'nweMult', 'nweSrc', 'nweWidth', 'nweReset'].forEach(function (id) {
     var el = document.getElementById(id);
     if (!L) { el.disabled = true; return; }   // no math file: nothing to set
-    if (id === 'nweReset') { el.onclick = nweReset; return; }
+    if (id === 'nweReset') {
+      el.onclick = nweReset;
+      // a press on Reset leaves focus where it is: taking it out of an emptied number box would show
+      // that box's error line first, which moves this button from under the pointer before the click lands
+      el.onmousedown = function (e) { e.preventDefault(); };
+      return;
+    }
     el.addEventListener('input', nweApplyFields);
     el.addEventListener('change', nweApplyFields);
+    // a number box that was empty when it took focus fires no change event when left empty again
+    if (el.type === 'number') el.addEventListener('blur', nweApplyFields);
   });
   nweSyncFields();
   document.getElementById('nweSetBtn').onclick = function () { nweMenuOpen() ? closeNweMenu(false) : openNweMenu(); };
