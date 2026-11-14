@@ -75,7 +75,10 @@ async function readLocalChartsHtml(): Promise<string | null> {
     // The page asks for legend-scenes.js?v=<content hash>; that URL changes whenever the file
     // does, so the route can mark a matching request immutable.
     const scenes = await readLocalLegendScenes();
-    localChartsHtml = scenes == null ? html : html.split(LEGEND_SCENES_TOKEN).join(legendScenesVersion(scenes));
+    const page = scenes == null ? html : html.split(LEGEND_SCENES_TOKEN).join(legendScenesVersion(scenes));
+    // Same for the envelope's math file, which the page loads with a script tag.
+    const nwe = await readLocalNweEnvelope();
+    localChartsHtml = nwe == null ? page : page.split(NWE_ENVELOPE_TOKEN).join(nwe.version);
   } catch {
     localChartsHtml = null; // absent -> 503
   }
@@ -102,6 +105,22 @@ async function readLocalLegendScenes(): Promise<string | null> {
     localLegendScenes = null; // absent -> 404
   }
   return localLegendScenes;
+}
+
+// The Nadaraya-Watson envelope's math (the NW toggle on the chart page), bundled next to the
+// page document. Read once; its version is the first 16 hex digits of the file's sha256.
+const NWE_ENVELOPE_TOKEN = "__NWE_ENVELOPE_VERSION__";
+const LOCAL_NWE_ENVELOPE_PATH = path.resolve(process.cwd(), "server/charts-app/nwe-envelope.js");
+let localNweEnvelope: { body: string; version: string } | null | undefined;
+async function readLocalNweEnvelope(): Promise<{ body: string; version: string } | null> {
+  if (localNweEnvelope !== undefined) return localNweEnvelope;
+  try {
+    const body = await readFile(LOCAL_NWE_ENVELOPE_PATH, "utf8");
+    localNweEnvelope = { body, version: createHash("sha256").update(body).digest("hex").slice(0, 16) };
+  } catch {
+    localNweEnvelope = null; // absent -> 404
+  }
+  return localNweEnvelope;
 }
 
 // charts.html is one big inline <script> app, so the helmet production CSP
@@ -237,6 +256,27 @@ export function registerFearlabChartsRoutes(app: Express): void {
     } catch (error: any) {
       console.error("[FearLab charts] legend data route error:", error?.message ?? error);
       res.status(500).json({ error: "Failed to load legend data" });
+    }
+  });
+
+  // The envelope's math file (see readLocalNweEnvelope), cached like the legend data: a request
+  // for the current ?v=<content hash> is immutable for a year, any other URL revalidates.
+  app.get("/charts/nwe-envelope.js", async (req: Request, res: Response) => {
+    try {
+      const file = await readLocalNweEnvelope();
+      if (file == null) {
+        res.set("Cache-Control", "no-store");
+        res.status(404).json({ error: "not found" });
+        return;
+      }
+      res.set("Content-Type", "text/javascript; charset=utf-8");
+      res.set("Cache-Control", req.query.v === file.version
+        ? "public, max-age=31536000, immutable"
+        : CHARTS_DOCUMENT_CACHE);
+      res.send(file.body);
+    } catch (error: any) {
+      console.error("[FearLab charts] envelope script route error:", error?.message ?? error);
+      res.status(500).json({ error: "Failed to load the envelope script" });
     }
   });
 
